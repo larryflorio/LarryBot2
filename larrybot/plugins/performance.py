@@ -12,11 +12,15 @@ from telegram.ext import ContextTypes
 
 from larrybot.core.performance import get_performance_collector, track_performance
 from larrybot.core.dependency_injection import ServiceLocator
-from larrybot.utils.ux_helpers import (
-    escape_markdown_v2, 
-    format_standardized_error,
-    performance_monitor
-)
+from larrybot.utils.ux_helpers import performance_monitor
+from larrybot.core.exceptions import format_standardized_error
+
+def escape_markdown_v2(text: str) -> str:
+    """Escape MarkdownV2 special characters."""
+    special_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+    for char in special_chars:
+        text = text.replace(char, f'\\{char}')
+    return text
 import logging
 
 logger = logging.getLogger(__name__)
