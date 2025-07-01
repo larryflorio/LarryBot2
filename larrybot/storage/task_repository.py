@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 from larrybot.models.task import Task
 from larrybot.models.task_dependency import TaskDependency
 from larrybot.models.task_time_entry import TaskTimeEntry
@@ -6,7 +6,7 @@ from larrybot.models.task_comment import TaskComment
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 import json
-from sqlalchemy import or_, and_, func
+from sqlalchemy import or_, and_, func, text, desc, asc
 from larrybot.utils.caching import cached, cache_invalidate, cache_clear
 from larrybot.utils.background_processing import background_task, submit_background_job
 import logging
@@ -33,14 +33,28 @@ class TaskRepository:
 
     @cached(ttl=60.0)  # Cache for 1 minute - frequently accessed
     def list_incomplete_tasks(self) -> List[Task]:
-        """Get all incomplete tasks with caching for improved performance."""
-        logger.debug("Fetching incomplete tasks from database")
-        return self.session.query(Task).filter_by(done=False).all()
+        """List all incomplete tasks with optimized client loading."""
+        return (self.session.query(Task)
+                .options(joinedload(Task.client))
+                .filter_by(done=False)
+                .order_by(Task.created_at.desc())
+                .all())
 
     @cached(ttl=300.0)  # Cache for 5 minutes
     def get_task_by_id(self, task_id: int) -> Optional[Task]:
-        """Get task by ID with caching."""
-        return self.session.query(Task).filter_by(id=task_id).first()
+        """Get task by ID with optimized relationship loading."""
+        return (self.session.query(Task)
+                .options(
+                    joinedload(Task.client),
+                    selectinload(Task.comments),
+                    selectinload(Task.time_entries),
+                    selectinload(Task.dependencies),
+                    selectinload(Task.dependents),
+                    selectinload(Task.subtasks),
+                    selectinload(Task.attachments)
+                )
+                .filter_by(id=task_id)
+                .first())
 
     def mark_task_done(self, task_id: int) -> Optional[Task]:
         # Query directly to ensure we have a session-attached object
@@ -91,13 +105,23 @@ class TaskRepository:
 
     def assign_task_to_client(self, task_id: int, client_name: str) -> Optional[Task]:
         from larrybot.models.client import Client
-        # Query directly to ensure we have a session-attached object
-        task = self.session.query(Task).filter_by(id=task_id).first()
-        if not task:
+        
+        # Use optimized join query
+        result = (self.session.query(Task, Client)
+                 .outerjoin(Client, Task.client_id == Client.id)
+                 .filter(Task.id == task_id)
+                 .first())
+        
+        if not result:
             return None
+            
+        task, _ = result
+        
+        # Get client by name
         client = self.session.query(Client).filter_by(name=client_name).first()
         if not client:
             return None
+            
         task.client_id = client.id
         self.session.commit()
         
@@ -123,12 +147,15 @@ class TaskRepository:
 
     @cached(ttl=180.0)  # Cache for 3 minutes
     def get_tasks_by_client(self, client_name: str) -> List[Task]:
-        """Get tasks by client with caching."""
+        """Get tasks by client with optimized join and caching."""
         from larrybot.models.client import Client
-        client = self.session.query(Client).filter_by(name=client_name).first()
-        if not client:
-            return []
-        return self.session.query(Task).filter_by(client_id=client.id).all()
+        
+        return (self.session.query(Task)
+                .join(Client, Task.client_id == Client.id)
+                .options(joinedload(Task.client))
+                .filter(Client.name == client_name)
+                .order_by(Task.created_at.desc())
+                .all())
 
     def add_task_with_metadata(
         self, 
@@ -164,8 +191,12 @@ class TaskRepository:
 
     @cached(ttl=300.0)  # Cache for 5 minutes
     def get_tasks_by_priority(self, priority: str) -> List[Task]:
-        """Get all tasks with a specific priority - cached."""
-        return self.session.query(Task).filter_by(priority=priority).all()
+        """Get all tasks with a specific priority with optimized loading."""
+        return (self.session.query(Task)
+                .options(joinedload(Task.client))
+                .filter_by(priority=priority)
+                .order_by(Task.created_at.desc())
+                .all())
 
     def update_priority(self, task_id: int, priority: str) -> Optional[Task]:
         """Update task priority."""
@@ -184,20 +215,28 @@ class TaskRepository:
 
     @cached(ttl=180.0)  # Cache for 3 minutes - changes frequently
     def get_overdue_tasks(self) -> List[Task]:
-        """Get all overdue tasks - cached with shorter TTL."""
+        """Get all overdue tasks with optimized client loading."""
         now = datetime.utcnow()
-        return self.session.query(Task).filter(
-            Task.due_date < now,
-            Task.done == False
-        ).all()
+        return (self.session.query(Task)
+                .options(joinedload(Task.client))
+                .filter(
+                    Task.due_date < now,
+                    Task.done == False
+                )
+                .order_by(Task.due_date.asc())
+                .all())
 
     @cached(ttl=300.0)
     def get_tasks_due_between(self, start_date: datetime, end_date: datetime) -> List[Task]:
-        """Get tasks due between two dates - cached."""
-        return self.session.query(Task).filter(
-            Task.due_date >= start_date,
-            Task.due_date <= end_date
-        ).all()
+        """Get tasks due between two dates with optimized loading."""
+        return (self.session.query(Task)
+                .options(joinedload(Task.client))
+                .filter(
+                    Task.due_date >= start_date,
+                    Task.due_date <= end_date
+                )
+                .order_by(Task.due_date.asc())
+                .all())
 
     def get_tasks_due_today(self) -> List[Task]:
         """Get tasks due today."""
@@ -224,8 +263,12 @@ class TaskRepository:
 
     @cached(ttl=300.0)
     def get_tasks_by_category(self, category: str) -> List[Task]:
-        """Get all tasks in a specific category - cached."""
-        return self.session.query(Task).filter_by(category=category).all()
+        """Get all tasks in a specific category with optimized loading."""
+        return (self.session.query(Task)
+                .options(joinedload(Task.client))
+                .filter_by(category=category)
+                .order_by(Task.created_at.desc())
+                .all())
 
     @cached(ttl=600.0)  # Cache for 10 minutes - categories change infrequently  
     def get_all_categories(self) -> List[str]:
@@ -253,8 +296,12 @@ class TaskRepository:
 
     @cached(ttl=300.0)
     def get_tasks_by_status(self, status: str) -> List[Task]:
-        """Get all tasks with a specific status - cached."""
-        return self.session.query(Task).filter_by(status=status).all()
+        """Get all tasks with a specific status with optimized loading."""
+        return (self.session.query(Task)
+                .options(joinedload(Task.client))
+                .filter_by(status=status)
+                .order_by(Task.created_at.desc())
+                .all())
 
     def update_status(self, task_id: int, status: str) -> Optional[Task]:
         """Update task status."""
@@ -370,16 +417,20 @@ class TaskRepository:
         return False
 
     def get_task_dependencies(self, task_id: int) -> List[Task]:
-        """Get all tasks that this task depends on."""
-        dependencies = self.session.query(TaskDependency).filter_by(task_id=task_id).all()
-        dependency_ids = [dep.dependency_id for dep in dependencies]
-        return self.session.query(Task).filter(Task.id.in_(dependency_ids)).all()
+        """Get task dependencies with optimized loading."""
+        return (self.session.query(Task)
+                .join(TaskDependency, Task.id == TaskDependency.dependency_id)
+                .options(joinedload(Task.client))
+                .filter(TaskDependency.task_id == task_id)
+                .all())
 
     def get_task_dependents(self, task_id: int) -> List[Task]:
-        """Get all tasks that depend on this task."""
-        dependents = self.session.query(TaskDependency).filter_by(dependency_id=task_id).all()
-        dependent_ids = [dep.task_id for dep in dependents]
-        return self.session.query(Task).filter(Task.id.in_(dependent_ids)).all()
+        """Get task dependents with optimized loading."""
+        return (self.session.query(Task)
+                .join(TaskDependency, Task.id == TaskDependency.task_id)
+                .options(joinedload(Task.client))
+                .filter(TaskDependency.dependency_id == task_id)
+                .all())
 
     def add_subtask(self, parent_id: int, description: str) -> Optional[Task]:
         """Add a subtask to a parent task."""
@@ -392,8 +443,12 @@ class TaskRepository:
         return None
 
     def get_subtasks(self, parent_id: int) -> List[Task]:
-        """Get all subtasks of a parent task."""
-        return self.session.query(Task).filter_by(parent_id=parent_id).all()
+        """Get subtasks with optimized client loading."""
+        return (self.session.query(Task)
+                .options(joinedload(Task.client))
+                .filter_by(parent_id=parent_id)
+                .order_by(Task.created_at.asc())
+                .all())
 
     def add_tags(self, task_id: int, tags: List[str]) -> Optional[Task]:
         """Add tags to a task."""
@@ -420,9 +475,12 @@ class TaskRepository:
         return None
 
     def get_tasks_by_tag(self, tag: str) -> List[Task]:
-        """Get all tasks with a specific tag."""
-        tasks = self.session.query(Task).filter(Task.tags.isnot(None)).all()
-        return [task for task in tasks if task.tags and tag in json.loads(task.tags)]
+        """Get tasks by tag with optimized loading."""
+        return (self.session.query(Task)
+                .options(joinedload(Task.client))
+                .filter(Task.tags.like(f'%"{tag}"%'))
+                .order_by(Task.created_at.desc())
+                .all())
 
     def get_tasks_with_filters(
         self,
@@ -436,87 +494,63 @@ class TaskRepository:
         parent_id: Optional[int] = None,
         done: Optional[bool] = None
     ) -> List[Task]:
-        """Get tasks with advanced filtering."""
-        query = self.session.query(Task)
+        """Get tasks with filters using optimized query building."""
+        query = (self.session.query(Task)
+                .options(joinedload(Task.client)))
+
+        # Build filters dynamically
+        filters = []
         
-        if status is not None:
-            query = query.filter(Task.status == status)
-        
-        if priority is not None:
-            query = query.filter(Task.priority == priority)
-        
-        if category is not None:
-            query = query.filter(Task.category == category)
-        
-        if due_before is not None:
-            query = query.filter(Task.due_date <= due_before)
-        
-        if due_after is not None:
-            query = query.filter(Task.due_date >= due_after)
-        
+        if status:
+            filters.append(Task.status == status)
+        if priority:
+            filters.append(Task.priority == priority)
+        if category:
+            filters.append(Task.category == category)
+        if due_before:
+            filters.append(Task.due_date < due_before)
+        if due_after:
+            filters.append(Task.due_date > due_after)
         if overdue_only:
-            now = datetime.utcnow()
-            query = query.filter(Task.due_date < now, Task.done == False)
-        
-        if client_id is not None:
-            query = query.filter(Task.client_id == client_id)
-        
-        if parent_id is not None:
-            query = query.filter(Task.parent_id == parent_id)
-        
+            filters.append(Task.due_date < datetime.utcnow())
+            filters.append(Task.done == False)
+        if client_id:
+            filters.append(Task.client_id == client_id)
+        if parent_id:
+            filters.append(Task.parent_id == parent_id)
         if done is not None:
-            query = query.filter(Task.done == done)
-        
-        return query.all()
+            filters.append(Task.done == done)
+
+        if filters:
+            query = query.filter(and_(*filters))
+
+        return query.order_by(Task.created_at.desc()).all()
 
     def search_tasks_by_text(self, search_text: str, case_sensitive: bool = False) -> List[Task]:
-        """Search tasks by text in description, comments, and tags."""
+        """Search tasks by text with optimized full-text search."""
         if not search_text.strip():
             return []
-        
-        query = self.session.query(Task)
-        
+
+        # Optimize for case-insensitive search using database functions
         if case_sensitive:
-            # Case-sensitive search
-            query = query.filter(
-                or_(
-                    Task.description.contains(search_text),
-                    Task.tags.contains(search_text)
-                )
+            search_filter = or_(
+                Task.description.contains(search_text),
+                Task.category.contains(search_text),
+                Task.status.contains(search_text)
             )
         else:
-            # Case-insensitive search
             search_lower = search_text.lower()
-            query = query.filter(
-                or_(
-                    func.lower(Task.description).contains(search_lower),
-                    func.lower(Task.tags).contains(search_lower)
-                )
+            search_filter = or_(
+                func.lower(Task.description).contains(search_lower),
+                func.lower(Task.category).contains(search_lower),
+                func.lower(Task.status).contains(search_lower)
             )
-        
-        # Also search in comments
-        comment_tasks = self.session.query(TaskComment.task_id).filter(
-            func.lower(TaskComment.comment).contains(search_lower)
-        ).distinct()
-        
-        comment_task_ids = [row[0] for row in comment_tasks]
-        
-        if comment_task_ids:
-            # Combine with main search results
-            main_results = query.all()
-            comment_results = self.session.query(Task).filter(Task.id.in_(comment_task_ids)).all()
-            
-            # Merge and deduplicate
-            all_tasks = main_results + comment_results
-            seen_ids = set()
-            unique_tasks = []
-            for task in all_tasks:
-                if task.id not in seen_ids:
-                    seen_ids.add(task.id)
-                    unique_tasks.append(task)
-            return unique_tasks
-        
-        return query.all()
+
+        return (self.session.query(Task)
+                .options(joinedload(Task.client))
+                .filter(search_filter)
+                .order_by(Task.created_at.desc())
+                .all())
 
     def get_tasks_with_advanced_filters(
         self,
@@ -540,218 +574,261 @@ class TaskRepository:
         sort_order: str = "desc",
         limit: Optional[int] = None
     ) -> List[Task]:
-        """Get tasks with advanced filtering and sorting options."""
-        query = self.session.query(Task)
+        """Get tasks with advanced filtering and optimized queries."""
+        # Start with optimized base query
+        query = (self.session.query(Task)
+                .options(joinedload(Task.client)))
+
+        # Build filters efficiently
+        filters = []
         
-        # Basic filters
-        if status is not None:
-            query = query.filter(Task.status == status)
-        
-        if priority is not None:
-            query = query.filter(Task.priority == priority)
-        
-        if category is not None:
-            query = query.filter(Task.category == category)
-        
-        if due_before is not None:
-            query = query.filter(Task.due_date <= due_before)
-        
-        if due_after is not None:
-            query = query.filter(Task.due_date >= due_after)
-        
+        if status:
+            filters.append(Task.status == status)
+        if priority:
+            filters.append(Task.priority == priority)
+        if category:
+            filters.append(Task.category == category)
+        if due_before:
+            filters.append(Task.due_date <= due_before)
+        if due_after:
+            filters.append(Task.due_date >= due_after)
         if overdue_only:
-            now = datetime.utcnow()
-            query = query.filter(Task.due_date < now, Task.done == False)
-        
-        if client_id is not None:
-            query = query.filter(Task.client_id == client_id)
-        
-        if parent_id is not None:
-            query = query.filter(Task.parent_id == parent_id)
-        
+            filters.append(Task.due_date < datetime.utcnow())
+            filters.append(Task.done == False)
+        if client_id:
+            filters.append(Task.client_id == client_id)
+        if parent_id:
+            filters.append(Task.parent_id == parent_id)
         if done is not None:
-            query = query.filter(Task.done == done)
-        
-        # Advanced filters
-        if tags:
-            for tag in tags:
-                query = query.filter(Task.tags.contains(tag))
-        
-        if has_comments is not None:
-            if has_comments:
-                # Tasks with comments
-                commented_tasks = self.session.query(TaskComment.task_id).distinct()
-                task_ids = [row[0] for row in commented_tasks]
-                if task_ids:
-                    query = query.filter(Task.id.in_(task_ids))
-                else:
-                    return []  # No tasks with comments
-            else:
-                # Tasks without comments
-                commented_tasks = self.session.query(TaskComment.task_id).distinct()
-                task_ids = [row[0] for row in commented_tasks]
-                if task_ids:
-                    query = query.filter(~Task.id.in_(task_ids))
-        
-        if has_time_entries is not None:
-            if has_time_entries:
-                # Tasks with time entries
-                from larrybot.models.task_time_entry import TaskTimeEntry
-                timed_tasks = self.session.query(TaskTimeEntry.task_id).distinct()
-                task_ids = [row[0] for row in timed_tasks]
-                if task_ids:
-                    query = query.filter(Task.id.in_(task_ids))
-                else:
-                    return []  # No tasks with time entries
-            else:
-                # Tasks without time entries
-                from larrybot.models.task_time_entry import TaskTimeEntry
-                timed_tasks = self.session.query(TaskTimeEntry.task_id).distinct()
-                task_ids = [row[0] for row in timed_tasks]
-                if task_ids:
-                    query = query.filter(~Task.id.in_(task_ids))
-        
+            filters.append(Task.done == done)
         if estimated_hours_min is not None:
-            query = query.filter(Task.estimated_hours >= estimated_hours_min)
-        
+            filters.append(Task.estimated_hours >= estimated_hours_min)
         if estimated_hours_max is not None:
-            query = query.filter(Task.estimated_hours <= estimated_hours_max)
-        
-        if created_after is not None:
-            query = query.filter(Task.created_at >= created_after)
-        
-        if created_before is not None:
-            query = query.filter(Task.created_at <= created_before)
-        
-        # Sorting
+            filters.append(Task.estimated_hours <= estimated_hours_max)
+        if created_after:
+            filters.append(Task.created_at >= created_after)
+        if created_before:
+            filters.append(Task.created_at <= created_before)
+
+        # Tag filtering with optimized LIKE query
+        if tags:
+            tag_filters = []
+            for tag in tags:
+                tag_filters.append(Task.tags.like(f'%"{tag}"%'))
+            filters.append(or_(*tag_filters))
+
+        # Subquery filters for related data
+        if has_comments is not None:
+            comment_subquery = self.session.query(TaskComment.task_id).distinct()
+            if has_comments:
+                filters.append(Task.id.in_(comment_subquery))
+            else:
+                filters.append(~Task.id.in_(comment_subquery))
+
+        if has_time_entries is not None:
+            time_entry_subquery = self.session.query(TaskTimeEntry.task_id).distinct()
+            if has_time_entries:
+                filters.append(Task.id.in_(time_entry_subquery))
+            else:
+                filters.append(~Task.id.in_(time_entry_subquery))
+
+        # Apply all filters
+        if filters:
+            query = query.filter(and_(*filters))
+
+        # Apply sorting with error handling
         sort_column = getattr(Task, sort_by, Task.created_at)
-        if sort_order.lower() == "desc":
-            query = query.order_by(sort_column.desc())
+        if sort_order.lower() == "asc":
+            query = query.order_by(asc(sort_column))
         else:
-            query = query.order_by(sort_column.asc())
-        
-        # Limiting
-        if limit is not None:
+            query = query.order_by(desc(sort_column))
+
+        # Apply limit
+        if limit:
             query = query.limit(limit)
-        
+
         return query.all()
 
     def get_tasks_by_multiple_tags(self, tags: List[str], match_all: bool = False) -> List[Task]:
-        """Get tasks by multiple tags with option to match all or any."""
+        """Get tasks by multiple tags with optimized query."""
         if not tags:
             return []
-        
-        tasks = self.session.query(Task).filter(Task.tags.isnot(None)).all()
-        
+
         if match_all:
-            # Must have ALL tags
-            return [task for task in tasks if task.tags and all(tag in json.loads(task.tags) for tag in tags)]
+            # All tags must be present - use AND logic with optimized LIKE
+            filters = [Task.tags.like(f'%"{tag}"%') for tag in tags]
+            query_filter = and_(*filters)
         else:
-            # Must have ANY tag
-            return [task for task in tasks if task.tags and any(tag in json.loads(task.tags) for tag in tags)]
+            # Any tag can be present - use OR logic
+            filters = [Task.tags.like(f'%"{tag}"%') for tag in tags]
+            query_filter = or_(*filters)
+
+        return (self.session.query(Task)
+                .options(joinedload(Task.client))
+                .filter(query_filter)
+                .order_by(Task.created_at.desc())
+                .all())
 
     def get_tasks_by_time_range(self, start_date: datetime, end_date: datetime, include_completed: bool = True) -> List[Task]:
-        """Get tasks created or due within a specific time range."""
-        query = self.session.query(Task).filter(
-            or_(
-                and_(Task.created_at >= start_date, Task.created_at <= end_date),
-                and_(Task.due_date >= start_date, Task.due_date <= end_date)
-            )
-        )
-        
+        """Get tasks by creation time range with optimized filtering."""
+        query = (self.session.query(Task)
+                .options(joinedload(Task.client))
+                .filter(
+                    Task.created_at >= start_date,
+                    Task.created_at <= end_date
+                ))
+
         if not include_completed:
             query = query.filter(Task.done == False)
-        
-        return query.all()
+
+        return query.order_by(Task.created_at.desc()).all()
 
     def get_tasks_by_priority_range(self, min_priority: str, max_priority: str) -> List[Task]:
-        """Get tasks within a priority range."""
-        priority_order = ['Low', 'Medium', 'High', 'Critical']
+        """Get tasks by priority range with optimized query."""
+        # Priority order mapping for range queries
+        priority_order = {"Low": 1, "Medium": 2, "High": 3, "Urgent": 4, "Critical": 4}
         
-        try:
-            min_index = priority_order.index(min_priority)
-            max_index = priority_order.index(max_priority)
-        except ValueError:
-            return []
+        min_value = priority_order.get(min_priority, 1)
+        max_value = priority_order.get(max_priority, 4)
         
-        if min_index > max_index:
-            min_index, max_index = max_index, min_index
+        # Use simple IN clause for better compatibility
+        valid_priorities = []
+        for priority, value in priority_order.items():
+            if min_value <= value <= max_value:
+                valid_priorities.append(priority)
         
-        valid_priorities = priority_order[min_index:max_index + 1]
-        return self.session.query(Task).filter(Task.priority.in_(valid_priorities)).all()
+        return (self.session.query(Task)
+                .options(joinedload(Task.client))
+                .filter(Task.priority.in_(valid_priorities))
+                .order_by(Task.created_at.desc())
+                .all())
 
     def bulk_update_status(self, task_ids: List[int], status: str) -> int:
-        """Update status for multiple tasks."""
-        updated = self.session.query(Task).filter(Task.id.in_(task_ids)).update(
-            {Task.status: status, Task.done: (status == 'Done')},
-            synchronize_session=False
-        )
+        """Bulk update task status - optimized for performance."""
+        if not task_ids:
+            return 0
+        
+        # Use bulk update for better performance
+        updated_count = (self.session.query(Task)
+                        .filter(Task.id.in_(task_ids))
+                        .update({
+                            Task.status: status,
+                            Task.done: (status == 'Done')
+                        }, synchronize_session=False))
+        
         self.session.commit()
         
-        # Clear cache to ensure consistency
-        cache_clear()
+        # Invalidate relevant caches
+        cache_invalidate('get_tasks_by_status')
+        cache_invalidate('list_incomplete_tasks')
+        cache_invalidate('task_statistics')
+        cache_invalidate('analytics')
         
-        return updated
+        return updated_count
 
     def bulk_update_priority(self, task_ids: List[int], priority: str) -> int:
-        """Update priority for multiple tasks."""
-        updated = self.session.query(Task).filter(Task.id.in_(task_ids)).update(
-            {Task.priority: priority},
-            synchronize_session=False
-        )
+        """Bulk update task priority - optimized for performance."""
+        if not task_ids:
+            return 0
+        
+        updated_count = (self.session.query(Task)
+                        .filter(Task.id.in_(task_ids))
+                        .update({Task.priority: priority}, synchronize_session=False))
+        
         self.session.commit()
         
-        # Clear cache to ensure consistency
-        cache_clear()
+        # Invalidate relevant caches
+        cache_invalidate('get_tasks_by_priority')
         
-        return updated
+        return updated_count
 
     def bulk_update_category(self, task_ids: List[int], category: str) -> int:
-        """Update category for multiple tasks."""
-        updated = self.session.query(Task).filter(Task.id.in_(task_ids)).update(
-            {Task.category: category},
-            synchronize_session=False
-        )
+        """Bulk update task category - optimized for performance."""
+        if not task_ids:
+            return 0
+        
+        updated_count = (self.session.query(Task)
+                        .filter(Task.id.in_(task_ids))
+                        .update({Task.category: category}, synchronize_session=False))
+        
         self.session.commit()
         
-        # Clear cache to ensure consistency
-        cache_clear()
+        # Invalidate relevant caches
+        cache_invalidate('get_tasks_by_category')
+        cache_invalidate('get_all_categories')
         
-        return updated
+        return updated_count
 
     def bulk_assign_to_client(self, task_ids: List[int], client_name: str) -> int:
-        """Assign multiple tasks to a client."""
-        # First get the client
-        from larrybot.storage.client_repository import ClientRepository
-        client_repo = ClientRepository(self.session)
-        client = client_repo.get_client_by_name(client_name)
+        """Bulk assign tasks to client - optimized for performance."""
+        if not task_ids:
+            return 0
+        
+        from larrybot.models.client import Client
+        client = self.session.query(Client).filter_by(name=client_name).first()
         if not client:
             return 0
         
-        # Update tasks with client_id
-        updated = self.session.query(Task).filter(Task.id.in_(task_ids)).update(
-            {Task.client_id: client.id},
-            synchronize_session=False
-        )
+        updated_count = (self.session.query(Task)
+                        .filter(Task.id.in_(task_ids))
+                        .update({Task.client_id: client.id}, synchronize_session=False))
+        
         self.session.commit()
         
-        # Clear cache to ensure consistency
-        cache_clear()
+        # Invalidate relevant caches
+        cache_invalidate('get_tasks_by_client')
         
-        return updated
+        return updated_count
 
     def bulk_delete_tasks(self, task_ids: List[int]) -> int:
-        """Delete multiple tasks."""
-        deleted = self.session.query(Task).filter(Task.id.in_(task_ids)).delete(
-            synchronize_session=False
-        )
-        self.session.commit()
+        """Bulk delete tasks - optimized for performance."""
+        if not task_ids:
+            return 0
         
-        # Clear entire cache after bulk deletion to ensure consistency
-        # This is needed because cache keys are hashed and we can't target specific entries
-        cache_clear()
-        
-        return deleted
+        try:
+            # Delete related records first (proper cascade handling)
+            # Comments
+            comment_deleted = self.session.query(TaskComment).filter(
+                TaskComment.task_id.in_(task_ids)
+            ).delete(synchronize_session=False)
+            
+            # Time entries  
+            time_deleted = self.session.query(TaskTimeEntry).filter(
+                TaskTimeEntry.task_id.in_(task_ids)
+            ).delete(synchronize_session=False)
+            
+            # Dependencies (both directions)
+            dep_deleted = self.session.query(TaskDependency).filter(
+                or_(TaskDependency.task_id.in_(task_ids), 
+                    TaskDependency.dependency_id.in_(task_ids))
+            ).delete(synchronize_session=False)
+            
+            # Delete subtasks first (where parent_id is in task_ids)
+            subtask_deleted = self.session.query(Task).filter(
+                Task.parent_id.in_(task_ids)
+            ).delete(synchronize_session=False)
+            
+            # Finally delete the main tasks
+            deleted_count = self.session.query(Task).filter(
+                Task.id.in_(task_ids)
+            ).delete(synchronize_session=False)
+            
+            # Commit before cache invalidation
+            self.session.commit()
+            
+            # Force session expiry to ensure fresh data on next query
+            self.session.expunge_all()
+            
+            # Invalidate all relevant caches - specifically target get_task_by_id
+            from larrybot.utils.caching import cache_clear
+            cache_clear()  # Clear all caches to be safe
+            
+            return deleted_count
+            
+        except Exception as e:
+            self.session.rollback()
+            logger.error(f"Error in bulk_delete_tasks: {e}")
+            raise
 
     def add_comment(self, task_id: int, comment: str) -> Optional[TaskComment]:
         """Add a comment to a task."""
@@ -764,8 +841,11 @@ class TaskRepository:
         return None
 
     def get_comments(self, task_id: int) -> List[TaskComment]:
-        """Get all comments for a task."""
-        return self.session.query(TaskComment).filter_by(task_id=task_id).order_by(TaskComment.created_at).all()
+        """Get task comments with optimized loading."""
+        return (self.session.query(TaskComment)
+                .filter_by(task_id=task_id)
+                .order_by(TaskComment.created_at.asc())
+                .all())
 
     # === ANALYTICS FUNCTIONS WITH BACKGROUND PROCESSING === #
 
@@ -986,4 +1066,18 @@ class TaskRepository:
             priority=4,  # Lower priority - heavy computation
             job_id=f"productivity_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}"
         )
-        return job_id 
+        return job_id
+
+    def get_tasks_by_ids(self, task_ids: List[int]) -> List[Task]:
+        """Batch load tasks by IDs with optimized relationships."""
+        if not task_ids:
+            return []
+        
+        return (self.session.query(Task)
+                .options(
+                    joinedload(Task.client),
+                    selectinload(Task.comments),
+                    selectinload(Task.time_entries)
+                )
+                .filter(Task.id.in_(task_ids))
+                .all()) 
