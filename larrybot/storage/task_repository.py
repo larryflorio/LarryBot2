@@ -10,6 +10,7 @@ from sqlalchemy import or_, and_, func, text, desc, asc
 from larrybot.utils.caching import cached, cache_invalidate, cache_clear
 from larrybot.utils.background_processing import background_task, submit_background_job
 import logging
+from larrybot.models.enums import TaskStatus
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +51,7 @@ class TaskRepository:
                     selectinload(Task.time_entries),
                     selectinload(Task.dependencies),
                     selectinload(Task.dependents),
-                    selectinload(Task.subtasks),
+                    selectinload(Task.children),
                     selectinload(Task.attachments)
                 )
                 .filter_by(id=task_id)
@@ -61,7 +62,8 @@ class TaskRepository:
         task = self.session.query(Task).filter_by(id=task_id).first()
         if task and not task.done:
             task.done = True
-            task.status = 'Done'
+            # Use proper enum value instead of string
+            task.status = TaskStatus.DONE.value
             self.session.commit()
             
             # Invalidate related caches

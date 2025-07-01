@@ -52,7 +52,6 @@ class TaskFactory(BaseFactory):
             'started_at': None,
             'parent_id': None,
             'tags': '["test", "automated"]',
-            'description_rich': None,
             'client_id': None,
             'created_at': datetime.now(),
             'updated_at': datetime.now()
