@@ -18,6 +18,7 @@ class HealthService(BaseService):
     """Service for monitoring system health and status."""
     
     def __init__(self, database_path: str, plugin_manager=None):
+        super().__init__()  # Initialize BaseService with logger
         self.database_path = database_path
         self.plugin_manager = plugin_manager
     

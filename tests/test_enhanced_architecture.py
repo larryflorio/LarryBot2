@@ -278,19 +278,26 @@ class TestBaseService:
         assert response["context"] == "Test context"
     
     def test_validate_input(self):
-        """Test input validation."""
+        """Test input validation with enhanced error handling."""
+        from larrybot.core.exceptions import ValidationError
+        import pytest
+        
         service = ConcreteTestService()
         
         # Valid input
         valid_data = {"field1": "value1", "field2": "value2"}
         assert service._validate_input(valid_data, ["field1", "field2"]) is True
         
-        # Invalid input - missing field
+        # Invalid input - missing field (should raise ValidationError)
         invalid_data = {"field1": "value1"}
-        assert service._validate_input(invalid_data, ["field1", "field2"]) is False
+        with pytest.raises(ValidationError) as exc_info:
+            service._validate_input(invalid_data, ["field1", "field2"])
+        assert "Missing required fields: field2" in str(exc_info.value)
         
-        # Invalid input - not a dict
-        assert service._validate_input("not a dict", ["field1"]) is False
+        # Invalid input - not a dict (should raise ValidationError)
+        with pytest.raises(ValidationError) as exc_info:
+            service._validate_input("not a dict", ["field1"])
+        assert "Input data must be a dictionary" in str(exc_info.value)
     
     @pytest.mark.asyncio
     async def test_execute_method(self):

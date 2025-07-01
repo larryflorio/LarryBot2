@@ -848,6 +848,38 @@ class MessageFormatter:
         return message
     
     @staticmethod
+    def format_standardized_error(error_response: Dict[str, Any]) -> str:
+        """
+        Format standardized error response from our error handling system.
+        
+        Args:
+            error_response: Standardized error response dictionary
+            
+        Returns:
+            Formatted error message with MarkdownV2 escaping
+        """
+        error_code = error_response.get('error_code', 'E001')
+        message = error_response.get('message', 'An error occurred')
+        suggested_action = error_response.get('suggested_action', '')
+        
+        # Choose emoji based on error severity or code
+        emoji = "❌"
+        if error_code.startswith('V'):  # Validation errors
+            emoji = "⚠️"
+        elif error_code.startswith('N'):  # Network errors
+            emoji = "🌐"
+        elif error_code.startswith('D'):  # Database errors
+            emoji = "💾"
+        
+        formatted = f"{emoji} **Error**\n\n{MessageFormatter.escape_markdown(message)}"
+        formatted += f"\n\n🔍 _Code: {MessageFormatter.escape_markdown(error_code)}_"
+        
+        if suggested_action:
+            formatted += f"\n\n💡 **Next Steps:**\n{MessageFormatter.escape_markdown(suggested_action)}"
+        
+        return formatted
+    
+    @staticmethod
     def format_success_message(message: str, details: Optional[Dict] = None) -> str:
         """
         Format success message with optional details.
