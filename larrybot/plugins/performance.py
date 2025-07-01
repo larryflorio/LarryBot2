@@ -13,7 +13,6 @@ from telegram.ext import ContextTypes
 from larrybot.core.performance import get_performance_collector, track_performance
 from larrybot.core.dependency_injection import ServiceLocator
 from larrybot.utils.ux_helpers import performance_monitor
-from larrybot.core.exceptions import format_standardized_error
 
 def escape_markdown_v2(text: str) -> str:
     """Escape MarkdownV2 special characters."""
@@ -21,6 +20,10 @@ def escape_markdown_v2(text: str) -> str:
     for char in special_chars:
         text = text.replace(char, f'\\{char}')
     return text
+
+def format_standardized_error(error_type: str, message: str, details: str = "") -> str:
+    """Format a standardized error message for Telegram."""
+    return f"❌ *Error*: {escape_markdown_v2(message)}"
 import logging
 
 logger = logging.getLogger(__name__)
