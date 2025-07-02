@@ -24,7 +24,7 @@ class TestTaskFactory:
         assert task is not None
         assert task.description is not None
         assert task.done is False
-        assert str(task.priority) == 'Medium'
+        assert task.priority_enum.name.title() == 'Medium'
         assert str(task.status) == 'Todo'
         assert task.category == 'General'
         assert task.estimated_hours == 2.0
@@ -39,7 +39,7 @@ class TestTaskFactory:
         )
         
         assert task.description == "Custom task"
-        assert str(task.priority) == 'High'  # Handle enum conversion
+        assert task.priority_enum.name.title() == 'High'  # Handle enum conversion
         assert task.category == "Custom"
     
     def test_task_factory_create_todo(self, task_factory):
@@ -57,7 +57,7 @@ class TestTaskFactory:
     def test_task_factory_create_high_priority(self, task_factory):
         """Test creating high priority task."""
         task = task_factory.create_high_priority()
-        assert str(task.priority) == 'High'  # Handle enum conversion
+        assert task.priority_enum.name.title() == 'High'  # Handle enum conversion
     
     def test_task_factory_create_overdue(self, task_factory):
         """Test create_overdue method."""

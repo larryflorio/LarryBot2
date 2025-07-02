@@ -525,35 +525,54 @@ def register(event_bus, command_registry, **kwargs):
     """Register the performance monitoring plugin."""
     plugin = PerformancePlugin()
     
-    # Register commands
+    # Register commands (command_registry.register only accepts command, handler, metadata)
+    from larrybot.core.command_registry import CommandMetadata
+    
     command_registry.register(
         command="performance",
         handler=plugin.handle_performance_dashboard,
-        description="📊 View performance monitoring dashboard"
+        metadata=CommandMetadata(
+            name="performance",
+            description="📊 View performance monitoring dashboard",
+            usage="performance",
+            category="monitoring"
+        )
     )
     
     command_registry.register(
         command="perfstats",
         handler=plugin.handle_performance_stats,
-        description="📈 View detailed performance statistics [hours]"
+        metadata=CommandMetadata(
+            name="perfstats",
+            description="📈 View detailed performance statistics [hours]",
+            usage="perfstats [hours]",
+            category="monitoring"
+        )
     )
     
     command_registry.register(
         command="perfalerts",
         handler=plugin.handle_performance_alerts,
-        description="⚠️ View active performance alerts"
+        metadata=CommandMetadata(
+            name="perfalerts",
+            description="⚠️ View active performance alerts",
+            usage="perfalerts",
+            category="monitoring"
+        )
     )
     
     command_registry.register(
         command="perfclear",
         handler=plugin.handle_performance_clear,
-        description="🧹 Clear performance metrics [hours]"
+        metadata=CommandMetadata(
+            name="perfclear",
+            description="🧹 Clear performance metrics [hours]",
+            usage="perfclear [hours]",
+            category="monitoring"
+        )
     )
     
-    # Register callback handler for performance-related callbacks
-    command_registry.register_callback_handler(
-        pattern=r"^perf_",
-        handler=plugin.handle_callback_query
-    )
+    # Note: Callback handler registration is not supported by current CommandRegistry
+    # This functionality could be added in future if needed
     
     logger.info("Performance monitoring plugin registered successfully") 

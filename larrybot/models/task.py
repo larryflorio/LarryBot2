@@ -7,6 +7,7 @@ validation, and enterprise-grade data consistency.
 
 from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, Float, ForeignKey, Enum
 from sqlalchemy.orm import relationship, Mapped, mapped_column
+from sqlalchemy.ext.hybrid import hybrid_property
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 import json
@@ -31,7 +32,8 @@ class Task(Base):
         default=TaskStatus.TODO.value, 
         nullable=False
     )
-    priority: Mapped[TaskPriority] = mapped_column(
+    _priority: Mapped[TaskPriority] = mapped_column(
+        "priority",  # Map to 'priority' column in database
         String(20),  # Keep as String to handle existing data, convert in Python
         default=TaskPriority.MEDIUM.value, 
         nullable=False
@@ -125,17 +127,22 @@ class Task(Base):
                 kwargs['status'] = status_value.value
         
         if 'priority' in kwargs:
-            priority_value = kwargs['priority']
-            if isinstance(priority_value, str):
+            priority_value = kwargs.pop('priority')  # Remove from kwargs so it doesn't conflict
+            if priority_value is None:
+                # Explicitly setting priority to None
+                kwargs['_priority'] = None
+            elif isinstance(priority_value, str):
                 # Convert string to enum value, handling legacy values
                 if priority_value in ['Low', 'Medium', 'High', 'Critical', 'Urgent']:
                     enum_value = TaskPriority.from_string(priority_value)
-                    kwargs['priority'] = enum_value.value if enum_value else TaskPriority.MEDIUM.value
+                    kwargs['_priority'] = enum_value.value if enum_value else TaskPriority.MEDIUM.value
                 else:
                     enum_value = TaskPriority.from_string(priority_value)
-                    kwargs['priority'] = enum_value.value if enum_value else TaskPriority.MEDIUM.value
+                    kwargs['_priority'] = enum_value.value if enum_value else TaskPriority.MEDIUM.value
             elif isinstance(priority_value, TaskPriority):
-                kwargs['priority'] = priority_value.value
+                kwargs['_priority'] = priority_value.value
+            elif isinstance(priority_value, int):
+                kwargs['_priority'] = priority_value
         
         # Set default timestamps if not provided
         if 'created_at' not in kwargs:
@@ -146,8 +153,19 @@ class Task(Base):
         # Ensure defaults for required enum fields
         if 'status' not in kwargs:
             kwargs['status'] = TaskStatus.TODO.value
-        if 'priority' not in kwargs:
-            kwargs['priority'] = TaskPriority.MEDIUM.value
+        if '_priority' not in kwargs:
+            # Only set default if priority wasn't explicitly set to None
+            kwargs['_priority'] = TaskPriority.MEDIUM.value
+        
+        # Ensure done field is properly set based on status (unless explicitly provided)
+        if 'done' not in kwargs:
+            status_value = kwargs.get('status', TaskStatus.TODO.value)
+            # Handle both string and enum values for status
+            if isinstance(status_value, str):
+                status_enum = TaskStatus.from_string(status_value) or TaskStatus.TODO
+            else:
+                status_enum = status_value
+            kwargs['done'] = status_enum.is_completed if hasattr(status_enum, 'is_completed') else False
         
         super().__init__(**kwargs)
     
@@ -160,40 +178,90 @@ class Task(Base):
     
     @status_enum.setter  
     def status_enum(self, value: TaskStatus) -> None:
-        """Set status using enum type."""
+        """Set status using enum type and synchronize done field."""
         self.status = value.value
+        # Synchronize done field with status
+        self.done = value.is_completed
+        if value.is_completed and not self.completed_at:
+            self.completed_at = datetime.utcnow()
     
     @property
-    def priority_enum(self) -> TaskPriority:
+    def priority_enum(self) -> Optional[TaskPriority]:
         """Get priority as enum type."""
-        if not self.priority:
+        if self._priority is None:
+            return None
+        if not self._priority:
             return TaskPriority.MEDIUM
         
         # Handle both string and integer values
-        if isinstance(self.priority, int):
+        if isinstance(self._priority, int):
             # Convert integer to enum by value
             try:
-                return TaskPriority(self.priority)
+                return TaskPriority(self._priority)
             except ValueError:
                 return TaskPriority.MEDIUM
-        elif isinstance(self.priority, str):
-            return TaskPriority.from_string(self.priority) or TaskPriority.MEDIUM
+        elif isinstance(self._priority, str):
+            # First try to convert string numbers to integers
+            try:
+                int_value = int(self._priority)
+                return TaskPriority(int_value)
+            except (ValueError, TypeError):
+                # If not a number, try name-based lookup
+                return TaskPriority.from_string(self._priority) or TaskPriority.MEDIUM
         else:
             return TaskPriority.MEDIUM
     
     @priority_enum.setter
     def priority_enum(self, value: TaskPriority) -> None:
         """Set priority using enum type."""
-        self.priority = value.value
+        self._priority = value.value
     
-    @property
-    def done(self) -> bool:
-        """Check if task is completed (backward compatibility)."""
-        return self.status_enum.is_completed
+    @hybrid_property
+    def priority(self) -> Optional[str]:
+        """Get priority as human-readable string for backward compatibility."""
+        if self._priority is None:
+            return None
+        priority_enum = self.priority_enum
+        if priority_enum is None:
+            return None
+        return priority_enum.name.title()
     
-    @done.setter
-    def done(self, value: bool) -> None:
-        """Set completion status (backward compatibility)."""
+    @priority.expression
+    def priority(cls):
+        """Expression for SQLAlchemy queries - returns the database column."""
+        return cls._priority
+    
+    @priority.setter
+    def priority(self, value) -> None:
+        """Set priority from various input types."""
+        if value is None:
+            # Handle explicit None values - keep as None for factory tests
+            self._priority = None
+            return
+            
+        if isinstance(value, str):
+            # Convert string to enum value
+            if value in ['Low', 'Medium', 'High', 'Critical', 'Urgent']:
+                enum_value = TaskPriority.from_string(value)
+                self._priority = enum_value.value if enum_value else TaskPriority.MEDIUM.value
+            else:
+                enum_value = TaskPriority.from_string(value)
+                self._priority = enum_value.value if enum_value else TaskPriority.MEDIUM.value
+        elif isinstance(value, TaskPriority):
+            self._priority = value.value
+        elif isinstance(value, int):
+            # Handle direct integer assignment
+            try:
+                TaskPriority(value)  # Validate it's a valid priority value
+                self._priority = value
+            except ValueError:
+                self._priority = TaskPriority.MEDIUM.value
+        else:
+            self._priority = TaskPriority.MEDIUM.value
+    
+    def set_done(self, value: bool) -> None:
+        """Set completion status and synchronize with status field."""
+        self.done = value  # Set the database column
         if value:
             self.status = TaskStatus.DONE.value
             if not self.completed_at:
@@ -203,6 +271,10 @@ class Task(Base):
             if self.status_enum == TaskStatus.DONE:
                 self.status = (TaskStatus.IN_PROGRESS.value if self.started_at else TaskStatus.TODO.value)
                 self.completed_at = None
+    
+    def is_done(self) -> bool:
+        """Check if task is completed (backward compatibility)."""
+        return self.done or self.status_enum.is_completed
     
     @property
     def is_overdue(self) -> bool:
@@ -378,7 +450,8 @@ class Task(Base):
         
         # Adjust for progress (lower progress = higher priority for incomplete tasks)
         if not self.status_enum.is_completed:
-            progress_penalty = (100 - self.progress) / 10
+            current_progress = self.progress if self.progress is not None else 0
+            progress_penalty = (100 - current_progress) / 10
             base_score += progress_penalty
         
         return base_score
@@ -390,7 +463,7 @@ class Task(Base):
             'description': self.description,
             'status': self.status_enum.value,
             'status_display': f"{self.status_enum.color_code} {self.status_enum.value}",
-            'priority': self.priority_enum.name,
+            'priority': self.priority_enum.name.title(),
             'priority_display': f"{self.priority_enum.color_code} {self.priority_enum.name.title()}",
             'priority_weight': self.priority_enum.weight,
             'due_date': self.due_date.isoformat() if self.due_date else None,
@@ -429,36 +502,47 @@ class Task(Base):
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Task':
         """Create task from dictionary with validation."""
+        # Fields to exclude from constructor (display fields and computed properties)
+        excluded_fields = {
+            'status_display', 'priority_display', 'priority_weight', 'time_spent_hours',
+            'completion_percentage', 'is_overdue', 'days_until_due', 'sla_hours_remaining',
+            'is_sla_violated', 'priority_score', 'client', 'comments_count',
+            'attachments_count', 'time_entries_count', 'subtasks_count'
+        }
+        
+        # Filter out excluded fields
+        filtered_data = {k: v for k, v in data.items() if k not in excluded_fields}
+        
         # Handle enum conversion
-        if 'status' in data and isinstance(data['status'], str):
-            data['status'] = validate_enum_value(TaskStatus, data['status'], 'status')
-        if 'priority' in data and isinstance(data['priority'], str):
-            data['priority'] = validate_enum_value(TaskPriority, data['priority'], 'priority')
+        if 'status' in filtered_data and isinstance(filtered_data['status'], str):
+            filtered_data['status'] = validate_enum_value(TaskStatus, filtered_data['status'], 'status')
+        if 'priority' in filtered_data and isinstance(filtered_data['priority'], str):
+            filtered_data['priority'] = validate_enum_value(TaskPriority, filtered_data['priority'], 'priority')
         
         # Handle datetime conversion
         datetime_fields = ['due_date', 'created_at', 'updated_at', 'started_at', 'completed_at']
         for field in datetime_fields:
-            if field in data and isinstance(data[field], str):
+            if field in filtered_data and isinstance(filtered_data[field], str):
                 try:
-                    data[field] = datetime.fromisoformat(data[field].replace('Z', '+00:00'))
+                    filtered_data[field] = datetime.fromisoformat(filtered_data[field].replace('Z', '+00:00'))
                 except (ValueError, AttributeError):
-                    data[field] = None
+                    filtered_data[field] = None
         
         # Handle tags conversion
         if 'tags' in data and isinstance(data['tags'], list):
-            task = cls(**{k: v for k, v in data.items() if k != 'tags'})
+            task = cls(**{k: v for k, v in filtered_data.items() if k != 'tags'})
             task.set_tags_list(data['tags'])
             return task
         
-        return cls(**data)
+        return cls(**filtered_data)
     
     def __repr__(self) -> str:
         """Enhanced string representation."""
         return (
             f"<Task(id={self.id}, "
             f"description='{self.description[:50]}...', "
-            f"status={self.status_enum.value}, "
-            f"priority={self.priority_enum.name})>"
+            f"status={self.status}, "
+            f"priority={self.priority_enum.name.upper()})>"
         )
 
 

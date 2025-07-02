@@ -60,6 +60,14 @@ class TaskStatus(Enum):
     @classmethod
     def from_string(cls, status_str: str) -> Optional['TaskStatus']:
         """Create TaskStatus from string, case-insensitive."""
+        # Handle case where input is already a TaskStatus object
+        if isinstance(status_str, cls):
+            return status_str
+        
+        # Handle string input
+        if not isinstance(status_str, str):
+            return None
+            
         for status in cls:
             if status.value.lower() == status_str.lower():
                 return status

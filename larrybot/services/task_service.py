@@ -753,7 +753,7 @@ class TaskService(BaseService):
             'id': task.id,
             'description': task.description,
             'done': task.done,
-            'priority': task.priority,
+            'priority': task.priority_enum.name.title(),  # Use human-readable format
             'due_date': task.due_date.isoformat() if task.due_date else None,
             'category': task.category,
             'status': task.status,

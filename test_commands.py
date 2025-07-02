@@ -75,6 +75,8 @@ def test_command_registration():
     else:
         print(f"\n✅ All Core Commands Present")
         assert len(commands) > 0, "No commands registered"
+    
+    return True  # Explicitly return success status
 
 def test_plugin_loading():
     """Test that all plugins are loaded properly."""
@@ -97,6 +99,8 @@ def test_plugin_loading():
     print(f"  • Enabled Plugins: {len(enabled_plugins)}")
     
     assert len(plugins) > 0, "No plugins loaded"
+    
+    return True  # Explicitly return success status
 
 if __name__ == "__main__":
     print("🚀 LarryBot2 Command Verification Test")

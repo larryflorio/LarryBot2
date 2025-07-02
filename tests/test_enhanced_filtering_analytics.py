@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from unittest.mock import patch, Mock
 from larrybot.storage.task_repository import TaskRepository
 from larrybot.services.task_service import TaskService
+from larrybot.models.task import Task
 from larrybot.plugins.advanced_tasks import (
     search_advanced_handler, filter_advanced_handler, tags_multi_handler,
     time_range_handler, priority_range_handler, analytics_advanced_handler,
@@ -116,8 +117,8 @@ class TestEnhancedFiltering:
         # Test priority range
         results = repo.get_tasks_by_priority_range("Medium", "High")
         assert len(results) == 2  # Medium and High
-        assert any(task.priority == "Medium" for task in results)
-        assert any(task.priority == "High" for task in results)
+        assert any(task.priority_enum.name.title() == "Medium" for task in results)
+        assert any(task.priority_enum.name.title() == "High" for task in results)
 
 class TestEnhancedAnalytics:
     """Test enhanced analytics functionality."""

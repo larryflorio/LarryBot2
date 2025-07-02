@@ -194,9 +194,24 @@ class TaskRepository:
     @cached(ttl=300.0)  # Cache for 5 minutes
     def get_tasks_by_priority(self, priority: str) -> List[Task]:
         """Get all tasks with a specific priority with optimized loading."""
+        from larrybot.models.enums import TaskPriority
+        
+        # Handle both string and enum values
+        priority_enum = TaskPriority.from_string(priority)
+        if priority_enum:
+            # Include multiple possible representations
+            possible_values = [
+                priority_enum.name,  # "HIGH"
+                priority_enum.name.title(),  # "High"
+                priority_enum.value  # 3
+            ]
+        else:
+            # Fallback to original value
+            possible_values = [priority]
+        
         return (self.session.query(Task)
                 .options(joinedload(Task.client))
-                .filter_by(priority=priority)
+                .filter(Task._priority.in_(possible_values))
                 .order_by(Task.created_at.desc())
                 .all())
 
@@ -205,7 +220,7 @@ class TaskRepository:
         # Query directly to ensure we have a session-attached object
         task = self.session.query(Task).filter_by(id=task_id).first()
         if task:
-            task.priority = priority
+            task.priority = priority  # This will use the property setter
             self.session.commit()
             
             # Invalidate caches
@@ -299,9 +314,23 @@ class TaskRepository:
     @cached(ttl=300.0)
     def get_tasks_by_status(self, status: str) -> List[Task]:
         """Get all tasks with a specific status with optimized loading."""
+        from larrybot.models.enums import TaskStatus
+        
+        # Handle both string and enum values
+        status_enum = TaskStatus.from_string(status)
+        if status_enum:
+            # Include multiple possible representations
+            possible_values = [
+                status_enum.value,  # "Todo", "In Progress", etc.
+                status
+            ]
+        else:
+            # Fallback to original value
+            possible_values = [status]
+        
         return (self.session.query(Task)
                 .options(joinedload(Task.client))
-                .filter_by(status=status)
+                .filter(Task.status.in_(possible_values))
                 .order_by(Task.created_at.desc())
                 .all())
 
@@ -504,9 +533,26 @@ class TaskRepository:
         filters = []
         
         if status:
-            filters.append(Task.status == status)
+            from larrybot.models.enums import TaskStatus
+            status_enum = TaskStatus.from_string(status)
+            if status_enum:
+                possible_values = [status_enum.value, status]
+                filters.append(Task.status.in_(possible_values))
+            else:
+                filters.append(Task.status == status)
+                
         if priority:
-            filters.append(Task.priority == priority)
+            from larrybot.models.enums import TaskPriority
+            priority_enum = TaskPriority.from_string(priority)
+            if priority_enum:
+                possible_values = [
+                    priority_enum.name,          # "HIGH"
+                    priority_enum.name.title(),  # "High"
+                    priority_enum.value          # 3
+                ]
+                filters.append(Task._priority.in_(possible_values))
+            else:
+                filters.append(Task._priority == priority)
         if category:
             filters.append(Task.category == category)
         if due_before:
@@ -585,9 +631,26 @@ class TaskRepository:
         filters = []
         
         if status:
-            filters.append(Task.status == status)
+            from larrybot.models.enums import TaskStatus
+            status_enum = TaskStatus.from_string(status)
+            if status_enum:
+                possible_values = [status_enum.value, status]
+                filters.append(Task.status.in_(possible_values))
+            else:
+                filters.append(Task.status == status)
+                
         if priority:
-            filters.append(Task.priority == priority)
+            from larrybot.models.enums import TaskPriority
+            priority_enum = TaskPriority.from_string(priority)
+            if priority_enum:
+                possible_values = [
+                    priority_enum.name,          # "HIGH"
+                    priority_enum.name.title(),  # "High"
+                    priority_enum.value          # 3
+                ]
+                filters.append(Task._priority.in_(possible_values))
+            else:
+                filters.append(Task._priority == priority)
         if category:
             filters.append(Task.category == category)
         if due_before:
@@ -687,21 +750,25 @@ class TaskRepository:
 
     def get_tasks_by_priority_range(self, min_priority: str, max_priority: str) -> List[Task]:
         """Get tasks by priority range with optimized query."""
-        # Priority order mapping for range queries
-        priority_order = {"Low": 1, "Medium": 2, "High": 3, "Urgent": 4, "Critical": 4}
+        from larrybot.models.enums import TaskPriority
         
-        min_value = priority_order.get(min_priority, 1)
-        max_value = priority_order.get(max_priority, 4)
+        # Convert priority strings to enum values
+        min_enum = TaskPriority.from_string(min_priority) or TaskPriority.LOW
+        max_enum = TaskPriority.from_string(max_priority) or TaskPriority.URGENT
         
-        # Use simple IN clause for better compatibility
+        # Include both string names and integer values for compatibility
         valid_priorities = []
-        for priority, value in priority_order.items():
-            if min_value <= value <= max_value:
-                valid_priorities.append(priority)
+        for priority_enum in TaskPriority:
+            if min_enum.value <= priority_enum.value <= max_enum.value:
+                valid_priorities.extend([
+                    priority_enum.name,  # "HIGH", "MEDIUM", etc.
+                    priority_enum.name.title(),  # "High", "Medium", etc.
+                    priority_enum.value  # 1, 2, 3, etc.
+                ])
         
         return (self.session.query(Task)
                 .options(joinedload(Task.client))
-                .filter(Task.priority.in_(valid_priorities))
+                .filter(Task._priority.in_(valid_priorities))
                 .order_by(Task.created_at.desc())
                 .all())
 
@@ -710,12 +777,19 @@ class TaskRepository:
         if not task_ids:
             return 0
         
+        # Determine if status represents completion
+        is_done = status in ['Done', 'Cancelled'] or (
+            hasattr(TaskStatus, 'from_string') and 
+            TaskStatus.from_string(status) and 
+            TaskStatus.from_string(status).is_completed
+        )
+        
         # Use bulk update for better performance
         updated_count = (self.session.query(Task)
                         .filter(Task.id.in_(task_ids))
                         .update({
-                            Task.status: status,
-                            Task.done: (status == 'Done')
+                            'status': status,
+                            'done': is_done
                         }, synchronize_session=False))
         
         self.session.commit()
@@ -735,7 +809,7 @@ class TaskRepository:
         
         updated_count = (self.session.query(Task)
                         .filter(Task.id.in_(task_ids))
-                        .update({Task.priority: priority}, synchronize_session=False))
+                        .update({'_priority': priority}, synchronize_session=False))
         
         self.session.commit()
         
@@ -751,7 +825,7 @@ class TaskRepository:
         
         updated_count = (self.session.query(Task)
                         .filter(Task.id.in_(task_ids))
-                        .update({Task.category: category}, synchronize_session=False))
+                        .update({'category': category}, synchronize_session=False))
         
         self.session.commit()
         
@@ -773,7 +847,7 @@ class TaskRepository:
         
         updated_count = (self.session.query(Task)
                         .filter(Task.id.in_(task_ids))
-                        .update({Task.client_id: client.id}, synchronize_session=False))
+                        .update({'client_id': client.id}, synchronize_session=False))
         
         self.session.commit()
         
@@ -864,10 +938,36 @@ class TaskRepository:
         completed_tasks = self.session.query(Task).filter_by(done=True).count()
         pending_tasks = total_tasks - completed_tasks
         
-        # Priority distribution
-        priority_stats = self.session.query(
-            Task.priority, func.count(Task.id)
-        ).group_by(Task.priority).all()
+        # Priority distribution with human-readable keys
+        priority_stats_raw = self.session.query(
+            Task._priority, func.count(Task.id)
+        ).group_by(Task._priority).all()
+        
+        # Convert priority keys to human-readable format
+        priority_distribution = {}
+        for priority_raw, count in priority_stats_raw:
+            try:
+                # Convert directly using TaskPriority enum
+                from larrybot.models.enums import TaskPriority
+                if isinstance(priority_raw, int):
+                    priority_enum = TaskPriority(priority_raw)
+                    priority_key = priority_enum.name.title()
+                elif isinstance(priority_raw, str):
+                    # Try to convert string to int first
+                    try:
+                        int_value = int(priority_raw)
+                        priority_enum = TaskPriority(int_value)
+                        priority_key = priority_enum.name.title()
+                    except (ValueError, TypeError):
+                        # If not a number, try name-based lookup
+                        priority_enum = TaskPriority.from_string(priority_raw)
+                        priority_key = priority_enum.name.title() if priority_enum else str(priority_raw)
+                else:
+                    priority_key = str(priority_raw)
+                priority_distribution[priority_key] = count
+            except Exception:
+                # Fallback to raw value if conversion fails
+                priority_distribution[str(priority_raw)] = count
         
         # Status distribution  
         status_stats = self.session.query(
@@ -888,7 +988,7 @@ class TaskRepository:
             'incomplete_tasks': pending_tasks,  # Add the expected key for tests
             'overdue_tasks': overdue_count,
             'completion_rate': (completed_tasks / max(1, total_tasks)) * 100,
-            'priority_distribution': dict(priority_stats),
+            'priority_distribution': priority_distribution,
             'status_distribution': dict(status_stats)
         }
 
@@ -930,14 +1030,31 @@ class TaskRepository:
         total_tasks = self.session.query(Task).count()
         completed_tasks_total = self.session.query(Task).filter_by(done=True).count()
         
-        # Priority analysis
+        # Priority analysis with proper enum handling
         priority_analysis = {}
-        priorities = ['High', 'Medium', 'Low']
-        for priority in priorities:
-            priority_tasks = self.session.query(Task).filter_by(priority=priority).all()
-            priority_analysis[priority] = {
-                'total': len(priority_tasks),
-                'completed': sum(1 for task in priority_tasks if task.done)
+        
+        # Get all tasks and group by priority enum
+        all_tasks = self.session.query(Task).all()
+        priority_groups = {}
+        
+        for task in all_tasks:
+            try:
+                priority_key = task.priority_enum.name.title()
+                if priority_key not in priority_groups:
+                    priority_groups[priority_key] = []
+                priority_groups[priority_key].append(task)
+            except Exception:
+                # Handle any conversion errors
+                priority_key = str(task.priority) if task.priority else 'Unknown'
+                if priority_key not in priority_groups:
+                    priority_groups[priority_key] = []
+                priority_groups[priority_key].append(task)
+        
+        # Convert to analysis format
+        for priority_key, tasks in priority_groups.items():
+            priority_analysis[priority_key] = {
+                'total': len(tasks),
+                'completed': sum(1 for task in tasks if task.done)
             }
         
         # Average completion time for completed tasks
