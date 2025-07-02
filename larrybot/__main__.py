@@ -1,3 +1,44 @@
+import logging
+import sys
+
+def setup_enhanced_logging():
+    """Configure enhanced logging for better monitoring and debugging."""
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+
+    # Only add handler if not already present
+    if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setFormatter(formatter)
+        console_handler.setLevel(logging.INFO)
+        root_logger.addHandler(console_handler)
+
+    # Performance monitoring logger
+    perf_logger = logging.getLogger('performance')
+    perf_logger.setLevel(logging.INFO)
+
+    # Network and database loggers for troubleshooting
+    network_logger = logging.getLogger('telegram')
+    network_logger.setLevel(logging.WARNING)  # Reduce noise
+
+    db_logger = logging.getLogger('sqlalchemy.engine')
+    db_logger.setLevel(logging.WARNING)  # Reduce noise
+
+    # APScheduler logger for reducing duplicate scheduler messages
+    apscheduler_logger = logging.getLogger('apscheduler.scheduler')
+    apscheduler_logger.setLevel(logging.WARNING)  # Reduce noise from scheduler start/stop
+
+    logger = logging.getLogger(__name__)
+    logger.info("Enhanced logging configured successfully")
+    return logger
+
+# Call logging setup before any other imports
+setup_enhanced_logging()
+
 from larrybot.core.event_bus import EventBus
 from larrybot.core.plugin_manager import PluginManager
 from larrybot.core.command_registry import CommandRegistry
@@ -10,47 +51,8 @@ from larrybot.plugins.reminder import register_event_handler, subscribe_to_event
 from larrybot.services.health_service import HealthService
 from larrybot.core.task_manager import get_task_manager, managed_task_context
 from larrybot.utils.caching import cache_stats
-import logging
-import sys
 from datetime import datetime
 import asyncio
-
-def setup_enhanced_logging():
-    """Configure enhanced logging for better monitoring and debugging."""
-    # Create formatter with timestamps
-    formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    
-    # Configure root logger
-    root_logger = logging.getLogger()
-    root_logger.setLevel(logging.INFO)
-    
-    # Console handler with colors for better readability
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setFormatter(formatter)
-    console_handler.setLevel(logging.INFO)
-    root_logger.addHandler(console_handler)
-    
-    # Performance monitoring logger
-    perf_logger = logging.getLogger('performance')
-    perf_logger.setLevel(logging.INFO)
-    
-    # Network and database loggers for troubleshooting
-    network_logger = logging.getLogger('telegram')
-    network_logger.setLevel(logging.WARNING)  # Reduce noise
-    
-    db_logger = logging.getLogger('sqlalchemy.engine')
-    db_logger.setLevel(logging.WARNING)  # Reduce noise
-    
-    # APScheduler logger for reducing duplicate scheduler messages
-    apscheduler_logger = logging.getLogger('apscheduler.scheduler')
-    apscheduler_logger.setLevel(logging.WARNING)  # Reduce noise from scheduler start/stop
-    
-    logger = logging.getLogger(__name__)
-    logger.info("Enhanced logging configured successfully")
-    return logger
 
 async def startup_system_monitoring():
     """Log initial system stats and perform database optimization."""

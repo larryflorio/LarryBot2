@@ -18,6 +18,8 @@ class Config:
         self.GOOGLE_CLIENT_SECRET_PATH: str = os.getenv('GOOGLE_CLIENT_SECRET_PATH', 'client_secret.json')
         self.LOG_LEVEL: str = os.getenv('LOG_LEVEL', 'INFO')
         self.MAX_REQUESTS_PER_MINUTE: int = int(os.getenv('MAX_REQUESTS_PER_MINUTE', '60'))
+        self.NLP_ENABLED: bool = os.getenv('NLP_ENABLED', 'true').lower() == 'true'
+        self.NLP_MODEL: str = os.getenv('NLP_MODEL', 'en_core_web_sm')
 
     def validate(self) -> None:
         """Validate required configuration values."""
@@ -39,11 +41,13 @@ class Config:
             raise ValueError(f'Configuration validation failed:\n{error_message}')
     
     def get_single_user_info(self) -> dict:
-        """Get information about the single-user configuration."""
+        """Get information about the single-user configuration, including NLP settings."""
         return {
             "authorized_user_id": self.ALLOWED_TELEGRAM_USER_ID,
             "bot_token_configured": bool(self.TELEGRAM_BOT_TOKEN),
             "database_path": self.DATABASE_PATH,
             "rate_limit_per_minute": self.MAX_REQUESTS_PER_MINUTE,
-            "log_level": self.LOG_LEVEL
+            "log_level": self.LOG_LEVEL,
+            "nlp_enabled": self.NLP_ENABLED,
+            "nlp_model": self.NLP_MODEL
         } 

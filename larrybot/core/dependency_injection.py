@@ -1,5 +1,8 @@
 from typing import Dict, Any, Type, Optional, Callable, Union
 from larrybot.core.interfaces import PluginInterface, EventListener, CommandHandler
+from larrybot.nlp.intent_recognizer import IntentRecognizer
+from larrybot.nlp.entity_extractor import EntityExtractor
+from larrybot.nlp.sentiment_analyzer import SentimentAnalyzer
 
 class DependencyContainer:
     """
@@ -96,4 +99,10 @@ class ServiceLocator:
         """Check if a dependency is available."""
         if cls._container is None:
             return False
-        return cls._container.has(name) 
+        return cls._container.has(name)
+
+def register_nlp_services(container: DependencyContainer):
+    """Register NLP services for intent, entity, and sentiment analysis."""
+    container.register_singleton('intent_recognizer', IntentRecognizer())
+    container.register_singleton('entity_extractor', EntityExtractor())
+    container.register_singleton('sentiment_analyzer', SentimentAnalyzer()) 

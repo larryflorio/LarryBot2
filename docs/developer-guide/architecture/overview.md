@@ -248,6 +248,34 @@ LarryBot2 now features a **comprehensive, enterprise-grade architecture** that c
 
 This architecture ensures **maintainability, extensibility, and exceptional performance** while providing the robust foundation needed for a world-class personal productivity assistant.
 
+## Natural Language Processing (NLP) Pipeline
+
+LarryBot integrates advanced NLP features to enhance user experience and productivity. The NLP pipeline is modular, fully backward compatible, and designed for local, privacy-preserving operation.
+
+### Features
+- **Intent Recognition:** Detects user intent (e.g., create task, set reminder) using spaCy and rule-based logic.
+- **Entity Extraction:** Extracts dates, times, task names, and named entities using spaCy NER and dateparser.
+    - The extracted entities dictionary always includes a 'date' key if any date is found, containing the most relevant/first date (from either method).
+    - The 'all_dates' key contains a list of all found dates (ISO format).
+    - This unification ensures consistent access for all downstream code and tests.
+- **Sentiment Analysis:** Analyzes user sentiment using a lightweight, rule-based approach.
+
+### Configuration
+- NLP is controlled via environment variables in `.env` or system environment:
+  - `NLP_ENABLED` (default: true)
+  - `NLP_MODEL` (default: 'en_core_web_sm')
+
+### Extension Points
+- To add new intents or entities, extend the respective NLP class in `larrybot/nlp/`.
+- To swap NLP models, update the `NLP_MODEL` config.
+
+### Developer Notes
+- NLP results are stored in `context.user_data` during message handling for downstream use.
+- All NLP features are strictly additive and backward compatible.
+
+### [2025-07-02] NLP Entity Extraction Update
+- Date extraction is now unified: the 'date' key is always present if any date is found (from either dateparser or spaCy NER), and 'all_dates' contains all found dates. This ensures consistent, backward-compatible access to date entities for all downstream consumers and tests.
+
 ---
 
 *Last Updated: June 30, 2025 - Enterprise Performance Architecture* 

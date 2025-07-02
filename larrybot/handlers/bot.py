@@ -13,6 +13,9 @@ from larrybot.core.event_utils import emit_task_event
 from datetime import datetime
 from larrybot.storage.client_repository import ClientRepository
 from larrybot.core.dependency_injection import ServiceLocator
+from larrybot.nlp.intent_recognizer import IntentRecognizer
+from larrybot.nlp.entity_extractor import EntityExtractor
+from larrybot.nlp.sentiment_analyzer import SentimentAnalyzer
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -45,6 +48,11 @@ class TelegramBotHandler:
         
         self._register_core_handlers()
         self._register_core_commands()
+        
+        # NLP pipeline initialization
+        self.intent_recognizer = IntentRecognizer()
+        self.entity_extractor = EntityExtractor()
+        self.sentiment_analyzer = SentimentAnalyzer()
 
     def _is_authorized(self, update: Update) -> bool:
         """Check if the user is authorized to use this single-user bot."""
@@ -1611,26 +1619,44 @@ class TelegramBotHandler:
                 logger.error(f"Error during bot shutdown: {e}")
 
     async def _handle_text_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Handle text messages for task editing."""
-        # Check if user is currently editing a task
+        """Handle text messages for task editing and NLP-driven commands."""
+        user_message = update.message.text.strip() if update.message and update.message.text else None
+        if not user_message:
+            return
+
+        # --- NLP Processing (additive, non-breaking) ---
+        nlp_intent = self.intent_recognizer.recognize_intent(user_message)
+        nlp_entities = self.entity_extractor.extract_entities(user_message)
+        nlp_sentiment = self.sentiment_analyzer.analyze_sentiment(user_message)
+        context.user_data['nlp_intent'] = nlp_intent
+        context.user_data['nlp_entities'] = nlp_entities
+        context.user_data['nlp_sentiment'] = nlp_sentiment
+        # ------------------------------------------------
+
+        # --- NLP-driven routing (future expansion) ---
+        # If you want to route based on NLP intent/entities, add logic here.
+        # For now, all legacy flows are preserved. Only log NLP results for debugging.
+        # Example (disabled):
+        # if nlp_intent == 'create_task' and 'task_name' in nlp_entities:
+        #     # Route to task creation handler (future)
+        #     pass
+        # ------------------------------------------------
+
+        # Existing logic: task editing mode
         if 'editing_task_id' in context.user_data:
             task_id = context.user_data['editing_task_id']
-            new_description = update.message.text.strip()
-            
+            new_description = user_message
             if not new_description:
                 await update.message.reply_text(
                     MessageFormatter.format_error_message(
                         "Description cannot be empty",
                         "Please provide a valid task description."
                     ),
-                    parse_mode='MarkdownV2'
                 )
                 return
-            
-            # Process the task edit
             await self._process_task_edit(update, context, task_id, new_description)
         else:
-            # Not in editing mode, ignore the message
+            # Not in editing mode, ignore the message (future: NLP intent routing here)
             return
 
     async def _process_task_edit(self, update: Update, context: ContextTypes.DEFAULT_TYPE, task_id: int, new_description: str) -> None:
