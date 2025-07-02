@@ -50,6 +50,8 @@ class ReminderEventHandler:
                     except RuntimeError:
                         # No running event loop - this is expected in test environments
                         logging.getLogger(__name__).debug("No running event loop - skipping task creation")
+                        # Don't create the coroutine if there's no loop to run it
+                        return
     
     async def _process_events(self):
         """Process events from the thread-safe queue."""
@@ -114,6 +116,21 @@ class ReminderEventHandler:
         except Exception as e:
             logging.error(f"Failed to send reminder message: {e}")
             print(f"Failed to send reminder message: {e}", flush=True)
+    
+    async def cleanup(self):
+        """Clean up the reminder event handler."""
+        if hasattr(self, '_processing_task') and self._processing_task:
+            try:
+                if not self._processing_task.done():
+                    self._processing_task.cancel()
+                    try:
+                        await self._processing_task
+                    except asyncio.CancelledError:
+                        logging.getLogger(__name__).info("Reminder event processor cancelled")
+                    except Exception as e:
+                        logging.getLogger(__name__).warning(f"Error during reminder processor cleanup: {e}")
+            except Exception as e:
+                logging.getLogger(__name__).warning(f"Error cancelling reminder processor: {e}")
 
 # Global references for registration
 _reminder_event_handler = None
@@ -138,6 +155,16 @@ def set_main_event_loop(loop):
     _main_loop = loop
     if _reminder_event_handler:
         _reminder_event_handler.set_event_loop(loop)
+
+async def cleanup_reminder_handler():
+    """Clean up the global reminder event handler."""
+    global _reminder_event_handler
+    if _reminder_event_handler:
+        try:
+            await _reminder_event_handler.cleanup()
+            logging.getLogger(__name__).info("Reminder event handler cleanup completed")
+        except Exception as e:
+            logging.getLogger(__name__).warning(f"Error during reminder handler cleanup: {e}")
 
 def subscribe_to_events(event_bus: EventBus) -> None:
     """Subscribe to reminder events using thread-safe queue mechanism."""

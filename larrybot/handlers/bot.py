@@ -1598,6 +1598,13 @@ class TelegramBotHandler:
                 logger.info("🧹 Shutting down bot application...")
                 await self.application.shutdown()
                 
+                # Clean up reminder handler
+                try:
+                    from larrybot.plugins.reminder import cleanup_reminder_handler
+                    await cleanup_reminder_handler()
+                except Exception as e:
+                    logger.warning(f"Error during reminder handler cleanup: {e}")
+                
                 logger.info("✅ Bot shutdown completed")
                 
             except Exception as e:

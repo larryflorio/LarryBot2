@@ -240,29 +240,49 @@ class TaskManager:
             logger.info(f"Waiting for {len(self._tasks)} tasks to complete...")
             
             try:
-                # Wait for tasks to complete gracefully
-                await asyncio.wait_for(
-                    asyncio.gather(*self._tasks, return_exceptions=True),
-                    timeout=self._shutdown_timeout
+                # Wait for tasks to complete gracefully with proper exception handling
+                done, pending = await asyncio.wait(
+                    self._tasks,
+                    timeout=self._shutdown_timeout,
+                    return_when=asyncio.ALL_COMPLETED
                 )
-                logger.info("✅ All tasks completed gracefully")
                 
-            except asyncio.TimeoutError:
-                logger.warning(f"⏱️ Shutdown timeout ({self._shutdown_timeout}s), cancelling remaining tasks...")
+                # Handle completed tasks
+                for task in done:
+                    try:
+                        # Check for exceptions in completed tasks
+                        if not task.cancelled():
+                            exception = task.exception()
+                            if exception:
+                                logger.warning(f"Task {getattr(task, 'get_name', lambda: 'unnamed')()} completed with exception: {exception}")
+                    except asyncio.CancelledError:
+                        # Task was cancelled, this is expected during shutdown
+                        pass
+                    except Exception as e:
+                        logger.debug(f"Error checking task {getattr(task, 'get_name', lambda: 'unnamed')()} status: {e}")
                 
-                # Cancel remaining tasks
-                for task in self._tasks:
-                    if not task.done():
+                # Cancel any remaining tasks
+                if pending:
+                    logger.warning(f"⏱️ Shutdown timeout ({self._shutdown_timeout}s), cancelling {len(pending)} remaining tasks...")
+                    for task in pending:
                         task.cancel()
+                    
+                    # Wait for cancellation to complete
+                    try:
+                        await asyncio.wait_for(
+                            asyncio.gather(*pending, return_exceptions=True),
+                            timeout=2.0
+                        )
+                        logger.info("✅ All remaining tasks cancelled successfully")
+                    except asyncio.TimeoutError:
+                        logger.warning("Some tasks did not respond to cancellation")
+                    except Exception as e:
+                        logger.debug(f"Error during task cancellation: {e}")
+                else:
+                    logger.info("✅ All tasks completed gracefully")
                 
-                # Wait a bit more for cancellation to complete
-                try:
-                    await asyncio.wait_for(
-                        asyncio.gather(*self._tasks, return_exceptions=True),
-                        timeout=2.0
-                    )
-                except asyncio.TimeoutError:
-                    logger.warning("Some tasks did not respond to cancellation")
+            except Exception as e:
+                logger.error(f"Error during shutdown: {e}")
         
         # Run cleanup callbacks
         for callback in self._cleanup_callbacks:
