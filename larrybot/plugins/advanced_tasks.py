@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 import json
 import re
 from larrybot.utils.ux_helpers import KeyboardBuilder, MessageFormatter, ChartBuilder, AnalyticsFormatter
+from larrybot.utils.datetime_utils import get_current_datetime, get_today_date, get_start_of_day, get_end_of_day, get_start_of_week, get_end_of_week, parse_date_string
 
 # Global reference to event bus for task events
 _advanced_task_event_bus = None
@@ -108,7 +109,7 @@ async def add_task_with_metadata_handler(update: Update, context: ContextTypes.D
         priority = args[1]
     if len(args) > 2:
         try:
-            due_date = datetime.strptime(args[2], "%Y-%m-%d")
+            due_date = parse_date_string(args[2], "%Y-%m-%d")
         except ValueError:
             await update.message.reply_text("Invalid date format. Use YYYY-MM-DD")
             return
@@ -204,7 +205,7 @@ async def due_date_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     task_id = int(context.args[0])
     
     try:
-        due_date = datetime.strptime(context.args[1], "%Y-%m-%d")
+        due_date = parse_date_string(context.args[1], "%Y-%m-%d")
     except ValueError:
         await update.message.reply_text("Invalid date format. Use YYYY-MM-DD")
         return
@@ -695,9 +696,9 @@ async def overdue_tasks_handler(update: Update, context: ContextTypes.DEFAULT_TY
 @command_handler("/today", "Show tasks due today", "Usage: /today", "tasks")
 async def today_tasks_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show tasks due today."""
-    today = datetime.utcnow().date()
-    start_of_day = datetime.combine(today, datetime.min.time())
-    end_of_day = datetime.combine(today, datetime.max.time())
+    today = get_today_date()
+    start_of_day = get_start_of_day()
+    end_of_day = get_end_of_day()
     
     task_service = _get_task_service()
     result = await task_service.get_tasks_with_filters(
@@ -723,12 +724,8 @@ async def today_tasks_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
 @command_handler("/week", "Show tasks due this week", "Usage: /week", "tasks")
 async def week_tasks_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show tasks due this week."""
-    today = datetime.utcnow().date()
-    start_of_week = today - timedelta(days=today.weekday())
-    end_of_week = start_of_week + timedelta(days=6)
-    
-    start_of_week_dt = datetime.combine(start_of_week, datetime.min.time())
-    end_of_week_dt = datetime.combine(end_of_week, datetime.max.time())
+    start_of_week_dt = get_start_of_week()
+    end_of_week_dt = get_end_of_week()
     
     task_service = _get_task_service()
     result = await task_service.get_tasks_with_filters(

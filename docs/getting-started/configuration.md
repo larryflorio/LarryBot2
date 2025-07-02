@@ -129,6 +129,35 @@ Google OAuth client secret for calendar integration.
 4. Create OAuth 2.0 credentials
 5. Download the client secret file
 
+### Timezone Configuration
+
+LarryBot2 supports robust, centralized timezone management for all time-sensitive features (reminders, due dates, analytics, etc.).
+
+#### `TIMEZONE`
+Manually override the system timezone. Set to a valid IANA timezone name (e.g., `America/New_York`).
+
+```bash
+TIMEZONE=America/New_York
+```
+
+#### `TIMEZONE_AUTO_DETECT`
+Enable automatic detection of the system's local timezone (default: `true`). If `TIMEZONE` is set, it takes precedence.
+
+```bash
+TIMEZONE_AUTO_DETECT=true
+```
+
+#### Timezone Handling Details
+- **Automatic Detection**: By default, LarryBot2 detects your system timezone at startup.
+- **Manual Override**: Set `TIMEZONE` to force a specific timezone.
+- **DST Handling**: Daylight Saving Time is handled automatically for all supported timezones.
+- **Fallback**: If detection fails, UTC is used as a safe default.
+- **UTC Storage**: All datetimes are stored in UTC in the database for consistency and reliability.
+- **Local Display**: All times shown to users (reminders, due dates, analytics, etc.) are transparently converted to your configured/system timezone.
+- **Commands**: Use `/timezone` to view/set your timezone, and `/autotimezone` to reset to auto-detection.
+
+> **Best Practice:** Always check your timezone setting after deployment or server migration to ensure reminders and due dates are accurate.
+
 ## 🔒 Security Configuration
 
 ### File Permissions

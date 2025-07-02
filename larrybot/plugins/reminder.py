@@ -7,6 +7,7 @@ from larrybot.storage.db import get_session
 from larrybot.storage.reminder_repository import ReminderRepository
 from larrybot.storage.task_repository import TaskRepository
 from larrybot.utils.ux_helpers import KeyboardBuilder, MessageFormatter
+from larrybot.utils.datetime_utils import get_current_datetime, get_current_utc_datetime, parse_datetime_string, format_datetime_for_display
 from datetime import datetime, timedelta
 import asyncio
 import logging
@@ -94,8 +95,8 @@ class ReminderEventHandler:
             message_text = (
                 f"⏰ **Reminder Due!**\n\n"
                 f"📋 **Task**: {event.task_description}\n"
-                f"🕐 **Scheduled**: {event.remind_at.strftime('%Y-%m-%d %H:%M')}\n"
-                f"⏰ **Due**: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
+                f"🕐 **Scheduled**: {format_datetime_for_display(event.remind_at, '%Y-%m-%d %H:%M')}\n"
+                f"⏰ **Due**: {format_datetime_for_display(get_current_datetime(), '%Y-%m-%d %H:%M')}\n\n"
                 f"💡 *Don't forget to complete this task!*"
             )
             
@@ -199,10 +200,10 @@ async def add_reminder_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     
     task_id = int(context.args[0])
     try:
-        remind_at = datetime.strptime(" ".join(context.args[1:]), "%Y-%m-%d %H:%M")
+        remind_at = parse_datetime_string(" ".join(context.args[1:]), "%Y-%m-%d %H:%M")
         
         # Check if reminder time is in the past
-        if remind_at <= datetime.now():
+        if remind_at <= get_current_datetime():
             await update.message.reply_text(
                 MessageFormatter.format_error_message(
                     "Reminder time is in the past",
@@ -240,7 +241,7 @@ async def add_reminder_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         reminder = repo.add_reminder(task_id, remind_at)
         
         # Calculate time until reminder
-        time_until = remind_at - datetime.now()
+        time_until = remind_at - get_current_datetime()
         hours_until = int(time_until.total_seconds() // 3600)
         minutes_until = int((time_until.total_seconds() % 3600) // 60)
         
@@ -256,7 +257,7 @@ async def add_reminder_handler(update: Update, context: ContextTypes.DEFAULT_TYP
                 {
                     "Task ID": task_id,
                     "Task": task.description,
-                    "Reminder Time": remind_at.strftime("%Y-%m-%d %H:%M"),
+                    "Reminder Time": format_datetime_for_display(remind_at, "%Y-%m-%d %H:%M"),
                     "Time Until": time_text.strip(),
                     "Reminder ID": reminder.id
                 }
@@ -283,17 +284,17 @@ async def quick_reminder_handler(update: Update, context: ContextTypes.DEFAULT_T
     try:
         if time_str.endswith('m'):
             minutes = int(time_str[:-1])
-            remind_at = datetime.now() + timedelta(minutes=minutes)
+            remind_at = get_current_datetime() + timedelta(minutes=minutes)
         elif time_str.endswith('h'):
             hours = int(time_str[:-1])
-            remind_at = datetime.now() + timedelta(hours=hours)
+            remind_at = get_current_datetime() + timedelta(hours=hours)
         elif time_str.endswith('d'):
             days = int(time_str[:-1])
-            remind_at = datetime.now() + timedelta(days=days)
+            remind_at = get_current_datetime() + timedelta(days=days)
         else:
             # Try to parse as minutes if no suffix
             minutes = int(time_str)
-            remind_at = datetime.now() + timedelta(minutes=minutes)
+            remind_at = get_current_datetime() + timedelta(minutes=minutes)
     except ValueError:
         await update.message.reply_text(
             MessageFormatter.format_error_message(
@@ -327,7 +328,7 @@ async def quick_reminder_handler(update: Update, context: ContextTypes.DEFAULT_T
                 {
                     "Task ID": task_id,
                     "Task": task.description,
-                    "Reminder Time": remind_at.strftime("%Y-%m-%d %H:%M"),
+                    "Reminder Time": format_datetime_for_display(remind_at, "%Y-%m-%d %H:%M"),
                     "Time Until": time_str,
                     "Reminder ID": reminder.id
                 }
@@ -357,7 +358,7 @@ async def list_reminders_handler(update: Update, context: ContextTypes.DEFAULT_T
         # Format reminder list with rich formatting
         message = f"⏰ **All Reminders** \\({len(reminders)} active\\)\n\n"
         
-        now = datetime.now()
+        now = get_current_datetime()
         
         for i, reminder in enumerate(reminders, 1):
             # Get task details
@@ -397,7 +398,7 @@ async def list_reminders_handler(update: Update, context: ContextTypes.DEFAULT_T
                     time_text = f"{minutes}m"
             
             message += f"{i}\\. {status_emoji} **{MessageFormatter.escape_markdown(task_description)}**\n"
-            message += f"   🕐 {reminder.remind_at.strftime('%Y-%m-%d %H:%M')}\n"
+            message += f"   🕐 {format_datetime_for_display(reminder.remind_at, '%Y-%m-%d %H:%M')}\n"
             message += f"   ⏰ {time_text} \\({status_text}\\)\n"
             message += f"   📋 Task ID: {reminder.task_id}\n"
             message += f"   🆔 Reminder ID: {reminder.id}\n\n"

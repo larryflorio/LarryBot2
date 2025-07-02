@@ -4,6 +4,12 @@ description: Data model reference for LarryBot2
 last_updated: 2025-06-28
 ---
 
+> **Timezone Handling:**
+> - All datetimes in LarryBot2 are stored in UTC in the database for consistency and reliability.
+> - All datetimes are transparently converted to and from the user's configured/system timezone for display and business logic.
+> - All datetimes are timezone-aware and Daylight Saving Time (DST) is handled automatically.
+> - **Best Practice:** Always use the provided timezone utilities for all datetime operations in plugins and integrations.
+
 # Models API Reference 📊
 
 > **Breadcrumbs:** [Home](../../README.md) > [API Reference](README.md) > Models
@@ -26,17 +32,17 @@ class Task(Base):
     done = Column(Boolean, default=False)
     client_id = Column(Integer, ForeignKey('clients.id'), nullable=True)
     priority = Column(String, default='medium')  # low, medium, high
-    due_date = Column(Date, nullable=True)
+    due_date = Column(Date, nullable=True)  # Displayed in local timezone, stored as UTC
     category = Column(String, nullable=True)
     status = Column(String, default='todo')  # todo, in_progress, done
     estimated_hours = Column(Float, nullable=True)
     actual_hours = Column(Float, default=0.0)
-    started_at = Column(DateTime, nullable=True)
+    started_at = Column(DateTime, nullable=True)  # Displayed in local timezone, stored as UTC
     parent_id = Column(Integer, ForeignKey('tasks.id'), nullable=True)
     tags = Column(String, nullable=True)  # comma-separated
     description_rich = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)  # Always UTC
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)  # Always UTC
     
     # Relationships
     client = relationship("Client", back_populates="tasks")

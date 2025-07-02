@@ -177,7 +177,7 @@ main_menu                   # Return to main menu
 - `status`: One of "Todo", "In Progress", "Review", "Done"
 - `category`: Task category name
 - `tags`: Comma-separated list of tags
-- `due_date`: Date in YYYY-MM-DD format
+- `due_date`: Date in YYYY-MM-DD format (displayed in local timezone, stored as UTC)
 - `duration_minutes`: Time duration in minutes
 
 ### File Attachment Parameters
@@ -210,8 +210,8 @@ main_menu                   # Return to main menu
 ### Reminder Parameters
 - `reminder_id`: Numeric ID of the reminder
 - `message`: Reminder message text
-- `date`: Date in YYYY-MM-DD format
-- `time`: Time in HH:MM format
+- `date`: Date in YYYY-MM-DD format (displayed in local timezone, stored as UTC)
+- `time`: Time in HH:MM format (displayed in local timezone, stored as UTC)
 
 ### Habit Parameters
 - `habit_id`: Numeric ID of the habit
@@ -366,6 +366,14 @@ All callback handlers follow consistent patterns:
 - **Caching**: Cache frequently accessed data
 - **Batch operations**: Use bulk operations when possible
 - **Database optimization**: Use efficient queries and indexes
+
+## 🎮 Timezone Handling
+
+> **Timezone Handling:**
+> - All datetimes/times in LarryBot2 are stored in UTC in the database for consistency and reliability.
+> - All times shown to users (command input/output, reminders, due dates, analytics, etc.) are transparently converted to and from the user's configured/system timezone.
+> - All datetimes are timezone-aware and DST is handled automatically.
+> - **Best Practice:** Always use the provided timezone utilities for all datetime operations in plugins and integrations.
 
 ---
 

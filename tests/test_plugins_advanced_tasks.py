@@ -136,12 +136,19 @@ class TestAdvancedTasksPlugin:
             await add_task_with_metadata_handler(mock_update, mock_context)
             
             # Assert
-            mock_task_service.create_task_with_metadata.assert_called_once_with(
-                description="Test task",
-                priority="High",
-                due_date=datetime(2025, 7, 15),
-                category="Work"
-            )
+            # Get the actual call arguments
+            actual_call = mock_task_service.create_task_with_metadata.call_args
+            actual_kwargs = actual_call[1]  # Get keyword arguments
+            
+            # Check the call was made with correct arguments
+            assert actual_kwargs['description'] == "Test task"
+            assert actual_kwargs['priority'] == "High"
+            assert actual_kwargs['category'] == "Work"
+            
+            # Check due_date is timezone-aware and has correct date
+            due_date = actual_kwargs['due_date']
+            assert due_date.tzinfo is not None  # Should be timezone-aware
+            assert due_date.date() == datetime(2025, 7, 15).date()  # Same date
             mock_update.message.reply_text.assert_called_once()
             call_args = mock_update.message.reply_text.call_args
             response_text = call_args[0][0]
@@ -240,7 +247,17 @@ class TestAdvancedTasksPlugin:
             await due_date_handler(mock_update, mock_context)
             
             # Assert
-            mock_task_service.update_task_due_date.assert_called_once_with(1, datetime(2025, 7, 15))
+            # Get the actual call arguments
+            actual_call = mock_task_service.update_task_due_date.call_args
+            actual_args = actual_call[0]  # Get positional arguments
+            
+            # Check the call was made with correct arguments
+            assert actual_args[0] == 1  # task_id
+            
+            # Check due_date is timezone-aware and has correct date
+            due_date = actual_args[1]
+            assert due_date.tzinfo is not None  # Should be timezone-aware
+            assert due_date.date() == datetime(2025, 7, 15).date()  # Same date
             call_args = mock_update.message.reply_text.call_args
             response_text = call_args[0][0]
             parse_mode = call_args[1].get('parse_mode')

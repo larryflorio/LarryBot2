@@ -276,6 +276,21 @@ LarryBot integrates advanced NLP features to enhance user experience and product
 ### [2025-07-02] NLP Entity Extraction Update
 - Date extraction is now unified: the 'date' key is always present if any date is found (from either dateparser or spaCy NER), and 'all_dates' contains all found dates. This ensures consistent, backward-compatible access to date entities for all downstream consumers and tests.
 
+## 🕒 Timezone and Datetime Handling
+
+LarryBot2 uses a centralized timezone management system for all time-sensitive features. The `TimeZoneService` (larrybot/core/timezone.py) and `datetime_utils` (larrybot/utils/datetime_utils.py) modules provide robust, maintainable, and consistent timezone handling across the codebase.
+
+- **UTC Storage**: All datetimes are stored in UTC in the database for consistency and reliability.
+- **Local Display**: All times shown to users are transparently converted to and from the user's configured/system timezone.
+- **Automatic Detection**: The system detects the local timezone at startup, with manual override and fallback to UTC.
+- **DST Handling**: Daylight Saving Time is handled automatically.
+- **Best Practices**:
+  - Always use the provided timezone utilities for all datetime operations in plugins and integrations.
+  - All datetime comparisons, filtering, and analytics should use the timezone-aware utilities.
+  - Never use naive datetime operations or direct datetime.now()/utcnow() in business logic.
+
+> See the developer guide and API reference for code examples and integration tips.
+
 ---
 
 *Last Updated: June 30, 2025 - Enterprise Performance Architecture* 

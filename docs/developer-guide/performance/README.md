@@ -302,6 +302,18 @@ with get_optimized_session() as session:
 "
 ```
 
+## 🕒 Timezone-Aware Performance
+
+LarryBot2's timezone system is designed for both correctness and performance:
+- **Centralized Timezone Management**: All datetime operations use a single, efficient service for conversions and detection.
+- **Optimized Utilities**: The `datetime_utils` module provides fast, consistent, and safe timezone-aware replacements for all common datetime operations.
+- **Best Practices**:
+  - Always use the provided timezone utilities for all datetime operations in plugins and integrations.
+  - Avoid direct use of datetime.now()/utcnow() in business logic.
+  - All analytics, filtering, and time-based queries should use timezone-aware utilities for accuracy and performance.
+
+> See the architecture overview and API reference for more details and code examples.
+
 ## 🛠️ Performance Best Practices
 
 ### **NEW: Caching Best Practices**

@@ -4,6 +4,11 @@ description: Event system reference for LarryBot2
 last_updated: 2025-06-28
 ---
 
+> **Timezone Handling:**
+> - All event timestamps in LarryBot2 are stored in UTC for consistency and reliability.
+> - All event datetimes are transparently converted to and from the user's configured/system timezone for display and business logic.
+> - All datetimes are timezone-aware and DST is handled automatically.
+
 # Events API Reference 📡
 
 > **Breadcrumbs:** [Home](../../README.md) > [API Reference](README.md) > Events
@@ -92,7 +97,8 @@ LarryBot2 uses an event-driven architecture where components communicate through
 
 ### Task Event Data
 ```python
-# task_created, task_updated
+# All datetimes below are stored in UTC, but displayed in the user's local/system timezone.
+# All datetimes are timezone-aware and DST is handled automatically.
 {
     "task_id": 1,
     "description": "Task description",
@@ -179,7 +185,8 @@ LarryBot2 uses an event-driven architecture where components communicate through
 
 ### Reminder Event Data
 ```python
-# reminder_created, reminder_updated
+# All datetimes below are stored in UTC, but displayed in the user's local/system timezone.
+# All datetimes are timezone-aware and DST is handled automatically.
 {
     "reminder_id": 1,
     "message": "Call client",

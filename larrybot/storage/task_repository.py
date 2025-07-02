@@ -9,6 +9,7 @@ import json
 from sqlalchemy import or_, and_, func, text, desc, asc
 from larrybot.utils.caching import cached, cache_invalidate, cache_clear
 from larrybot.utils.background_processing import background_task, submit_background_job
+from larrybot.utils.datetime_utils import get_current_datetime, get_current_utc_datetime, get_today_date, get_start_of_day, get_end_of_day
 import logging
 from larrybot.models.enums import TaskStatus
 
@@ -233,7 +234,7 @@ class TaskRepository:
     @cached(ttl=180.0)  # Cache for 3 minutes - changes frequently
     def get_overdue_tasks(self) -> List[Task]:
         """Get all overdue tasks with optimized client loading."""
-        now = datetime.utcnow()
+        now = get_current_utc_datetime()
         return (self.session.query(Task)
                 .options(joinedload(Task.client))
                 .filter(
@@ -257,9 +258,9 @@ class TaskRepository:
 
     def get_tasks_due_today(self) -> List[Task]:
         """Get tasks due today."""
-        today = datetime.utcnow().date()
-        start_of_day = datetime.combine(today, datetime.min.time())
-        end_of_day = datetime.combine(today, datetime.max.time())
+        today = get_today_date()
+        start_of_day = get_start_of_day()
+        end_of_day = get_end_of_day()
         return self.get_tasks_due_between(start_of_day, end_of_day)
 
     def update_due_date(self, task_id: int, due_date: datetime) -> Optional[Task]:
@@ -359,7 +360,7 @@ class TaskRepository:
         # Query directly to ensure we have a session-attached object
         task = self.session.query(Task).filter_by(id=task_id).first()
         if task and not task.started_at:
-            task.started_at = datetime.utcnow()
+            task.started_at = get_current_utc_datetime()
             self.session.commit()
             return True
         return False
@@ -369,7 +370,7 @@ class TaskRepository:
         # Query directly to ensure we have a session-attached object
         task = self.session.query(Task).filter_by(id=task_id).first()
         if task and task.started_at:
-            end_time = datetime.utcnow()
+            end_time = get_current_utc_datetime()
             duration = (end_time - task.started_at).total_seconds() / 3600  # Convert to hours
             task.actual_hours = (task.actual_hours or 0) + duration
             task.started_at = None

@@ -15,6 +15,18 @@ LarryBot2 provides a comprehensive task management system with **enhanced unifie
 > - **Advanced Users**: Add optional parameters for enhanced functionality
 > - **Migration**: All old commands (`/addtask`, `/tasks`) automatically redirect with helpful guidance
 
+## 🌍 Timezone Handling
+
+All task due dates, creation times, and time tracking entries are displayed in your configured or automatically detected local timezone. Internally, all times are stored in UTC for reliability and consistency. Daylight Saving Time (DST) is handled automatically for all supported timezones.
+
+- **Local Display**: Due dates, creation times, and time tracking are always shown in your local time.
+- **UTC Storage**: All times are stored in UTC in the database.
+- **Manual Override**: Use `/timezone` to set your timezone, or `/autotimezone` to reset to automatic detection.
+- **DST Support**: DST changes are handled automatically.
+- **Fallback**: If timezone detection fails, UTC is used as a safe default.
+
+> **Tip:** If your task times appear off, check your timezone setting with `/timezone`.
+
 ---
 
 ## 🚀 **Enhanced Basic Commands**

@@ -498,6 +498,18 @@ Get AI-powered priority suggestions for new tasks based on description analysis.
 - **Privacy Compliance**: Respect for user data privacy
 - **Audit Trail**: Logging of analytics access
 
+## 🌍 Timezone Handling
+
+All analytics, productivity reports, and time tracking data are displayed in your configured or automatically detected local timezone. Internally, all times are stored in UTC for reliability and consistency. Daylight Saving Time (DST) is handled automatically for all supported timezones.
+
+- **Local Display**: Analytics, time tracking, and report periods are always shown in your local time.
+- **UTC Storage**: All times are stored in UTC in the database.
+- **Manual Override**: Use `/timezone` to set your timezone, or `/autotimezone` to reset to automatic detection.
+- **DST Support**: DST changes are handled automatically.
+- **Fallback**: If timezone detection fails, UTC is used as a safe default.
+
+> **Tip:** If your analytics or time tracking data appears off, check your timezone setting with `/timezone`.
+
 ---
 
 *Last updated: June 28, 2025* 

@@ -50,6 +50,7 @@ from larrybot.scheduler import start_scheduler
 from larrybot.plugins.reminder import register_event_handler, subscribe_to_events
 from larrybot.services.health_service import HealthService
 from larrybot.core.task_manager import get_task_manager, managed_task_context
+from larrybot.core.timezone import initialize_timezone_service
 from larrybot.utils.caching import cache_stats
 from datetime import datetime
 import asyncio
@@ -93,6 +94,11 @@ async def async_main():
             # Load configuration
             logger.info("⚙️ Loading configuration...")
             config = Config()
+            
+            # Initialize timezone service
+            logger.info("🌍 Initializing timezone service...")
+            timezone_service = initialize_timezone_service(config.TIMEZONE if config.TIMEZONE else None)
+            logger.info(f"✅ Timezone service initialized: {timezone_service.timezone_name}")
             
             # Initialize dependency injection container
             logger.info("🔧 Setting up dependency injection...")

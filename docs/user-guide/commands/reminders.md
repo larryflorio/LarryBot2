@@ -217,6 +217,18 @@ Each reminder shows:
 - **Real-time feedback**: Immediate updates and visual confirmation
 - **Task integration**: Seamless task completion from reminders
 
+## 🌍 Timezone Handling
+
+All reminder times in LarryBot2 are displayed in your configured or automatically detected local timezone. Internally, all times are stored in UTC for reliability and consistency. Daylight Saving Time (DST) is handled automatically for all supported timezones.
+
+- **Local Display**: Reminders, due dates, and snooze times are always shown in your local time.
+- **UTC Storage**: All reminder times are stored in UTC in the database.
+- **Manual Override**: Use `/timezone` to set your timezone, or `/autotimezone` to reset to automatic detection.
+- **DST Support**: DST changes are handled automatically.
+- **Fallback**: If timezone detection fails, UTC is used as a safe default.
+
+> **Tip:** If your reminders appear at the wrong time, check your timezone setting with `/timezone`.
+
 ---
 
 **Related Commands**: [Task Management](task-management.md) → [Calendar Integration](calendar-integration.md) → [Habits](habits.md) 

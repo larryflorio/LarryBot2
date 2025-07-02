@@ -14,6 +14,7 @@ import json
 
 from larrybot.models import Base
 from larrybot.models.enums import TaskStatus, TaskPriority, validate_enum_value
+from larrybot.utils.datetime_utils import get_current_datetime, get_current_utc_datetime, is_overdue, days_until_due, hours_elapsed_since
 
 
 class Task(Base):
@@ -146,9 +147,9 @@ class Task(Base):
         
         # Set default timestamps if not provided
         if 'created_at' not in kwargs:
-            kwargs['created_at'] = datetime.utcnow()
+            kwargs['created_at'] = get_current_utc_datetime()
         if 'updated_at' not in kwargs:
-            kwargs['updated_at'] = datetime.utcnow()
+            kwargs['updated_at'] = get_current_utc_datetime()
         
         # Ensure defaults for required enum fields
         if 'status' not in kwargs:
@@ -183,7 +184,7 @@ class Task(Base):
         # Synchronize done field with status
         self.done = value.is_completed
         if value.is_completed and not self.completed_at:
-            self.completed_at = datetime.utcnow()
+            self.completed_at = get_current_utc_datetime()
     
     @property
     def priority_enum(self) -> Optional[TaskPriority]:
@@ -281,15 +282,12 @@ class Task(Base):
         """Check if task is overdue."""
         if not self.due_date or self.status_enum.is_completed:
             return False
-        return datetime.utcnow() > self.due_date
+        return is_overdue(self.due_date)
     
     @property
     def days_until_due(self) -> Optional[int]:
         """Get days until due date."""
-        if not self.due_date:
-            return None
-        delta = self.due_date - datetime.utcnow()
-        return delta.days
+        return days_until_due(self.due_date)
     
     @property
     def time_spent_hours(self) -> float:
@@ -315,7 +313,7 @@ class Task(Base):
         if not sla_hours:
             return None
         
-        hours_elapsed = (datetime.utcnow() - self.created_at).total_seconds() / 3600
+        hours_elapsed = hours_elapsed_since(self.created_at)
         return max(0, sla_hours - hours_elapsed)
     
     @property
@@ -339,11 +337,11 @@ class Task(Base):
         
         # Calculate based on current velocity
         remaining_hours = self.estimated_hours * (100 - self.progress) / 100
-        hours_per_day = hours_spent / max(1, (datetime.utcnow() - self.created_at).days or 1)
+        hours_per_day = hours_spent / max(1, (get_current_datetime() - self.created_at).days or 1)
         
         if hours_per_day > 0:
             days_remaining = remaining_hours / hours_per_day
-            return datetime.utcnow() + timedelta(days=days_remaining)
+            return get_current_datetime() + timedelta(days=days_remaining)
         
         return None
     

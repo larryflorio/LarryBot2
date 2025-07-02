@@ -9,6 +9,7 @@ import logging
 import time
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from larrybot.utils.datetime_utils import get_current_datetime, get_current_utc_datetime
 
 scheduler = BackgroundScheduler()
 _event_bus = None
@@ -33,7 +34,7 @@ def check_due_reminders():
 def _check_reminders_safe():
     """Safe reminder checking with proper error isolation."""
     start_time = time.time()
-    now = datetime.now()
+    now = get_current_datetime()
     
     try:
         # Use shorter-lived session with aggressive timeout

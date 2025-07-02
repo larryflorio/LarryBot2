@@ -646,6 +646,18 @@ class KeyboardBuilder:
         ]
         
         return InlineKeyboardMarkup(buttons)
+    
+    @staticmethod
+    def build_timezone_keyboard() -> InlineKeyboardMarkup:
+        """Build keyboard for timezone management."""
+        buttons = [
+            [InlineKeyboardButton("⚙️ Set Timezone", callback_data="timezone_set")],
+            [InlineKeyboardButton("🔍 Search Timezones", callback_data="timezone_search")],
+            [InlineKeyboardButton("🔄 Auto Detect", callback_data="timezone_auto")],
+            [InlineKeyboardButton("📋 List All", callback_data="timezone_list")],
+            [InlineKeyboardButton("⬅️ Back", callback_data="nav_back")]
+        ]
+        return InlineKeyboardMarkup(buttons)
 
 
 class MessageFormatter:

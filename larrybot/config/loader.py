@@ -20,6 +20,10 @@ class Config:
         self.MAX_REQUESTS_PER_MINUTE: int = int(os.getenv('MAX_REQUESTS_PER_MINUTE', '60'))
         self.NLP_ENABLED: bool = os.getenv('NLP_ENABLED', 'true').lower() == 'true'
         self.NLP_MODEL: str = os.getenv('NLP_MODEL', 'en_core_web_sm')
+        
+        # Timezone configuration
+        self.TIMEZONE: str = os.getenv('TIMEZONE', '')  # Empty for auto-detection
+        self.TIMEZONE_AUTO_DETECT: bool = os.getenv('TIMEZONE_AUTO_DETECT', 'true').lower() == 'true'
 
     def validate(self) -> None:
         """Validate required configuration values."""
@@ -49,5 +53,7 @@ class Config:
             "rate_limit_per_minute": self.MAX_REQUESTS_PER_MINUTE,
             "log_level": self.LOG_LEVEL,
             "nlp_enabled": self.NLP_ENABLED,
-            "nlp_model": self.NLP_MODEL
+            "nlp_model": self.NLP_MODEL,
+            "timezone": self.TIMEZONE or "auto-detected",
+            "timezone_auto_detect": self.TIMEZONE_AUTO_DETECT
         } 

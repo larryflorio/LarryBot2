@@ -15,6 +15,18 @@ LarryBot2 is designed for individual users managing their personal tasks, client
 - **Individual Analytics**: Personal productivity insights and trends
 - **Simplified Architecture**: No multi-user complexity or user isolation overhead
 
+## 🌍 Timezone Handling
+
+All advanced task features (due dates, time tracking, analytics, reminders) are timezone-aware. Times are displayed in your configured or automatically detected local timezone, but stored in UTC for reliability and consistency. Daylight Saving Time (DST) is handled automatically for all supported timezones.
+
+- **Local Display**: All advanced task times are shown in your local time.
+- **UTC Storage**: All times are stored in UTC in the database.
+- **Manual Override**: Use `/timezone` to set your timezone, or `/autotimezone` to reset to automatic detection.
+- **DST Support**: DST changes are handled automatically.
+- **Fallback**: If timezone detection fails, UTC is used as a safe default.
+
+> **Tip:** If your advanced task times appear off, check your timezone setting with `/timezone`.
+
 ## Current State Analysis
 
 ### Existing Capabilities ✅
