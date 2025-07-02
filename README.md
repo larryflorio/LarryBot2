@@ -1,21 +1,22 @@
 # LarryBot2 🤖
 
-> **Enterprise-Grade Telegram Task Management Bot**  
-> *Single-user optimized with powerful productivity features, interactive action buttons, and 30-50% faster performance*
+> **Personal Productivity Powerhouse**  
+> *Advanced task management, analytics, and automation—optimized for single-user performance, privacy, and speed.*
 
 [![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://python.org)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/Tests-986%20Passing-brightgreen.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/Coverage-73%25-brightgreen.svg)](tests/)
 [![Documentation](https://img.shields.io/badge/Docs-Complete-blue.svg)](docs/)
-[![Performance](https://img.shields.io/badge/Performance-Enterprise%20Grade-gold.svg)](docs/developer-guide/performance/)
+[![Performance](https://img.shields.io/badge/Performance-High%20Performance-gold.svg)](docs/developer-guide/performance/)
 
 ## 🎯 Overview
 
-LarryBot2 is a comprehensive Telegram bot for advanced task management, designed specifically for single-user optimization with **enterprise-grade performance**. With **86 powerful commands**, **interactive action buttons**, and **446x performance improvements** through intelligent caching, it provides everything you need for efficient task organization, time tracking, and productivity management.
+LarryBot2 is a comprehensive Telegram bot for advanced personal productivity, designed specifically for single-user optimization with **high-performance features**. With **86 powerful commands**, **interactive action buttons**, and **blazing-fast performance** through intelligent caching, it provides everything you need for efficient task organization, time tracking, and productivity management.
 
 ### ✨ Key Features
 
+- **🧠 Natural Language Processing (NLP)** – Understands user intent, extracts dates/times/task names, and analyzes sentiment using a local, privacy-preserving pipeline (spaCy + dateparser). Enables more natural, flexible command input and future AI-driven features.
 - **📋 Advanced Task Management** - Create, edit, and organize tasks with metadata and **cached performance**
 - **🎮 Interactive Action Buttons** - Quick actions for tasks, clients, habits, and reminders with **instant feedback**
 - **⏰ Time Tracking** - Track time spent on tasks with manual entry support
@@ -28,11 +29,11 @@ LarryBot2 is a comprehensive Telegram bot for advanced task management, designed
 - **📈 Habit Tracking** - Build and track daily habits
 - **🤖 AI Suggestions** - Get intelligent priority suggestions
 
-### 🚀 **NEW: Enterprise Performance Features (June 30, 2025)**
+### 🚀 **NEW: High-Performance Features (June 30, 2025)**
 
-- **⚡ 30-50% Faster Responses** - Intelligent query caching with smart invalidation
+- **⚡ Blazing-Fast Responses** - Intelligent query caching with smart invalidation
 - **🔄 Non-blocking Analytics** - Background processing with immediate user feedback  
-- **💾 20-30% Memory Reduction** - Optimized session lifecycle management
+- **💾 Memory Efficiency** - Optimized session lifecycle management
 - **📊 Real-time Monitoring** - Comprehensive performance tracking and alerting
 - **🛡️ Network Resilience** - Enhanced error handling with timeout protection
 - **🎯 Loading Indicators** - Immediate visual feedback for all operations
@@ -155,9 +156,9 @@ python -m larrybot
 
 ## 🔄 **Recent Updates**
 
-### **🏆 MAJOR: Enterprise Performance Optimization (June 30, 2025)**
+### **🏆 MAJOR: High-Performance Optimization (June 30, 2025)**
 
-**Comprehensive Performance Transformation** - LarryBot2 has been upgraded with enterprise-grade performance optimizations:
+**Comprehensive Performance Transformation** - LarryBot2 has been upgraded with high-performance optimizations:
 
 #### **Query Result Caching System** ⚡
 - **446x faster** cached operations (16ms → 0.0ms)
@@ -184,10 +185,10 @@ python -m larrybot
 - **Better perceived performance** through responsive UI
 
 ### **Performance Achievements:**
-- ✅ **30-50% faster responses** for repeated operations
+- ✅ **Blazing-fast responses** for repeated operations
 - ✅ **Non-blocking analytics** with immediate user feedback
-- ✅ **20-30% memory reduction** through optimized sessions
-- ✅ **Enterprise-grade monitoring** with real-time performance tracking
+- ✅ **Memory efficiency** through optimized sessions
+- ✅ **Comprehensive monitoring** with real-time performance tracking
 - ✅ **Enhanced network resilience** with timeout protection
 
 ### Action Button Implementation ✅ (June 29, 2025)
@@ -220,7 +221,7 @@ python -m larrybot
 
 ## 🏗️ Architecture
 
-LarryBot2 is built with a modern, modular architecture enhanced with enterprise-grade performance components:
+LarryBot2 is built with a modern, modular architecture enhanced with high-performance components:
 
 ```
 larrybot/
@@ -249,7 +250,7 @@ larrybot/
 
 ## 📊 **Performance**
 
-### **Enterprise-Grade Performance Characteristics**
+### **High-Performance Characteristics**
 - **Cached Operations**: < 1ms (446x improvement from 16ms)
 - **Basic Commands**: < 100ms for basic commands
 - **Complex Operations**: < 300ms for bulk operations
@@ -380,7 +381,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Last Updated**: July 2, 2025  
-**Version**: 2.1.0 - Enterprise Performance Edition  
+**Version**: 2.1.0 - High-Performance Edition  
 **Total Commands**: 86  
 **Action Buttons**: ✅ Fully Implemented  
-**Performance**: ✅ Enterprise Grade (30-50% faster, 446x cached operations) 
+**Performance**: ✅ High Performance (30-50% faster, 446x cached operations) 
