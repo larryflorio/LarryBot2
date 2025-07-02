@@ -5,6 +5,7 @@ from larrybot.config.loader import Config
 from larrybot.core.command_registry import CommandRegistry
 from larrybot.plugins.reminder import set_main_event_loop
 from larrybot.utils.ux_helpers import MessageFormatter
+from larrybot.core.enhanced_message_processor import EnhancedMessageProcessor
 import asyncio
 import logging
 from larrybot.storage.db import get_session
@@ -53,6 +54,9 @@ class TelegramBotHandler:
         self.intent_recognizer = IntentRecognizer()
         self.entity_extractor = EntityExtractor()
         self.sentiment_analyzer = SentimentAnalyzer()
+        
+        # Enhanced UX system initialization
+        self.enhanced_message_processor = EnhancedMessageProcessor()
 
     def _is_authorized(self, update: Update) -> bool:
         """Check if the user is authorized to use this single-user bot."""
@@ -1745,19 +1749,37 @@ class TelegramBotHandler:
                 logger.error(f"Failed to send error message: {nested_e}")
 
     async def _handle_tasks_refresh_operation(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Handle the actual tasks refresh operation."""
+        """Handle the actual tasks refresh operation with enhanced UX."""
         from larrybot.utils.ux_helpers import MessageFormatter, KeyboardBuilder
         
         with next(get_session()) as session:
             repo = TaskRepository(session)
             tasks = repo.list_incomplete_tasks()
             
+            # Create context for enhanced UX processing
+            ux_context = {
+                'current_context': 'tasks',
+                'tasks': tasks,
+                'navigation_path': ['Main Menu', 'Tasks'],
+                'available_actions': [
+                    {'text': '➕ Add Task', 'callback_data': 'add_task', 'type': 'primary'},
+                    {'text': '🔄 Refresh', 'callback_data': 'tasks_refresh', 'type': 'primary'},
+                    {'text': '🔍 Search', 'callback_data': 'tasks_search', 'type': 'secondary'},
+                    {'text': '📊 Analytics', 'callback_data': 'tasks_analytics', 'type': 'secondary'},
+                    {'text': '🏠 Main Menu', 'callback_data': 'nav_main', 'type': 'navigation'}
+                ]
+            }
+            
             if not tasks:
                 message = "📋 **All Tasks Complete\\!** 🎉\n\nNo incomplete tasks found\\."
                 keyboard = KeyboardBuilder.build_add_task_keyboard()
             else:
-                message = MessageFormatter.format_task_list(tasks, title="📋 **Incomplete Tasks**")
-                keyboard = KeyboardBuilder.build_task_list_keyboard(tasks)
+                # Use enhanced message processing
+                message, keyboard = await self.enhanced_message_processor.process_message(
+                    MessageFormatter.format_task_list(tasks, title="📋 **Incomplete Tasks**"),
+                    ux_context,
+                    user_id=query.from_user.id if query.from_user else None
+                )
             
             await query.edit_message_text(
                 message,
@@ -1784,7 +1806,7 @@ class TelegramBotHandler:
                         parse_mode='MarkdownV2'
                     )
                     return
-                # Build detailed message
+                # Build detailed message with enhanced UX
                 details = {
                     "Task": task.description,
                     "ID": task.id,
@@ -1797,17 +1819,28 @@ class TelegramBotHandler:
                 }
                 # Remove None values
                 details = {k: v for k, v in details.items() if v is not None}
-                message = MessageFormatter.format_success_message("Task Details", details)
-                # Action buttons: Done, Edit, Delete, Back
-                from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-                keyboard = InlineKeyboardMarkup([
-                    [
-                        InlineKeyboardButton("✅ Done", callback_data=f"task_done:{task.id}"),
-                        InlineKeyboardButton("✏️ Edit", callback_data=f"task_edit:{task.id}"),
-                        InlineKeyboardButton("🗑️ Delete", callback_data=f"task_delete:{task.id}")
-                    ],
-                    [InlineKeyboardButton("⬅️ Back to List", callback_data="tasks_refresh")]
-                ])
+                
+                # Create context for enhanced UX processing
+                ux_context = {
+                    'current_context': 'task_view',
+                    'task': task,
+                    'entity_type': 'task',
+                    'entity_id': task.id,
+                    'navigation_path': ['Main Menu', 'Tasks', f'Task #{task.id}'],
+                    'available_actions': [
+                        {'text': '✅ Done', 'callback_data': f'task_done:{task.id}', 'type': 'primary'},
+                        {'text': '✏️ Edit', 'callback_data': f'task_edit:{task.id}', 'type': 'secondary'},
+                        {'text': '🗑️ Delete', 'callback_data': f'task_delete:{task.id}', 'type': 'secondary'},
+                        {'text': '⬅️ Back to List', 'callback_data': 'tasks_refresh', 'type': 'navigation'}
+                    ]
+                }
+                
+                # Use enhanced message processing
+                message, keyboard = await self.enhanced_message_processor.process_message(
+                    MessageFormatter.format_success_message("Task Details", details),
+                    ux_context,
+                    user_id=query.from_user.id if query.from_user else None
+                )
                 await query.edit_message_text(
                     message,
                     reply_markup=keyboard,
@@ -2465,19 +2498,47 @@ class TelegramBotHandler:
         )
 
     async def _global_error_handler(self, update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Handle all uncaught exceptions to prevent bot crashes."""
+        """Handle all uncaught exceptions to prevent bot crashes with enhanced error recovery."""
         logger.error(f"Exception while handling update: {context.error}")
         
-        # If update has a message, try to inform user
+        # If update has a message, try to inform user with enhanced error handling
         if update and hasattr(update, 'effective_message') and update.effective_message:
             try:
+                # Create error context for enhanced UX
+                error_context = {
+                    'current_context': 'error',
+                    'error_type': 'system_error',
+                    'navigation_path': ['Error Recovery'],
+                    'available_actions': [
+                        {'text': '🔄 Retry', 'callback_data': 'retry_action', 'type': 'primary'},
+                        {'text': '🏠 Main Menu', 'callback_data': 'nav_main', 'type': 'navigation'},
+                        {'text': '❓ Help', 'callback_data': 'show_help', 'type': 'secondary'}
+                    ]
+                }
+                
+                # Use enhanced error response
+                error_message, recovery_keyboard = self.enhanced_message_processor.create_error_response(
+                    'system_error',
+                    "⚠️ System temporarily unavailable. Please try again in a moment.",
+                    error_context
+                )
+                
                 await update.effective_message.reply_text(
-                    MessageFormatter.format_error_message(
-                        "⚠️ System temporarily unavailable",
-                        "Please try again in a moment\\. If the issue persists, check your network connection\\."
-                    ),
+                    error_message,
+                    reply_markup=recovery_keyboard,
                     parse_mode='MarkdownV2'
                 )
             except Exception as e:
-                logger.error(f"Failed to send error message to user: {e}")
-                # Don't let error handling cause more errors 
+                logger.error(f"Failed to send enhanced error message to user: {e}")
+                # Fallback to basic error message
+                try:
+                    await update.effective_message.reply_text(
+                        MessageFormatter.format_error_message(
+                            "⚠️ System temporarily unavailable",
+                            "Please try again in a moment\\. If the issue persists, check your network connection\\."
+                        ),
+                        parse_mode='MarkdownV2'
+                    )
+                except Exception as fallback_e:
+                    logger.error(f"Failed to send fallback error message: {fallback_e}")
+                    # Don't let error handling cause more errors 

@@ -1,7 +1,7 @@
 ---
 title: Developer Guide
 description: Complete developer guide for LarryBot2 architecture and development
-last_updated: 2025-06-29
+last_updated: 2025-07-02
 ---
 
 # Developer Guide 🛠️
@@ -22,6 +22,7 @@ Welcome to the LarryBot2 Developer Guide. This section covers architecture, deve
 - **✅ Factory system** for consistent test data creation
 - **✅ All tests aligned with MarkdownV2/UX formatting**
 - **✅ Performance optimizations verified** with test validation
+- **✅ Enhanced UX system** with 36 comprehensive UX tests
 - **✅ Best practices for updating tests with UX changes**
 
 > **Best Practice:** When bot responses or formatting change, update test assertions to match the new UX. Prefer substring checks and structure over brittle exact matches.
@@ -31,6 +32,7 @@ Welcome to the LarryBot2 Developer Guide. This section covers architecture, deve
 - **✅ Comprehensive documentation** with examples
 - **✅ Type hints** and modern Python practices
 - **✅ Error handling** and edge case coverage
+- **✅ Enhanced UX system** with modern design patterns
 
 ## 📚 Table of Contents
 - [Architecture](#architecture)
@@ -47,6 +49,7 @@ Welcome to the LarryBot2 Developer Guide. This section covers architecture, deve
 - **[Data Layer](architecture/data-layer.md)** - Database and data management
 - **[Single User Optimization](architecture/single-user-optimization.md)** - Performance optimizations
 - **[Performance Guide](performance/README.md)** - Performance optimization and monitoring
+- **[Enhanced UX System](architecture/enhanced-ux-system.md)** - Modern user experience architecture
 
 ## 🛠️ Development
 - **[Adding Commands](development/adding-commands.md)** - Create new bot commands

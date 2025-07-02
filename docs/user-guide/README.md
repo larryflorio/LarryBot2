@@ -1,7 +1,7 @@
 ---
 title: User Guide
 description: Complete user guide for LarryBot2 commands and features
-last_updated: 2025-06-28
+last_updated: 2025-07-02
 ---
 
 # User Guide 👥
@@ -26,6 +26,7 @@ Welcome to the LarryBot2 User Guide. This section covers all commands and featur
 - **[Habits](commands/habits.md)** - Build and track productive habits
 
 ## 🚀 Features
+- **[Enhanced UX System](features/enhanced-ux.md)** - Modern interface and user experience
 - **[Advanced Task Features](features/advanced-tasks.md)** - Advanced task capabilities
 - **[File Attachments](features/file-attachments.md)** - Attach files to tasks
 - **[Analytics](features/analytics.md)** - Task and client analytics
