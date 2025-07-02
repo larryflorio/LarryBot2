@@ -47,7 +47,7 @@ LarryBot2 implements comprehensive action button functionality across all major 
 
 ## 🎯 Command Summary
 
-**Total Commands**: 119 commands across 6 categories *(5 commands consolidated, 7 deprecation handlers added)*
+**Total Commands**: 86 commands across 7 categories *(5 commands consolidated, 7 deprecation handlers added)*
 
 > **📋 Command Consolidation Summary**: 5 major command mergers completed with full backward compatibility through 7 deprecation handlers.
 

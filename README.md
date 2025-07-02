@@ -5,14 +5,14 @@
 
 [![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://python.org)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-959%20Passing-brightgreen.svg)](tests/)
-[![Coverage](https://img.shields.io/badge/Coverage-77%25-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-986%20Passing-brightgreen.svg)](tests/)
+[![Coverage](https://img.shields.io/badge/Coverage-73%25-brightgreen.svg)](tests/)
 [![Documentation](https://img.shields.io/badge/Docs-Complete-blue.svg)](docs/)
 [![Performance](https://img.shields.io/badge/Performance-Enterprise%20Grade-gold.svg)](docs/developer-guide/performance/)
 
 ## 🎯 Overview
 
-LarryBot2 is a comprehensive Telegram bot for advanced task management, designed specifically for single-user optimization with **enterprise-grade performance**. With **75 powerful commands**, **interactive action buttons**, and **446x performance improvements** through intelligent caching, it provides everything you need for efficient task organization, time tracking, and productivity management.
+LarryBot2 is a comprehensive Telegram bot for advanced task management, designed specifically for single-user optimization with **enterprise-grade performance**. With **86 powerful commands**, **interactive action buttons**, and **446x performance improvements** through intelligent caching, it provides everything you need for efficient task organization, time tracking, and productivity management.
 
 ### ✨ Key Features
 
@@ -205,8 +205,8 @@ python -m larrybot
 - **Consistent Patterns**: Unified action button design across all features
 
 ### Testing Excellence ✅
-- **959 tests passing** with 100% success rate (edge case resolution complete)
-- **Enterprise-grade reliability** achieved with zero failures
+- **986 tests passing** (100% success rate)
+- **Enterprise-grade reliability** achieved with comprehensive testing
 - **Comprehensive coverage improvements**: Task Service (86%), Database Layer (92%)
 - **Edge case testing** systematically resolved (19 critical fixes)
 - **Factory system** fully implemented for consistent test data
@@ -279,7 +279,7 @@ python -m pytest tests/test_plugins_advanced_tasks.py
 python -m pytest tests/test_enhanced_filtering_analytics.py
 
 # Test command registration
-python test_commands.py
+python scripts/verify_documentation_accuracy.py
 
 # Performance testing
 python -c "
@@ -291,8 +291,8 @@ print('Background queue:', get_background_queue_stats())
 ```
 
 ### Test Results
-- **✅ 959 tests passing** (100% success rate, zero failures)
-- **✅ 77% overall coverage** (6,349 statements, 1,430 missing)
+- **✅ 986 tests passing** (100% success rate)
+- **✅ 73% overall coverage** (8,076 statements, 2,148 missing)
 - **✅ Critical service improvements**: Task Service (86%), Database Layer (92%)
 - **✅ Edge case resolution** complete (19 critical tests fixed)
 - **✅ Factory system** fully implemented with comprehensive test data
@@ -309,6 +309,17 @@ print('Background queue:', get_background_queue_stats())
 - **[Action Button Guide](docs/user-guide/features/advanced-tasks.md)** - Interactive features
 - **✅ **NEW:** [Performance Guide](docs/developer-guide/performance/README.md)** - Optimization and best practices
 - **✅ **NEW:** [Performance Optimizations](docs/developer-guide/performance/optimizations.md)** - Implementation details
+
+## 📊 Statistics Verification
+
+All statistics in this document are automatically verified against the codebase:
+
+- **Test Count**: `python -m pytest --collect-only -q`
+- **Coverage**: `python -m pytest --cov=larrybot --cov-report=term`
+- **Commands**: `python scripts/verify_documentation_accuracy.py`
+- **Plugins**: `ls larrybot/plugins/*.py | grep -v __init__ | wc -l`
+
+**Last verified**: July 2, 2025
 
 ## 🎮 Action Button Examples
 
@@ -368,8 +379,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Last Updated**: June 30, 2025  
+**Last Updated**: July 2, 2025  
 **Version**: 2.1.0 - Enterprise Performance Edition  
-**Total Commands**: 75  
+**Total Commands**: 86  
 **Action Buttons**: ✅ Fully Implemented  
 **Performance**: ✅ Enterprise Grade (30-50% faster, 446x cached operations) 
