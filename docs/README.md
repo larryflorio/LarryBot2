@@ -1,142 +1,138 @@
 ---
 title: LarryBot2 Documentation
-description: Complete documentation for LarryBot2 - A powerful, extensible Telegram bot with enhanced unified commands
+description: Complete documentation for LarryBot2 - Your personal productivity companion
 last_updated: 2025-07-02
 version: 2.4
 ---
 
 # LarryBot2 Documentation 🤖
 
-> **Breadcrumbs:** Home
+> **Your Personal Productivity Companion**  
+> *Task management, reminders, habits, and calendar integration—all in one powerful Telegram bot.*
 
-Welcome to the comprehensive documentation for LarryBot2 - your intelligent task management companion.
+Welcome to LarryBot2 - your intelligent task management companion that helps you stay organized, productive, and on top of your goals.
 
-> **🆕 New in v2.4 - Enhanced UX System:** Major UI/UX improvements completed! Enhanced message layout, smart navigation, error recovery systems, and visual feedback. All 1,034 tests passing with comprehensive coverage. See [Current State](project/current-state.md) for full details.
+## 🎯 What Can LarryBot2 Do For You?
 
-## 🏆 Project Status
+LarryBot2 transforms your Telegram into a powerful productivity hub. Whether you're managing work projects, personal tasks, or building better habits, LarryBot2 has you covered.
 
-> **📊 Latest Metrics**: For current statistics, test results, and detailed project metrics, see [Current State](project/current-state.md).
+### ✨ Key Features
 
-### Quick Summary
-- **✅ Production-ready architecture** with comprehensive features
-- **✅ Performance optimized** - Sub-second command responses achieved  
-- **✅ Extensible plugin architecture** with comprehensive task management
-- **✅ Advanced testing infrastructure** with factory system and modern practices
-- **✅ Database optimizations** - WAL mode, connection pooling, bulk operations
-- **✅ Enhanced UX system** - Modern message layout, smart navigation, error recovery
+- **📋 Smart Task Management** - Create, organize, and track tasks with natural language
+- **⏰ Intelligent Reminders** - Never miss important deadlines or appointments
+- **📈 Habit Tracking** - Build and maintain productive daily habits
+- **📅 Calendar Integration** - Sync with Google Calendar for seamless scheduling
+- **📊 Productivity Analytics** - Get insights into your productivity patterns
+- **📎 File Attachments** - Keep important files organized with your tasks
+- **🎮 Interactive Buttons** - Quick actions for faster task management
+- **🔍 Powerful Search** - Find tasks quickly with advanced filtering
 
-**Status**: Enterprise-grade task management bot with Enhanced UX System complete. All 1,034 tests passing (100% success rate). Production deployment ready.
+## 🚀 Quick Start
 
-## 📚 Table of Contents
-- [Getting Started](#getting-started)
-- [User Guide](#user-guide)
-- [Developer Guide](#developer-guide)
-- [Deployment](#deployment)
-- [Project Information](#project-information)
-- [Feedback & Versioning](#feedback--versioning)
+### Get Started in 5 Minutes
 
----
+1. **Set up your bot** - Follow our [Quick Start Guide](getting-started/quick-start.md)
+2. **Create your first task** - Try `/add "Buy groceries"`
+3. **Explore features** - Check out [Task Management](user-guide/commands/task-management.md)
 
-## 🚀 Getting Started
-- **[Installation Guide](getting-started/installation.md)** - Complete setup with quality verification
-- **[Quick Start](getting-started/quick-start.md)** - Fast setup tutorial
-- **[Configuration](getting-started/configuration.md)** - Environment and settings
-- **[Troubleshooting](getting-started/troubleshooting.md)** - Common issues and solutions
+### Your First Tasks
 
-## 👥 User Guide
-- **[System Commands](user-guide/commands/system-commands.md)**
-- **[Task Management](user-guide/commands/task-management.md)**
-- **[Advanced Task Features](user-guide/features/advanced-tasks.md)**
-- **[Client Management](user-guide/commands/client-management.md)**
-- **[Calendar Integration](user-guide/commands/calendar-integration.md)**
-- **[Reminders](user-guide/commands/reminders.md)**
-- **[Habits](user-guide/commands/habits.md)**
-- **[Analytics](user-guide/features/analytics.md)**
-- **[Health Monitoring](user-guide/features/health-monitoring.md)**
-- **[Examples](user-guide/examples.md)**
+```bash
+# Create a simple task
+/add "Buy groceries"
 
-## 🔧 Developer Guide
-- **[Architecture Overview](developer-guide/architecture/overview.md)** - System design and principles
-- **[Event System](developer-guide/architecture/event-system.md)** - Event-driven architecture
-- **[Plugin System](developer-guide/architecture/plugin-system.md)** - Extensible plugin architecture
-- **[Data Layer](developer-guide/architecture/data-layer.md)** - Database and data management
-- **[Performance Guide](developer-guide/performance/README.md)** - Performance optimization and monitoring
-- **[Adding Commands](developer-guide/development/adding-commands.md)** - Create new bot commands
-- **[Adding Plugins](developer-guide/development/adding-plugins.md)** - Develop custom plugins
-- **[Testing Guide](developer-guide/development/testing.md)** - Comprehensive testing strategies
-- **[Deployment Guide](developer-guide/development/deployment.md)** - Local and production deployment
-- **[API Reference](developer-guide/api-reference/)**
+# Add a task with priority and due date
+/add "Complete project proposal" high 2025-07-05
 
-## 🚀 Deployment
-- **[Production Deployment](deployment/production.md)** - Production setup guide
-- **[Docker Deployment](deployment/docker.md)** - Containerized deployment
-- **[Monitoring](deployment/monitoring.md)** - System monitoring and logging
+# Set up a reminder
+/addreminder "Team meeting" 2025-07-01 14:00
 
-## 📋 Project Information
-- **[Project Overview](project/README.md)** - Current status and feature set
-- **[Changelog](project/changelog.md)** - Complete change history
-- **[Achievements](project/achievements.md)** - Project milestones and accomplishments
-- **[Coverage Analysis](project/coverage-analysis.md)** - Test coverage metrics and analysis
-- **[Runtime Analysis](project/runtime-analysis.md)** - Performance monitoring results
-- **[Roadmap](project/roadmap.md)** - Future development plans
+# Start tracking a habit
+/habit_add "Daily exercise" "Exercise for 30 minutes"
+```
 
----
-
-## 🧪 Testing Excellence
-- **Comprehensive test suite**: Modern testing infrastructure covering all functionality
-- **Quality assurance**: High-quality automated testing with comprehensive error handling
-- **Continuous integration**: Automated testing and coverage reporting
-- **Advanced infrastructure**: Factory system for consistent test data creation
-- **Enhanced configuration**: Comprehensive test markers and performance monitoring
-- **Phase 3 improvements**: Enhanced UX system with 36 comprehensive tests
-
-> **📊 Detailed Testing Metrics**: For current test counts, coverage percentages, and status details, see [Current State](project/current-state.md).
-
-## 📝 Feedback & Versioning
-- **Last Updated:** July 2, 2025
-- **Version:** 2.4
-- **Feedback:**
-  - Found an error or have a suggestion? [Open an issue on GitHub](https://github.com/your-repo/issues)
-  - Use the feedback section in each guide to suggest improvements
-
----
-
-**Quick Navigation:**
-- [For New Users](getting-started/installation.md)
-- [For Developers](developer-guide/architecture/overview.md)
-- [For System Administrators](deployment/production.md)
-
----
-
-**LarryBot2** - Your intelligent task management companion 🤖✨
-
-## 🎯 Quick Navigation
+## 📚 Documentation Guide
 
 ### For New Users
-1. Start with **[Installation](getting-started/installation.md)**
-2. Follow the **[Quick Start](getting-started/quick-start.md)** guide
-3. Explore **[Task Management](user-guide/commands/task-management.md)** commands
+- **[Quick Start](getting-started/quick-start.md)** - Get up and running in 5 minutes
+- **[Installation Guide](getting-started/installation.md)** - Complete setup instructions
+- **[First Steps](getting-started/first-steps.md)** - Learn your first commands
 
-### For Developers
-1. Review the **[Architecture Overview](developer-guide/architecture/overview.md)**
-2. Learn about the **[Plugin System](developer-guide/architecture/plugin-system.md)**
-3. Check the **[Testing Guide](developer-guide/development/testing.md)**
-4. Explore the **[API Reference](developer-guide/api-reference/)**
+### For Daily Use
+- **[Task Management](user-guide/commands/task-management.md)** - Create and manage tasks
+- **[Reminders](user-guide/commands/reminders.md)** - Set up smart reminders
+- **[Habits](user-guide/commands/habits.md)** - Build productive habits
+- **[Calendar Integration](user-guide/commands/calendar-integration.md)** - Sync with Google Calendar
+- **[Client Management](user-guide/commands/client-management.md)** - Organize work by clients
 
-### For System Administrators
-1. Read **[Production Deployment](deployment/production.md)**
-2. Set up **[Monitoring](deployment/monitoring.md)**
-3. Configure **[Health Monitoring](user-guide/features/health-monitoring.md)**
+### For Power Users
+- **[Advanced Features](user-guide/features/advanced-tasks.md)** - Advanced task capabilities
+- **[Analytics](user-guide/features/analytics.md)** - Productivity insights
+- **[File Attachments](user-guide/features/file-attachments.md)** - Organize files with tasks
+- **[Examples](user-guide/examples.md)** - Real-world use cases
 
-## 🔍 Search Documentation
+### When You Need Help
+- **[Troubleshooting](getting-started/troubleshooting.md)** - Common issues and solutions
+- **[Getting Help](troubleshooting/getting-help.md)** - How to get support
 
-Use your browser's search function (Ctrl+F / Cmd+F) to find specific topics, commands, or code examples.
+## 🎮 Interactive Features
 
-## 📞 Support
+LarryBot2 makes task management effortless with interactive buttons:
 
-- **GitHub Issues**: Report bugs and feature requests
-- **Documentation Issues**: Found an error? Please report it
-- **Community**: Join our community discussions
+### Task Management
+- **👁️ View** - See detailed task information
+- **✅ Done** - Mark tasks complete with one click
+- **✏️ Edit** - Update task details inline
+- **🗑️ Delete** - Remove tasks with confirmation
+
+### Quick Actions
+- **➕ Add Task** - Create new tasks quickly
+- **🔄 Refresh** - Update your task list
+- **⬅️ Back** - Navigate between views
+
+## 📊 What You Can Accomplish
+
+### Daily Productivity
+- **Morning Routine**: Set up daily tasks and reminders
+- **Work Organization**: Manage projects and deadlines
+- **Personal Goals**: Track habits and personal projects
+- **Time Management**: Monitor how you spend your time
+
+### Project Management
+- **Task Organization**: Group tasks by project or client
+- **Progress Tracking**: Monitor completion rates and deadlines
+- **File Management**: Keep project files organized
+- **Team Coordination**: Share task status and updates
+
+### Habit Building
+- **Daily Habits**: Track exercise, reading, or other daily activities
+- **Progress Monitoring**: See your habit streaks and patterns
+- **Motivation**: Get insights into your consistency
+
+## 🔧 For Developers
+
+If you're interested in contributing or understanding the technical details:
+
+- **[Developer Guide](developer-guide/README.md)** - Architecture and development
+- **[Developer Guide](developer-guide/README.md)** - Technical documentation for developers
+
+## 📞 Support & Feedback
+
+- **Found a bug?** [Report it on GitHub](https://github.com/your-repo/issues)
+- **Have a suggestion?** We'd love to hear your ideas
+- **Need help?** Check our [troubleshooting guide](getting-started/troubleshooting.md)
+
+## 🎯 Success Stories
+
+> "LarryBot2 helped me organize my freelance work and never miss a deadline. The reminder system is a game-changer!" - *Sarah, Freelance Designer*
+
+> "I've built better habits using the habit tracking feature. Seeing my progress motivates me to keep going." - *Mike, Student*
+
+---
+
+**Ready to boost your productivity?** Start with our [Quick Start Guide](getting-started/quick-start.md) and create your first task in minutes!
+
+**LarryBot2** - Your intelligent task management companion 🤖✨
 
 ---
 

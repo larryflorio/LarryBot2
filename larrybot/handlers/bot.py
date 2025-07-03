@@ -17,6 +17,7 @@ from larrybot.core.dependency_injection import ServiceLocator
 from larrybot.nlp.intent_recognizer import IntentRecognizer
 from larrybot.nlp.entity_extractor import EntityExtractor
 from larrybot.nlp.sentiment_analyzer import SentimentAnalyzer
+from larrybot.nlp.enhanced_narrative_processor import EnhancedNarrativeProcessor
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -54,6 +55,9 @@ class TelegramBotHandler:
         self.intent_recognizer = IntentRecognizer()
         self.entity_extractor = EntityExtractor()
         self.sentiment_analyzer = SentimentAnalyzer()
+        
+        # Enhanced narrative processor initialization
+        self.enhanced_narrative_processor = EnhancedNarrativeProcessor()
         
         # Enhanced UX system initialization
         self.enhanced_message_processor = EnhancedMessageProcessor()
@@ -197,6 +201,8 @@ class TelegramBotHandler:
             await self._handle_menu_callback(query, context)
         elif callback_data.startswith("bulk_"):
             await self._handle_bulk_operations_callback(query, context)
+        elif callback_data.startswith("task_disclose:"):
+            await self._handle_task_disclosure(query, context)
         elif callback_data == "task_edit_cancel":
             await self._handle_task_edit_cancel(query, context)
         elif callback_data == "tasks_refresh":
@@ -593,16 +599,87 @@ class TelegramBotHandler:
                     # Event emission is non-critical, continue if it fails
                     pass
                 
+                # Build smart suggestions after task completion
+                from larrybot.utils.enhanced_ux_helpers import UnifiedButtonBuilder, ButtonType
+                
+                # Get remaining tasks for context
+                remaining_tasks = repo.list_incomplete_tasks()
+                high_priority_remaining = sum(1 for t in remaining_tasks if getattr(t, 'priority', 'Medium') in ['High', 'Critical'])
+                
+                # Build success message with smart suggestions
+                success_message = MessageFormatter.format_success_message(
+                    "✅ Task Completed!",
+                    {
+                        "Task": completed_task.description,
+                        "Status": "Completed",
+                        "Message": "🎉 Great work! Keep up the momentum!"
+                    }
+                )
+                
+                # Add smart suggestions based on remaining tasks
+                suggestions = []
+                if remaining_tasks:
+                    suggestions.append(f"📋 **{len(remaining_tasks)} tasks remaining**")
+                    if high_priority_remaining > 0:
+                        suggestions.append(f"⚠️ **{high_priority_remaining} high priority tasks** need attention")
+                    suggestions.append("💡 **Suggestions:**")
+                    suggestions.append("• Review your task list")
+                    suggestions.append("• Focus on high priority items")
+                    if len(remaining_tasks) > 5:
+                        suggestions.append("• Use filters to organize tasks")
+                else:
+                    suggestions.append("🎉 **All tasks complete!** Time to celebrate!")
+                    suggestions.append("💡 **Suggestions:**")
+                    suggestions.append("• Add new tasks to stay productive")
+                    suggestions.append("• Review your analytics")
+                
+                if suggestions:
+                    success_message += "\n\n" + "\n".join(suggestions)
+                
+                # Build smart action keyboard
+                custom_actions = [
+                    {
+                        "text": "📋 View Tasks",
+                        "callback_data": "tasks_refresh",
+                        "type": ButtonType.PRIMARY,
+                        "emoji": "📋"
+                    }
+                ]
+                
+                if remaining_tasks and high_priority_remaining > 0:
+                    custom_actions.append({
+                        "text": "⚠️ High Priority",
+                        "callback_data": "tasks_filter_priority_high",
+                        "type": ButtonType.WARNING,
+                        "emoji": "⚠️"
+                    })
+                
+                if remaining_tasks:
+                    custom_actions.append({
+                        "text": "➕ Add Task",
+                        "callback_data": "add_task",
+                        "type": ButtonType.SECONDARY,
+                        "emoji": "➕"
+                    })
+                else:
+                    custom_actions.append({
+                        "text": "📊 Analytics",
+                        "callback_data": "tasks_analytics",
+                        "type": ButtonType.INFO,
+                        "emoji": "📊"
+                    })
+                
+                keyboard = UnifiedButtonBuilder.build_entity_keyboard(
+                    entity_id=0,
+                    entity_type="task_completed",
+                    available_actions=[],
+                    custom_actions=custom_actions
+                )
+                
                 await query.edit_message_text(
-                    MessageFormatter.format_success_message(
-                        "✅ Task Completed!",
-                        {
-                            "Task": completed_task.description,
-                            "Status": "Completed",
-                            "Message": "🎉 Great work! Keep up the momentum!"
-                        }
-                    ),
-                    parse_mode='Markdown'
+                    success_message,
+                    reply_markup=keyboard,
+                    parse_mode='MarkdownV2'
                 )
             else:
                 await query.edit_message_text(
@@ -1623,45 +1700,169 @@ class TelegramBotHandler:
                 logger.error(f"Error during bot shutdown: {e}")
 
     async def _handle_text_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Handle text messages for task editing and NLP-driven commands."""
+        """Handle text messages with enhanced narrative processing and task editing."""
         user_message = update.message.text.strip() if update.message and update.message.text else None
         if not user_message:
             return
 
-        # --- NLP Processing (additive, non-breaking) ---
-        nlp_intent = self.intent_recognizer.recognize_intent(user_message)
-        nlp_entities = self.entity_extractor.extract_entities(user_message)
-        nlp_sentiment = self.sentiment_analyzer.analyze_sentiment(user_message)
-        context.user_data['nlp_intent'] = nlp_intent
-        context.user_data['nlp_entities'] = nlp_entities
-        context.user_data['nlp_sentiment'] = nlp_sentiment
-        # ------------------------------------------------
-
-        # --- NLP-driven routing (future expansion) ---
-        # If you want to route based on NLP intent/entities, add logic here.
-        # For now, all legacy flows are preserved. Only log NLP results for debugging.
-        # Example (disabled):
-        # if nlp_intent == 'create_task' and 'task_name' in nlp_entities:
-        #     # Route to task creation handler (future)
-        #     pass
-        # ------------------------------------------------
-
-        # Existing logic: task editing mode
+        # Check if user is in task editing mode
         if 'editing_task_id' in context.user_data:
-            task_id = context.user_data['editing_task_id']
-            new_description = user_message
-            if not new_description:
-                await update.message.reply_text(
-                    MessageFormatter.format_error_message(
-                        "Description cannot be empty",
-                        "Please provide a valid task description."
-                    ),
-                )
-                return
-            await self._process_task_edit(update, context, task_id, new_description)
-        else:
-            # Not in editing mode, ignore the message (future: NLP intent routing here)
+            await self._handle_task_edit_mode(update, context, user_message)
             return
+
+        # Enhanced narrative processing for free-form text
+        user_id = update.effective_user.id if update.effective_user else None
+        processed_input = self.enhanced_narrative_processor.process_input(user_message, user_id)
+        
+        # Store NLP results in context for debugging/legacy compatibility
+        context.user_data['nlp_intent'] = processed_input.intent.value
+        context.user_data['nlp_entities'] = processed_input.entities
+        context.user_data['nlp_sentiment'] = processed_input.context.sentiment
+        
+        # Route based on intent with confidence threshold
+        if processed_input.confidence > 0.5:
+            await self._handle_narrative_intent(update, context, processed_input)
+        else:
+            # Low confidence - show help and suggestions
+            await self._handle_low_confidence_input(update, context, processed_input)
+
+    async def _handle_task_edit_mode(self, update: Update, context: ContextTypes.DEFAULT_TYPE, user_message: str) -> None:
+        """Handle text input when user is in task editing mode."""
+        task_id = context.user_data['editing_task_id']
+        new_description = user_message
+        if not new_description:
+            await update.message.reply_text(
+                MessageFormatter.format_error_message(
+                    "Description cannot be empty",
+                    "Please provide a valid task description."
+                ),
+            )
+            return
+        await self._process_task_edit(update, context, task_id, new_description)
+
+    async def _handle_narrative_intent(self, update: Update, context: ContextTypes.DEFAULT_TYPE, processed_input) -> None:
+        """Handle narrative input based on detected intent."""
+        from larrybot.nlp.enhanced_narrative_processor import IntentType
+        
+        # Send the narrative processor's response message
+        await update.message.reply_text(
+            processed_input.response_message,
+            parse_mode='MarkdownV2'
+        )
+        
+        # Route to appropriate command handler if suggested
+        if processed_input.suggested_command:
+            await self._execute_suggested_command(update, context, processed_input)
+
+    async def _handle_low_confidence_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE, processed_input) -> None:
+        """Handle input with low confidence - show help and context-aware command suggestions."""
+        # Determine context-aware suggestions
+        suggestions = []
+        user_context = context.user_data
+        
+        # If user is editing a task
+        if 'editing_task_id' in user_context:
+            suggestions.append("/edit <new description> — Edit the current task")
+            suggestions.append("/cancel — Cancel editing")
+        # If user is viewing a task
+        elif user_context.get('current_context') == 'task_view' or user_context.get('last_viewed_task_id'):
+            suggestions.append("/edit <desc> — Edit this task")
+            suggestions.append("/done — Mark as complete")
+            suggestions.append("/delete — Delete this task")
+        # If user is in the main task list
+        elif user_context.get('current_context') == 'tasks':
+            suggestions.append("/add <desc> — Add a new task")
+            suggestions.append("/list — Show all tasks")
+            suggestions.append("/search <query> — Search tasks")
+            suggestions.append("/analytics — View analytics")
+        else:
+            # General suggestions
+            suggestions.append("/add <desc> — Add a new task")
+            suggestions.append("/list — Show all tasks")
+            suggestions.append("/remind <desc> — Add a reminder")
+            suggestions.append("/help — Show all commands")
+        
+        # Always include help and list as fallback
+        if "/help — Show all commands" not in suggestions:
+            suggestions.append("/help — Show all commands")
+        if "/list — Show all tasks" not in suggestions:
+            suggestions.append("/list — Show all tasks")
+        
+        help_message = (
+            "🤔 I'm not sure what you'd like to do. Here are some things you can try:\n\n" +
+            "\n".join(f"• {s}" for s in suggestions)
+        )
+        
+        await update.message.reply_text(help_message)
+
+    async def _execute_suggested_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE, processed_input) -> None:
+        """Execute the suggested command with extracted parameters."""
+        from larrybot.plugins.tasks import add_task
+        from larrybot.plugins.tasks import list_tasks
+        from larrybot.plugins.tasks import search_tasks
+        from larrybot.plugins.reminder import add_reminder
+        from larrybot.plugins.analytics import show_analytics
+        
+        command = processed_input.suggested_command
+        params = processed_input.suggested_parameters
+        
+        try:
+            if command == "/add" and params.get('description'):
+                # Create task with extracted parameters
+                description = params['description']
+                priority = params.get('priority', 'Medium')
+                category = params.get('category')
+                due_date = params.get('due_date')
+                
+                # Call the add_task function directly
+                await add_task(update, context, description, priority, category, due_date)
+                
+            elif command == "/list":
+                # List tasks with optional filters
+                priority = params.get('priority')
+                category = params.get('category')
+                await list_tasks(update, context, priority, category)
+                
+            elif command == "/search" and params.get('query'):
+                # Search tasks
+                query = params['query']
+                await search_tasks(update, context, query)
+                
+            elif command == "/remind" and params.get('task_name'):
+                # Add reminder
+                task_name = params['task_name']
+                due_date = params.get('due_date')
+                await add_reminder(update, context, task_name, due_date)
+                
+            elif command == "/analytics":
+                # Show analytics
+                await show_analytics(update, context)
+                
+        except Exception as e:
+            logger.error(f"Error executing suggested command {command}: {e}")
+            await update.message.reply_text(
+                "❌ Sorry, I couldn't execute that command automatically. Please try using the command directly."
+            )
+
+    async def _handle_task_disclosure(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handle progressive disclosure for task views."""
+        try:
+            # Parse disclosure data: task_disclose:task_id:level
+            parts = query.data.split(':')
+            if len(parts) >= 3:
+                task_id = int(parts[1])
+                disclosure_level = int(parts[2])
+                
+                # Store disclosure level in context
+                context.user_data[f'task_disclosure_{task_id}'] = disclosure_level
+                
+                # Re-show task view with new disclosure level
+                await self._handle_task_view(query, context, task_id)
+            else:
+                logger.error(f"Invalid task disclosure callback data: {query.data}")
+        except (ValueError, IndexError) as e:
+            logger.error(f"Error parsing task disclosure callback: {e}")
+            await query.answer("Error processing request")
 
     async def _process_task_edit(self, update: Update, context: ContextTypes.DEFAULT_TYPE, task_id: int, new_description: str) -> None:
         """Process the actual task editing."""
@@ -1749,37 +1950,109 @@ class TelegramBotHandler:
                 logger.error(f"Failed to send error message: {nested_e}")
 
     async def _handle_tasks_refresh_operation(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Handle the actual tasks refresh operation with enhanced UX."""
-        from larrybot.utils.ux_helpers import MessageFormatter, KeyboardBuilder
+        """Handle the actual tasks refresh operation with progressive disclosure and smart suggestions."""
+        from larrybot.utils.ux_helpers import MessageFormatter
+        from larrybot.utils.enhanced_ux_helpers import MessageLayoutBuilder, UnifiedButtonBuilder, ButtonType
         
         with next(get_session()) as session:
             repo = TaskRepository(session)
             tasks = repo.list_incomplete_tasks()
             
-            # Create context for enhanced UX processing
-            ux_context = {
-                'current_context': 'tasks',
-                'tasks': tasks,
-                'navigation_path': ['Main Menu', 'Tasks'],
-                'available_actions': [
-                    {'text': '➕ Add Task', 'callback_data': 'add_task', 'type': 'primary'},
-                    {'text': '🔄 Refresh', 'callback_data': 'tasks_refresh', 'type': 'primary'},
-                    {'text': '🔍 Search', 'callback_data': 'tasks_search', 'type': 'secondary'},
-                    {'text': '📊 Analytics', 'callback_data': 'tasks_analytics', 'type': 'secondary'},
-                    {'text': '🏠 Main Menu', 'callback_data': 'nav_main', 'type': 'navigation'}
-                ]
-            }
-            
             if not tasks:
                 message = "📋 **All Tasks Complete\\!** 🎉\n\nNo incomplete tasks found\\."
-                keyboard = KeyboardBuilder.build_add_task_keyboard()
-            else:
-                # Use enhanced message processing
-                message, keyboard = await self.enhanced_message_processor.process_message(
-                    MessageFormatter.format_task_list(tasks, title="📋 **Incomplete Tasks**"),
-                    ux_context,
-                    user_id=query.from_user.id if query.from_user else None
+                keyboard = UnifiedButtonBuilder.build_entity_keyboard(
+                    entity_id=0,
+                    entity_type="add_task",
+                    available_actions=[],
+                    custom_actions=[
+                        {
+                            "text": "➕ Add New Task",
+                            "callback_data": "add_task",
+                            "type": ButtonType.PRIMARY,
+                            "emoji": "➕"
+                        },
+                        {
+                            "text": "🏠 Main Menu",
+                            "callback_data": "nav_main",
+                            "type": ButtonType.SECONDARY,
+                            "emoji": "🏠"
+                        }
+                    ]
                 )
+            else:
+                # Use progressive list with smart suggestions
+                message = MessageLayoutBuilder.build_progressive_list(
+                    items=tasks,
+                    max_visible=5,
+                    title="Incomplete Tasks"
+                )
+                
+                # Add smart suggestions based on task list
+                suggestions = []
+                high_priority_count = sum(1 for t in tasks if getattr(t, 'priority', 'Medium') in ['High', 'Critical'])
+                overdue_count = sum(1 for t in tasks if hasattr(t, 'due_date') and t.due_date and t.due_date < datetime.now())
+                
+                if high_priority_count > 0:
+                    suggestions.append(f"⚠️ **{high_priority_count} high priority tasks** need attention")
+                if overdue_count > 0:
+                    suggestions.append(f"🚨 **{overdue_count} overdue tasks** require immediate action")
+                if len(tasks) > 10:
+                    suggestions.append("💡 **Tip:** Use filters to focus on specific tasks")
+                
+                if suggestions:
+                    message += "\n\n" + "\n".join(suggestions)
+                
+                # Build progressive keyboard with smart actions
+                custom_actions = [
+                    {
+                        "text": "➕ Add Task",
+                        "callback_data": "add_task",
+                        "type": ButtonType.PRIMARY,
+                        "emoji": "➕"
+                    },
+                    {
+                        "text": "🔍 Search",
+                        "callback_data": "tasks_search",
+                        "type": ButtonType.SECONDARY,
+                        "emoji": "🔍"
+                    }
+                ]
+                
+                # Add filter suggestions if many tasks
+                if len(tasks) > 5:
+                    custom_actions.append({
+                        "text": "🔧 Filter",
+                        "callback_data": "tasks_filter",
+                        "type": ButtonType.SECONDARY,
+                        "emoji": "🔧"
+                    })
+                
+                # Add analytics if there are tasks
+                if tasks:
+                    custom_actions.append({
+                        "text": "📊 Analytics",
+                        "callback_data": "tasks_analytics",
+                        "type": ButtonType.INFO,
+                        "emoji": "📊"
+                    })
+                
+                keyboard = UnifiedButtonBuilder.build_list_keyboard(
+                    items=[{"id": t.id, "description": t.description} for t in tasks[:5]],
+                    item_type="task",
+                    max_items=5,
+                    show_navigation=True,
+                    navigation_actions=[]
+                )
+                
+                # Add custom actions row
+                keyboard.inline_keyboard.append([
+                    UnifiedButtonBuilder.create_button(
+                        text=action["text"],
+                        callback_data=action["callback_data"],
+                        button_type=action["type"],
+                        custom_emoji=action["emoji"]
+                    ) for action in custom_actions
+                ])
             
             await query.edit_message_text(
                 message,
@@ -1788,10 +2061,11 @@ class TelegramBotHandler:
             )
 
     async def _handle_task_view(self, query, context: ContextTypes.DEFAULT_TYPE, task_id: int) -> None:
-        """Show detailed view of a task with action buttons and back navigation."""
+        """Show detailed view of a task with progressive disclosure and smart suggestions."""
         from larrybot.storage.db import get_session
         from larrybot.storage.task_repository import TaskRepository
-        from larrybot.utils.ux_helpers import MessageFormatter, KeyboardBuilder
+        from larrybot.utils.ux_helpers import MessageFormatter
+        from larrybot.utils.enhanced_ux_helpers import ProgressiveDisclosureBuilder, ContextAwareButtonBuilder
         
         try:
             with next(get_session()) as session:
@@ -1806,41 +2080,46 @@ class TelegramBotHandler:
                         parse_mode='MarkdownV2'
                     )
                     return
-                # Build detailed message with enhanced UX
-                details = {
-                    "Task": task.description,
-                    "ID": task.id,
-                    "Status": getattr(task, 'status', 'Todo'),
-                    "Priority": getattr(task, 'priority', 'Medium'),
-                    "Due": getattr(task, 'due_date', None),
-                    "Category": getattr(task, 'category', None),
-                    "Tags": getattr(task, 'tags', None),
-                    "Created": getattr(task, 'created_at', None)
-                }
-                # Remove None values
-                details = {k: v for k, v in details.items() if v is not None}
                 
-                # Create context for enhanced UX processing
-                ux_context = {
-                    'current_context': 'task_view',
-                    'task': task,
-                    'entity_type': 'task',
-                    'entity_id': task.id,
-                    'navigation_path': ['Main Menu', 'Tasks', f'Task #{task.id}'],
-                    'available_actions': [
-                        {'text': '✅ Done', 'callback_data': f'task_done:{task.id}', 'type': 'primary'},
-                        {'text': '✏️ Edit', 'callback_data': f'task_edit:{task.id}', 'type': 'secondary'},
-                        {'text': '🗑️ Delete', 'callback_data': f'task_delete:{task.id}', 'type': 'secondary'},
-                        {'text': '⬅️ Back to List', 'callback_data': 'tasks_refresh', 'type': 'navigation'}
-                    ]
+                # Build task data for progressive disclosure
+                task_data = {
+                    'id': task.id,
+                    'description': task.description,
+                    'status': getattr(task, 'status', 'Todo'),
+                    'priority': getattr(task, 'priority', 'Medium'),
+                    'due_date': getattr(task, 'due_date', None),
+                    'category': getattr(task, 'category', None),
+                    'tags': getattr(task, 'tags', None),
+                    'created_at': getattr(task, 'created_at', None)
                 }
                 
-                # Use enhanced message processing
-                message, keyboard = await self.enhanced_message_processor.process_message(
-                    MessageFormatter.format_success_message("Task Details", details),
-                    ux_context,
-                    user_id=query.from_user.id if query.from_user else None
+                # Build detailed message with smart suggestions
+                details = {k: v for k, v in task_data.items() if v is not None and k != 'id'}
+                
+                # Add smart suggestions based on task state
+                suggestions = []
+                if task_data['status'] == 'Todo' and not task_data.get('due_date'):
+                    suggestions.append("💡 **Suggestion:** Add a due date to track progress")
+                if task_data['priority'] == 'Medium' and task_data['status'] == 'Todo':
+                    suggestions.append("💡 **Suggestion:** Consider setting priority for better organization")
+                if task_data['status'] == 'In Progress':
+                    suggestions.append("💡 **Suggestion:** Use time tracking to monitor progress")
+                
+                # Build message with suggestions
+                message = MessageFormatter.format_success_message("Task Details", details)
+                if suggestions:
+                    message += "\n\n" + "\n".join(suggestions)
+                
+                # Get disclosure level from context (default to 1 for progressive disclosure)
+                disclosure_level = context.user_data.get(f'task_disclosure_{task_id}', 1)
+                
+                # Use progressive disclosure keyboard
+                keyboard = ProgressiveDisclosureBuilder.build_progressive_task_keyboard(
+                    task_id=task_id,
+                    task_data=task_data,
+                    disclosure_level=disclosure_level
                 )
+                
                 await query.edit_message_text(
                     message,
                     reply_markup=keyboard,

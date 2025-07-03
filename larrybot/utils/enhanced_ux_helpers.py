@@ -11,6 +11,34 @@ import json
 import time
 from datetime import datetime
 from larrybot.utils.ux_helpers import MessageFormatter
+from enum import Enum
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class ButtonType(Enum):
+    """Enumeration of button types for consistent styling."""
+    PRIMARY = "primary"
+    SECONDARY = "secondary"
+    SUCCESS = "success"
+    DANGER = "danger"
+    WARNING = "warning"
+    INFO = "info"
+
+
+class ActionType(Enum):
+    """Enumeration of action types for consistent callback data."""
+    VIEW = "view"
+    EDIT = "edit"
+    DELETE = "delete"
+    COMPLETE = "complete"
+    START = "start"
+    STOP = "stop"
+    REFRESH = "refresh"
+    NAVIGATE = "navigate"
+    CONFIRM = "confirm"
+    CANCEL = "cancel"
 
 
 class MessageLayoutBuilder:
@@ -568,6 +596,595 @@ class VisualFeedbackSystem:
         return message, keyboard
 
 
+class UnifiedButtonBuilder:
+    """
+    Unified button builder that consolidates repetitive keyboard building patterns.
+    
+    This class provides a consistent, maintainable approach to creating inline keyboards
+    across the LarryBot2 codebase, reducing code duplication and improving UX consistency.
+    """
+    
+    # Button styling templates
+    BUTTON_STYLES = {
+        ButtonType.PRIMARY: {"emoji": "🔵", "style": "primary"},
+        ButtonType.SECONDARY: {"emoji": "⚪", "style": "secondary"},
+        ButtonType.SUCCESS: {"emoji": "✅", "style": "success"},
+        ButtonType.DANGER: {"emoji": "🗑️", "style": "danger"},
+        ButtonType.WARNING: {"emoji": "⚠️", "style": "warning"},
+        ButtonType.INFO: {"emoji": "ℹ️", "style": "info"}
+    }
+    
+    # Action templates for common operations
+    ACTION_TEMPLATES = {
+        ActionType.VIEW: {"emoji": "👁️", "text": "View", "style": ButtonType.INFO},
+        ActionType.EDIT: {"emoji": "✏️", "text": "Edit", "style": ButtonType.SECONDARY},
+        ActionType.DELETE: {"emoji": "🗑️", "text": "Delete", "style": ButtonType.DANGER},
+        ActionType.COMPLETE: {"emoji": "✅", "text": "Done", "style": ButtonType.SUCCESS},
+        ActionType.START: {"emoji": "▶️", "text": "Start", "style": ButtonType.SUCCESS},
+        ActionType.STOP: {"emoji": "⏹️", "text": "Stop", "style": ButtonType.WARNING},
+        ActionType.REFRESH: {"emoji": "🔄", "text": "Refresh", "style": ButtonType.INFO},
+        ActionType.NAVIGATE: {"emoji": "🏠", "text": "Main Menu", "style": ButtonType.PRIMARY},
+        ActionType.CONFIRM: {"emoji": "✅", "text": "Confirm", "style": ButtonType.SUCCESS},
+        ActionType.CANCEL: {"emoji": "❌", "text": "Cancel", "style": ButtonType.DANGER}
+    }
+    
+    @staticmethod
+    def create_button(
+        text: str,
+        callback_data: str,
+        button_type: ButtonType = ButtonType.PRIMARY,
+        custom_emoji: Optional[str] = None
+    ) -> InlineKeyboardButton:
+        """
+        Create a single button with consistent styling.
+        
+        Args:
+            text: Button text
+            callback_data: Callback data for the button
+            button_type: Type of button for styling
+            custom_emoji: Custom emoji to override default
+            
+        Returns:
+            InlineKeyboardButton with consistent styling
+        """
+        style = UnifiedButtonBuilder.BUTTON_STYLES[button_type]
+        emoji = custom_emoji or style["emoji"]
+        
+        # Apply emoji if not already present and text doesn't start with any emoji
+        if emoji and not any(text.startswith(e) for e in ["👁️", "✏️", "🗑️", "✅", "▶️", "⏹️", "🔄", "🏠", "⚠️", "❌", "📊", "⚙️", "🔍", "⏱️", "🔗", "➕", "📅"]):
+            display_text = f"{emoji} {text}"
+        else:
+            display_text = text
+            
+        return InlineKeyboardButton(display_text, callback_data=callback_data)
+    
+    @staticmethod
+    def create_action_button(
+        action_type: ActionType,
+        entity_id: Union[int, str],
+        entity_type: str = "item",
+        custom_text: Optional[str] = None
+    ) -> InlineKeyboardButton:
+        """
+        Create an action button using predefined templates.
+        
+        Args:
+            action_type: Type of action to perform
+            entity_id: ID of the entity to act upon
+            entity_type: Type of entity (e.g., 'task', 'client', 'habit')
+            custom_text: Custom text to override template
+            
+        Returns:
+            InlineKeyboardButton with action-specific styling
+        """
+        template = UnifiedButtonBuilder.ACTION_TEMPLATES[action_type]
+        text = custom_text or template["text"]
+        style = template["style"]
+        emoji = template["emoji"]
+        
+        callback_data = f"{entity_type}_{action_type.value}:{entity_id}"
+        
+        return UnifiedButtonBuilder.create_button(
+            text=text,
+            callback_data=callback_data,
+            button_type=style,
+            custom_emoji=emoji
+        )
+    
+    @staticmethod
+    def build_entity_keyboard(
+        entity_id: int,
+        entity_type: str,
+        available_actions: List[ActionType],
+        entity_status: Optional[str] = None,
+        custom_actions: Optional[List[Dict[str, Any]]] = None
+    ) -> InlineKeyboardMarkup:
+        """
+        Build a keyboard for entity actions with context-aware button visibility.
+        
+        Args:
+            entity_id: ID of the entity
+            entity_type: Type of entity (e.g., 'task', 'client', 'habit')
+            available_actions: List of available actions for this entity
+            entity_status: Current status of the entity (for conditional buttons)
+            custom_actions: List of custom actions with 'text', 'callback_data', 'type'
+            
+        Returns:
+            InlineKeyboardMarkup with context-aware buttons
+        """
+        buttons = []
+        
+        # Add standard action buttons
+        for action in available_actions:
+            # Context-aware button visibility
+            if action == ActionType.COMPLETE and entity_status == "Done":
+                continue  # Don't show complete button for already completed items
+            elif action == ActionType.EDIT and entity_status == "Done":
+                continue  # Don't show edit button for completed items
+                
+            button = UnifiedButtonBuilder.create_action_button(
+                action_type=action,
+                entity_id=entity_id,
+                entity_type=entity_type
+            )
+            buttons.append(button)
+        
+        # Add custom actions
+        if custom_actions:
+            for custom_action in custom_actions:
+                button = UnifiedButtonBuilder.create_button(
+                    text=custom_action["text"],
+                    callback_data=custom_action["callback_data"],
+                    button_type=custom_action.get("type", ButtonType.SECONDARY),
+                    custom_emoji=custom_action.get("emoji")
+                )
+                buttons.append(button)
+        
+        return InlineKeyboardMarkup([buttons])
+    
+    @staticmethod
+    def build_list_keyboard(
+        items: List[Dict[str, Any]],
+        item_type: str,
+        max_items: int = 5,
+        show_navigation: bool = True,
+        navigation_actions: Optional[List[ActionType]] = None
+    ) -> InlineKeyboardMarkup:
+        """
+        Build a keyboard for listing items with pagination and navigation.
+        
+        Args:
+            items: List of items to display
+            item_type: Type of items (e.g., 'task', 'client', 'habit')
+            max_items: Maximum number of items to show
+            show_navigation: Whether to show navigation buttons
+            navigation_actions: List of navigation actions to include
+            
+        Returns:
+            InlineKeyboardMarkup with item list and navigation
+        """
+        buttons = []
+        
+        # Add item buttons
+        for item in items[:max_items]:
+            item_id = item.get('id', item.get('task_id'))
+            item_name = item.get('name', item.get('description', 'Unknown'))
+            
+            # Truncate long names
+            display_name = item_name[:20] + "..." if len(item_name) > 20 else item_name
+            
+            button = UnifiedButtonBuilder.create_action_button(
+                action_type=ActionType.VIEW,
+                entity_id=item_id,
+                entity_type=item_type,
+                custom_text=display_name
+            )
+            buttons.append([button])
+        
+        # Add navigation buttons
+        if show_navigation:
+            nav_buttons = []
+            
+            # Default navigation actions
+            if navigation_actions is None:
+                navigation_actions = [ActionType.REFRESH, ActionType.NAVIGATE]
+            
+            for action in navigation_actions:
+                if action == ActionType.NAVIGATE:
+                    button = UnifiedButtonBuilder.create_button(
+                        text="Main Menu",
+                        callback_data="nav_main",
+                        button_type=ButtonType.PRIMARY,
+                        custom_emoji="🏠"
+                    )
+                else:
+                    button = UnifiedButtonBuilder.create_action_button(
+                        action_type=action,
+                        entity_id="list",
+                        entity_type=item_type
+                    )
+                nav_buttons.append(button)
+            
+            buttons.append(nav_buttons)
+        
+        return InlineKeyboardMarkup(buttons)
+    
+    @staticmethod
+    def build_task_keyboard(
+        task_id: int,
+        status: str = "Todo",
+        show_edit: bool = True,
+        show_time_tracking: bool = False,
+        is_time_tracking: bool = False
+    ) -> InlineKeyboardMarkup:
+        """
+        Build a specialized keyboard for task actions.
+        
+        Args:
+            task_id: Task ID
+            status: Current task status
+            show_edit: Whether to show edit button
+            show_time_tracking: Whether to show time tracking buttons
+            is_time_tracking: Whether time tracking is currently active
+            
+        Returns:
+            InlineKeyboardMarkup with task-specific buttons
+        """
+        available_actions = [ActionType.VIEW, ActionType.DELETE]
+        
+        # Add complete button for incomplete tasks
+        if status != "Done":
+            available_actions.append(ActionType.COMPLETE)
+        
+        # Add edit button if requested and task is not done
+        if show_edit and status != "Done":
+            available_actions.append(ActionType.EDIT)
+        
+        # Add time tracking buttons if enabled
+        custom_actions = []
+        if show_time_tracking:
+            if is_time_tracking:
+                custom_actions.append({
+                    "text": "⏹️ Stop Timer",
+                    "callback_data": f"task_time_stop:{task_id}",
+                    "type": ButtonType.WARNING,
+                    "emoji": "⏹️"
+                })
+            else:
+                custom_actions.append({
+                    "text": "▶️ Start Timer",
+                    "callback_data": f"task_time_start:{task_id}",
+                    "type": ButtonType.SUCCESS,
+                    "emoji": "▶️"
+                })
+        
+        return UnifiedButtonBuilder.build_entity_keyboard(
+            entity_id=task_id,
+            entity_type="task",
+            available_actions=available_actions,
+            entity_status=status,
+            custom_actions=custom_actions
+        )
+    
+    @staticmethod
+    def build_analytics_keyboard(
+        complexity_levels: List[str] = None,
+        show_custom: bool = True
+    ) -> InlineKeyboardMarkup:
+        """
+        Build a keyboard for analytics options.
+        
+        Args:
+            complexity_levels: List of complexity levels to show
+            show_custom: Whether to show custom analytics option
+            
+        Returns:
+            InlineKeyboardMarkup with analytics options
+        """
+        if complexity_levels is None:
+            complexity_levels = ["basic", "detailed", "advanced"]
+        
+        buttons = []
+        
+        # Add complexity level buttons
+        for level in complexity_levels:
+            button = UnifiedButtonBuilder.create_button(
+                text=level.title(),
+                callback_data=f"analytics_{level}",
+                button_type=ButtonType.INFO,
+                custom_emoji="📊"
+            )
+            buttons.append(button)
+        
+        # Add custom analytics button
+        if show_custom:
+            custom_button = UnifiedButtonBuilder.create_button(
+                text="Custom Days",
+                callback_data="analytics_custom",
+                button_type=ButtonType.SECONDARY,
+                custom_emoji="⚙️"
+            )
+            buttons.append(custom_button)
+        
+        # Add navigation
+        nav_button = UnifiedButtonBuilder.create_button(
+            text="Main Menu",
+            callback_data="nav_main",
+            button_type=ButtonType.PRIMARY,
+            custom_emoji="🏠"
+        )
+        buttons.append(nav_button)
+        
+        # Arrange in rows of 2-3 buttons
+        keyboard_rows = []
+        for i in range(0, len(buttons), 3):
+            keyboard_rows.append(buttons[i:i+3])
+        
+        return InlineKeyboardMarkup(keyboard_rows)
+    
+    @staticmethod
+    def build_filter_keyboard(
+        filter_types: List[str] = None,
+        show_advanced: bool = True
+    ) -> InlineKeyboardMarkup:
+        """
+        Build a keyboard for filtering options.
+        
+        Args:
+            filter_types: List of filter types to show
+            show_advanced: Whether to show advanced filtering option
+            
+        Returns:
+            InlineKeyboardMarkup with filter options
+        """
+        if filter_types is None:
+            filter_types = ["status", "priority", "category", "tags"]
+        
+        buttons = []
+        
+        # Add filter type buttons
+        for filter_type in filter_types:
+            button = UnifiedButtonBuilder.create_button(
+                text=filter_type.title(),
+                callback_data=f"filter_{filter_type}",
+                button_type=ButtonType.SECONDARY,
+                custom_emoji="🔍"
+            )
+            buttons.append(button)
+        
+        # Add advanced filtering button
+        if show_advanced:
+            advanced_button = UnifiedButtonBuilder.create_button(
+                text="Advanced",
+                callback_data="filter_advanced",
+                button_type=ButtonType.INFO,
+                custom_emoji="⚙️"
+            )
+            buttons.append(advanced_button)
+        
+        # Add clear filters button
+        clear_button = UnifiedButtonBuilder.create_button(
+            text="Clear Filters",
+            callback_data="filter_clear",
+            button_type=ButtonType.WARNING,
+            custom_emoji="🗑️"
+        )
+        buttons.append(clear_button)
+        
+        # Add navigation
+        nav_button = UnifiedButtonBuilder.create_button(
+            text="Main Menu",
+            callback_data="nav_main",
+            button_type=ButtonType.PRIMARY,
+            custom_emoji="🏠"
+        )
+        buttons.append(nav_button)
+        
+        # Arrange in rows of 2-3 buttons
+        keyboard_rows = []
+        for i in range(0, len(buttons), 3):
+            keyboard_rows.append(buttons[i:i+3])
+        
+        return InlineKeyboardMarkup(keyboard_rows)
+    
+    @staticmethod
+    def build_confirmation_keyboard(
+        action: str,
+        entity_id: int,
+        entity_type: str = "item",
+        entity_name: str = ""
+    ) -> InlineKeyboardMarkup:
+        """
+        Build a confirmation keyboard for destructive actions.
+        
+        Args:
+            action: Action to confirm (e.g., 'delete', 'remove')
+            entity_id: ID of the entity
+            entity_type: Type of entity
+            entity_name: Name of the entity for display
+            
+        Returns:
+            InlineKeyboardMarkup with confirmation buttons
+        """
+        # Confirm button
+        confirm_button = UnifiedButtonBuilder.create_button(
+            text=f"Confirm {action.title()}",
+            callback_data=f"{entity_type}_{action}_confirm:{entity_id}",
+            button_type=ButtonType.DANGER,
+            custom_emoji="⚠️"
+        )
+        
+        # Cancel button
+        cancel_button = UnifiedButtonBuilder.create_button(
+            text="Cancel",
+            callback_data=f"{entity_type}_{action}_cancel:{entity_id}",
+            button_type=ButtonType.SECONDARY,
+            custom_emoji="❌"
+        )
+        
+        return InlineKeyboardMarkup([[confirm_button, cancel_button]])
+
+
+class ContextAwareButtonBuilder:
+    """
+    Context-aware button builder that adapts to user behavior and preferences.
+    """
+    
+    @staticmethod
+    def build_smart_task_keyboard(
+        task_id: int,
+        task_data: Dict[str, Any],
+        user_preferences: Optional[Dict[str, Any]] = None
+    ) -> InlineKeyboardMarkup:
+        """
+        Build a smart task keyboard that adapts to task context and user preferences.
+        
+        Args:
+            task_id: Task ID
+            task_data: Task data including status, priority, due_date, etc.
+            user_preferences: User preferences for button layout
+            
+        Returns:
+            InlineKeyboardMarkup with context-aware buttons
+        """
+        status = task_data.get('status', 'Todo')
+        priority = task_data.get('priority', 'Medium')
+        due_date = task_data.get('due_date')
+        
+        # Determine available actions based on context
+        available_actions = [ActionType.VIEW, ActionType.DELETE]
+        
+        # Add complete button for incomplete tasks
+        if status != "Done":
+            available_actions.append(ActionType.COMPLETE)
+        
+        # Add edit button for tasks that can be modified
+        if status not in ["Done", "Archived"]:
+            available_actions.append(ActionType.EDIT)
+        
+        # Add custom actions based on task context
+        custom_actions = []
+        
+        # Time tracking for active tasks
+        if status in ["Todo", "In Progress"]:
+            is_tracking = task_data.get('time_tracking_active', False)
+            if is_tracking:
+                custom_actions.append({
+                    "text": "⏹️ Stop Timer",
+                    "callback_data": f"task_time_stop:{task_id}",
+                    "type": ButtonType.WARNING,
+                    "emoji": "⏹️"
+                })
+            else:
+                custom_actions.append({
+                    "text": "▶️ Start Timer",
+                    "callback_data": f"task_time_start:{task_id}",
+                    "type": ButtonType.SUCCESS,
+                    "emoji": "▶️"
+                })
+        
+        # Priority adjustment for high-priority tasks
+        if priority == "High" or priority == "Critical":
+            custom_actions.append({
+                "text": "📊 Time Summary",
+                "callback_data": f"task_time_summary:{task_id}",
+                "type": ButtonType.INFO,
+                "emoji": "📊"
+            })
+        
+        # Due date actions for tasks with due dates
+        if due_date:
+            custom_actions.append({
+                "text": "📅 Extend Due Date",
+                "callback_data": f"task_extend_due:{task_id}",
+                "type": ButtonType.WARNING,
+                "emoji": "📅"
+            })
+        
+        return UnifiedButtonBuilder.build_entity_keyboard(
+            entity_id=task_id,
+            entity_type="task",
+            available_actions=available_actions,
+            entity_status=status,
+            custom_actions=custom_actions
+        )
+
+
+class ProgressiveDisclosureBuilder:
+    """
+    Builder for progressive disclosure keyboards that show options based on user interaction.
+    """
+    
+    @staticmethod
+    def build_progressive_task_keyboard(
+        task_id: int,
+        task_data: Dict[str, Any],
+        disclosure_level: int = 1
+    ) -> InlineKeyboardMarkup:
+        """
+        Build a progressive disclosure keyboard for tasks.
+        
+        Args:
+            task_id: Task ID
+            task_data: Task data
+            disclosure_level: Level of disclosure (1=basic, 2=advanced, 3=expert)
+            
+        Returns:
+            InlineKeyboardMarkup with progressive disclosure
+        """
+        buttons = []
+        
+        # Level 1: Basic actions (always shown)
+        basic_actions = [ActionType.VIEW, ActionType.COMPLETE, ActionType.DELETE]
+        
+        # Level 2: Advanced actions (shown on second interaction)
+        if disclosure_level >= 2:
+            basic_actions.extend([ActionType.EDIT])
+            
+            # Add time tracking
+            if task_data.get('status') in ["Todo", "In Progress"]:
+                buttons.append(UnifiedButtonBuilder.create_button(
+                    text="Time Tracking",
+                    callback_data=f"task_time_menu:{task_id}",
+                    button_type=ButtonType.INFO,
+                    custom_emoji="⏱️"
+                ))
+        
+        # Level 3: Expert actions (shown on third interaction)
+        if disclosure_level >= 3:
+            buttons.append(UnifiedButtonBuilder.create_button(
+                text="📊 Analytics",
+                callback_data=f"task_analytics:{task_id}",
+                button_type=ButtonType.INFO
+            ))
+            
+            buttons.append(UnifiedButtonBuilder.create_button(
+                text="🔗 Dependencies",
+                callback_data=f"task_dependencies:{task_id}",
+                button_type=ButtonType.SECONDARY
+            ))
+        
+        # Add basic action buttons
+        for action in basic_actions:
+            button = UnifiedButtonBuilder.create_action_button(
+                action_type=action,
+                entity_id=task_id,
+                entity_type="task"
+            )
+            buttons.append(button)
+        
+        # Add "More Options" button for progressive disclosure
+        if disclosure_level < 3:
+            buttons.append(UnifiedButtonBuilder.create_button(
+                text="More Options",
+                callback_data=f"task_disclose:{task_id}:{disclosure_level + 1}",
+                button_type=ButtonType.SECONDARY,
+                custom_emoji="➕"
+            ))
+        
+        return InlineKeyboardMarkup([buttons])
+
+
 class EnhancedUXSystem:
     """Main enhanced UX system that coordinates all components."""
     
@@ -645,4 +1262,14 @@ class EnhancedUXSystem:
             error_type, context
         )
         
-        return full_message, keyboard 
+        return full_message, keyboard
+
+
+# Export the main classes for easy access
+__all__ = [
+    'UnifiedButtonBuilder',
+    'ContextAwareButtonBuilder', 
+    'ProgressiveDisclosureBuilder',
+    'ButtonType',
+    'ActionType'
+] 

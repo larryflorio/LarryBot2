@@ -1,153 +1,126 @@
 ---
 title: Reminders Commands
-description: Set, list, and delete reminders in LarryBot2 with enhanced action buttons
-last_updated: 2025-06-29
+description: Set up smart reminders to never miss important deadlines
+last_updated: 2025-07-02
 ---
 
 # Reminders Commands ⏰
 
-LarryBot2 allows you to set, list, and delete reminders for your tasks with enhanced action buttons for quick interactions. This guide covers all reminder commands and interactive features.
+Never miss important deadlines again! LarryBot2's smart reminder system helps you stay on top of your tasks with timely notifications and flexible snooze options.
 
-## ⏰ Reminder Commands
+## 🎯 What You Can Do
 
-### `/addreminder` - Add Reminder
-Add a reminder for a specific task.
+- **Set reminders** for any task with specific times
+- **Get notified** when tasks are due
+- **Snooze reminders** when you need more time
+- **Track overdue items** to stay accountable
+- **Manage multiple reminders** with ease
 
-**Usage**: `/addreminder <task_id> <YYYY-MM-DD HH:MM>`
+## ⏰ Setting Up Reminders
 
-**Examples**:
-```
-/addreminder 124 2025-06-30 09:00
-/addreminder 125 2025-07-01 14:30
-```
+### Basic Reminder Creation
 
-**Response**:
-```
-✅ Reminder set for Task #124 at 2025-06-30 09:00.
-
-📋 **Details:**
-   • Task: Complete project proposal
-   • ID: 124
-   • Reminder: 2025-06-30 09:00
-   • Status: Active
-   • Created: 2025-06-29 10:30
-```
-
-### `/reminders` - List Reminders
-List all reminders for your tasks with action buttons for quick management.
-
-**Usage**: `/reminders`
-
-**Features**:
-- **Per-reminder action buttons**: Complete, Snooze, Edit, Delete for each reminder
-- **Task information**: Shows associated task details
-- **Time indicators**: Visual indicators for upcoming vs overdue reminders
-- **Navigation buttons**: Add Reminder, Refresh, Back to Main
-- **Status tracking**: Shows active vs completed reminders
-
-**Response**:
-```
-⏰ **All Reminders** (3 found)
-
-1. 🔴 **Overdue** - Task #124
-   📝 Complete project proposal
-   ⏰ Due: 2025-06-29 09:00 (2 hours ago)
-   📅 Created: 2025-06-28 10:30
-
-2. 🟡 **Today** - Task #125
-   📝 Call client about project
-   ⏰ Due: 2025-06-29 14:30 (in 2 hours)
-   📅 Created: 2025-06-28 11:00
-
-3. 🟢 **Upcoming** - Task #126
-   📝 Review quarterly reports
-   ⏰ Due: 2025-06-30 10:00 (tomorrow)
-   📅 Created: 2025-06-28 15:00
-
-[✅ Complete] [⏰ Snooze 1h] [✏️ Edit] [🗑️ Delete]
-[✅ Complete] [⏰ Snooze 1h] [✏️ Edit] [🗑️ Delete]
-[✅ Complete] [⏰ Snooze 1h] [✏️ Edit] [🗑️ Delete]
-
-[➕ Add Reminder] [🔄 Refresh]
-[⬅️ Back]
-```
-
-### `/delreminder` - Delete Reminder
-Delete a reminder by its ID with confirmation dialog.
-
-**Usage**: `/delreminder <reminder_id>`
-
-**Examples**:
-```
-/delreminder 1
-/delreminder 2
-```
-
-**Response (confirmation dialog)**:
-```
-🗑️ **Confirm Reminder Deletion**
-
-**Reminder**: Task #124 - Complete project proposal
-**ID**: 1
-**Due**: 2025-06-29 09:00
-**Status**: Overdue
-
-⚠️ **Warning**: This will permanently delete the reminder.
-
-Are you sure you want to delete this reminder?
-
-[Inline keyboard: Confirm Delete | Cancel]
-```
-
-**Response (after confirmation)**:
-```
-🗑️ Reminder #1 deleted successfully!
-
-📋 **Details:**
-   • Task: Complete project proposal
-   • ID: 1
-   • Status: Deleted
-   • Action: Reminder removed from database
-```
-
-## 🎮 Action Buttons
-
-### Reminder List Actions
-When you use `/reminders`, each reminder displays action buttons:
-
-- **✅ Complete**: Mark the associated task as complete
-- **⏰ Snooze 1h**: Snooze the reminder for 1 hour
-- **⏰ Snooze 1d**: Snooze the reminder for 1 day
-- **✏️ Edit**: Edit reminder time (placeholder - shows "not implemented")
-- **🗑️ Delete**: Delete the reminder with confirmation dialog
-- **👁️ View Task**: View the associated task details
-
-### Reminder Response Actions
-When a reminder triggers, you can:
-
-- **✅ Mark Done**: Mark the task as complete
-- **⏰ Snooze 1h**: Snooze the reminder for 1 hour
-- **⏰ Snooze 1d**: Snooze the reminder for 1 day
-- **🗑️ Delete Reminder**: Delete the reminder permanently
-- **👁️ View Task**: View the task details
-- **❌ Dismiss**: Dismiss the reminder without action
-
-### Navigation Actions
-- **➕ Add Reminder**: Shows instructions for adding a new reminder
-- **🔄 Refresh**: Reload the reminder list with current data
-- **⬅️ Back**: Return to main menu
-
-## 🎯 Reminder Response Example
-
-When a reminder triggers, you'll receive a message like this:
+Set a reminder for a specific task:
 
 ```
-⏰ **Reminder**
+/addreminder 124 2025-07-03 14:00
+```
 
-📝 **Task**: Complete project proposal
-🆔 **ID**: 124
-⏰ **Due**: 2025-06-29 09:00
-📅 **Created**: 2025-06-28 10:30
+This creates a reminder for task #124 on July 3rd at 2:00 PM.
+
+### Quick Reminder Creation
+
+Create a reminder for today:
+
+```
+/reminder_quick "Pick up dry cleaning"
+```
+
+This creates a reminder for today with a simple description.
+
+### Reminder with Task Description
+
+```
+/addreminder "Team meeting" 2025-07-03 14:00
+```
+
+This creates a reminder with a description and specific time.
+
+## 📋 Managing Your Reminders
+
+### View All Reminders
+
+See all your active reminders:
+
+```
+/reminders
+```
+
+This shows all reminders with interactive buttons for quick actions.
+
+### Reminder Status
+
+Your reminders are color-coded for easy identification:
+
+- **🔴 Overdue** - Past due time
+- **🟡 Today** - Due today
+- **🟢 Upcoming** - Due in the future
+- **✅ Completed** - Task is done
+
+### Reminder Actions
+
+Each reminder comes with interactive buttons:
+
+- **✅ Complete** - Mark the task as done
+- **⏰ Snooze 1h** - Snooze for 1 hour
+- **⏰ Snooze 1d** - Snooze for 1 day
+- **✏️ Edit** - Change the reminder time
+- **🗑️ Delete** - Remove the reminder
+
+## 🔄 Snoozing Reminders
+
+### When You Need More Time
+
+Sometimes you need a little extra time. Use snooze options:
+
+**Snooze for 1 hour:**
+- Click **⏰ Snooze 1h** button
+- Reminder will trigger again in 1 hour
+
+**Snooze for 1 day:**
+- Click **⏰ Snooze 1d** button
+- Reminder will trigger again tomorrow
+
+### Snooze Example
+
+When you snooze a reminder, you'll see:
+
+```
+⏰ Reminder Snoozed
+
+📝 Task: Complete project proposal
+⏰ New Due: 2025-07-03 15:00 (in 1 hour)
+📅 Snoozed: 2025-07-03 14:00
+
+The reminder has been snoozed for 1 hour.
+
+[✅ Mark Done] [⏰ Snooze Again]
+[👁️ View Task] [🗑️ Delete Reminder]
+```
+
+## 📅 Reminder Notifications
+
+### When Reminders Trigger
+
+You'll receive a notification like this:
+
+```
+⏰ Reminder
+
+📝 Task: Complete project proposal
+🆔 ID: 124
+⏰ Due: 2025-07-03 14:00
+📅 Created: 2025-07-02 10:30
 
 This task is due now!
 
@@ -156,79 +129,188 @@ This task is due now!
 [👁️ View Task] [❌ Dismiss]
 ```
 
-## 🔄 Snooze Functionality
+### Taking Action
 
-### Snooze Options
-- **1 Hour**: Snooze reminder for 1 hour
-- **1 Day**: Snooze reminder for 24 hours
-- **Custom**: Set custom snooze time (future feature)
+When you receive a reminder, you can:
 
-### Snooze Example
-When you click **⏰ Snooze 1h**:
+- **✅ Mark Done** - Complete the task immediately
+- **⏰ Snooze 1h** - Get reminded again in 1 hour
+- **⏰ Snooze 1d** - Get reminded again tomorrow
+- **🗑️ Delete Reminder** - Remove the reminder permanently
+- **👁️ View Task** - See full task details
+- **❌ Dismiss** - Ignore for now
+
+## 🗑️ Removing Reminders
+
+### Delete a Reminder
+
+Remove a reminder you no longer need:
 
 ```
-⏰ **Reminder Snoozed**
-
-📝 **Task**: Complete project proposal
-⏰ **New Due**: 2025-06-29 10:00 (in 1 hour)
-📅 **Snoozed**: 2025-06-29 09:00
-
-The reminder has been snoozed for 1 hour.
-
-[✅ Mark Done] [⏰ Snooze Again]
-[👁️ View Task] [🗑️ Delete Reminder]
+/delreminder 1
 ```
 
-## 🎯 Reminder Management
+This deletes reminder #1 with a confirmation dialog.
 
-### Reminder Status Indicators
-- **🔴 Overdue**: Reminder is past due time
-- **🟡 Today**: Reminder is due today
-- **🟢 Upcoming**: Reminder is due in the future
-- **✅ Completed**: Associated task is completed
+### Bulk Reminder Management
 
-### Reminder Information Display
-Each reminder shows:
+Use interactive buttons to manage multiple reminders:
 
-- **Task Details**: Description and ID of associated task
-- **Due Time**: When the reminder is scheduled
-- **Status**: Current status (active, overdue, completed)
-- **Created Date**: When the reminder was created
-- **Snooze History**: Previous snooze actions (if any)
+- Click **🗑️ Delete** next to any reminder
+- Confirm deletion in the dialog
+- Reminder is permanently removed
 
-## 🛠️ Best Practices
-- **Set reminders for important deadlines** to stay on track
-- **Use snooze functionality** when you need more time
-- **Regularly review reminders** to keep them current
-- **Delete completed reminders** to maintain a clean list
-- **Use action buttons** for quick interactions without typing commands
-- **Check reminder status** to prioritize urgent items
+## 📊 Reminder Statistics
 
-## 🚨 Troubleshooting
-- **Reminder not set**: Ensure the date/time format is correct (YYYY-MM-DD HH:MM)
-- **Reminder not found**: Check the reminder ID or use the reminder list
-- **Action buttons not working**: Refresh the list or use command alternatives
-- **Snooze not working**: Check if the reminder is still active
-- **Edit functionality**: Reminder editing is currently a placeholder - use command alternatives
+### Track Your Reminder Usage
 
-## 🔄 Integration
-- **Event-driven updates**: Reminder actions emit events for other plugins
-- **Database persistence**: All reminder data is stored securely
-- **Real-time feedback**: Immediate updates and visual confirmation
-- **Task integration**: Seamless task completion from reminders
+Get insights into your reminder patterns:
 
-## 🌍 Timezone Handling
+```
+/reminder_stats
+```
 
-All reminder times in LarryBot2 are displayed in your configured or automatically detected local timezone. Internally, all times are stored in UTC for reliability and consistency. Daylight Saving Time (DST) is handled automatically for all supported timezones.
+This shows:
+- Total reminders created
+- Completion rates
+- Average response time
+- Most common reminder times
 
-- **Local Display**: Reminders, due dates, and snooze times are always shown in your local time.
-- **UTC Storage**: All reminder times are stored in UTC in the database.
-- **Manual Override**: Use `/timezone` to set your timezone, or `/autotimezone` to reset to automatic detection.
-- **DST Support**: DST changes are handled automatically.
-- **Fallback**: If timezone detection fails, UTC is used as a safe default.
+## 🎯 Pro Tips
 
-> **Tip:** If your reminders appear at the wrong time, check your timezone setting with `/timezone`.
+### Set Effective Reminders
+
+**For important deadlines:**
+```
+/addreminder "Submit quarterly report" 2025-07-15 17:00
+```
+
+**For daily tasks:**
+```
+/reminder_quick "Take medication"
+/reminder_quick "Check email"
+```
+
+**For meetings:**
+```
+/addreminder "Team standup" 2025-07-03 09:00
+/addreminder "Client call with Sarah" 2025-07-03 14:00
+```
+
+### Use Snooze Wisely
+
+- **Snooze 1h** when you need a short delay
+- **Snooze 1d** when you need to reschedule for tomorrow
+- **Complete immediately** when you can do it now
+
+### Organize Your Reminders
+
+**Work reminders:**
+```
+/addreminder "Review project timeline" 2025-07-03 10:00 work
+/addreminder "Follow up on client proposal" 2025-07-04 15:00 work
+```
+
+**Personal reminders:**
+```
+/addreminder "Call mom" 2025-07-03 19:00 personal
+/addreminder "Pick up groceries" 2025-07-03 18:00 personal
+```
+
+### Morning Routine Reminders
+
+Set up reminders for your daily routine:
+
+```
+/reminder_quick "Morning workout"
+/reminder_quick "Review today's priorities"
+/reminder_quick "Check calendar"
+```
+
+### End-of-Day Reminders
+
+Plan for tomorrow:
+
+```
+/addreminder "Prepare for tomorrow's meeting" 2025-07-02 17:00
+/addreminder "Pack lunch for tomorrow" 2025-07-02 20:00
+```
+
+## 🆘 Getting Help
+
+### Reminder Help
+
+```
+/help reminders
+```
+
+Get help with reminder commands.
+
+### Check Reminder Status
+
+```
+/reminders
+```
+
+See all your active reminders.
+
+### Reminder Statistics
+
+```
+/reminder_stats
+```
+
+View your reminder usage patterns.
+
+## 🎯 Common Use Cases
+
+### Work Deadlines
+
+**Project deadlines:**
+```
+/addreminder "Submit project proposal" 2025-07-10 17:00
+/addreminder "Review team feedback" 2025-07-08 14:00
+/addreminder "Schedule client meeting" 2025-07-05 16:00
+```
+
+### Personal Tasks
+
+**Daily tasks:**
+```
+/reminder_quick "Take vitamins"
+/reminder_quick "Water plants"
+/reminder_quick "Check mail"
+```
+
+**Appointments:**
+```
+/addreminder "Dentist appointment" 2025-07-15 14:00
+/addreminder "Hair appointment" 2025-07-12 10:00
+```
+
+### Health and Wellness
+
+**Exercise reminders:**
+```
+/reminder_quick "Go for a walk"
+/reminder_quick "Stretch break"
+/reminder_quick "Drink water"
+```
+
+**Health appointments:**
+```
+/addreminder "Annual checkup" 2025-07-20 09:00
+/addreminder "Eye exam" 2025-07-25 15:00
+```
 
 ---
 
-**Related Commands**: [Task Management](task-management.md) → [Calendar Integration](calendar-integration.md) → [Habits](habits.md) 
+**Never miss another deadline!** Start with a simple reminder: `/reminder_quick "Test reminder"` and see how LarryBot2 keeps you on track.
+
+---
+
+**Next Steps:**
+- [Habits](habits.md) - Build productive habits
+- [Calendar Integration](calendar-integration.md) - Sync with Google Calendar
+- [Task Management](task-management.md) - Master task creation and management
+- [Examples](../examples.md) - See real-world reminder use cases 

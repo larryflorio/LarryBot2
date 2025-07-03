@@ -40,7 +40,7 @@ Welcome to the LarryBot2 User Guide. This section covers all commands and featur
 **Quick Navigation:**
 - [Getting Started](../../getting-started/installation.md)
 - [Developer Guide](../../developer-guide/architecture/overview.md)
-- [Deployment](../../deployment/production.md)
+- [Development Guide](../../developer-guide/development/deployment.md)
 
 ---
 

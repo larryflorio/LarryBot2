@@ -1,270 +1,313 @@
 ---
 title: File Attachments
 description: Attach files to tasks for better project management
-last_updated: 2025-06-28
+last_updated: 2025-07-02
 ---
 
 # File Attachments 📎
 
 > **Breadcrumbs:** [Home](../../README.md) > [User Guide](../README.md) > [Features](README.md) > File Attachments
 
-LarryBot2 supports file attachments for tasks, allowing you to store documents, images, and other files directly with your tasks for better project management and organization.
+Keep all your project files organized by attaching them directly to tasks. Whether you're working on design projects, client deliverables, or personal projects, file attachments help you keep everything in one place.
 
-## 🚀 Overview
+## 🎯 What You Can Do
 
-File attachments enable you to:
-- **Store project documents** (PDFs, Word docs, etc.)
-- **Attach design mockups** (images, screenshots)
-- **Keep reference materials** (text files, spreadsheets)
+- **Attach project documents** (PDFs, Word docs, spreadsheets)
+- **Store design files** (images, mockups, screenshots)
+- **Keep reference materials** (text files, notes)
 - **Organize project assets** (archives, compressed files)
+- **Add descriptions** to files for better organization
+- **Manage multiple files** per task
 
 ## 📋 Supported File Types
 
 ### Documents
-- **PDF** (`.pdf`) - Portable Document Format
-- **Word Documents** (`.doc`, `.docx`) - Microsoft Word files
-- **Text Files** (`.txt`) - Plain text documents
+- **PDF** (`.pdf`) - Reports, contracts, specifications
+- **Word Documents** (`.doc`, `.docx`) - Proposals, documentation
+- **Text Files** (`.txt`) - Notes, instructions, logs
 
 ### Images
-- **JPEG** (`.jpg`, `.jpeg`) - Photographic images
-- **PNG** (`.png`) - Graphics and screenshots
-- **GIF** (`.gif`) - Animated images
+- **JPEG** (`.jpg`, `.jpeg`) - Photos, screenshots
+- **PNG** (`.png`) - Graphics, mockups, diagrams
+- **GIF** (`.gif`) - Animated graphics, demos
 
 ### Archives
-- **ZIP** (`.zip`) - Compressed archives
-- **RAR** (`.rar`) - WinRAR archives
+- **ZIP** (`.zip`) - Compressed project files
+- **RAR** (`.rar`) - Compressed archives
 
-## 📏 File Size Limits
+## 📏 File Limits
 
 - **Maximum file size**: 10MB per file
-- **Storage**: Files are stored locally on the server
-- **Security**: Files are stored with hash-based naming for security
+- **Storage**: Files are stored securely on your system
+- **Security**: Files are protected with secure naming
 
-## 🎯 Commands
+## 📎 Attaching Files
 
-### `/attach` - Attach File to Task
-Attach a file to a specific task.
+### Basic File Attachment
 
-**Usage**: `/attach <task_id> [description]`
+Attach a file to a task:
 
-**Steps**:
-1. Send a file (document, image, etc.) to the bot
-2. Reply with: `/attach <task_id> [description]`
+1. **Send the file** to your bot (document, image, etc.)
+2. **Reply with the command**:
+   ```
+   /attach 123
+   ```
 
-**Examples**:
+This attaches the file to task #123.
+
+### Adding Descriptions
+
+Include a description for better organization:
+
 ```
-/attach 123
-/attach 124 "Project requirements document"
-/attach 125 "Design mockup v2"
-```
-
-**Response**:
-```
-✅ File attached successfully!
-
-📎 File: project_requirements.pdf
-📋 Task: #124
-📏 Size: 2,456 bytes
-📄 Type: application/pdf
-🆔 Attachment ID: 5
+/attach 123 "Project requirements document"
+/attach 124 "Design mockup v2"
+/attach 125 "Client feedback notes"
 ```
 
-### `/attachments` - List Task Attachments
-View all attachments for a specific task.
+### Multiple Files
 
-**Usage**: `/attachments <task_id>`
+You can attach multiple files to the same task:
 
-**Examples**:
+1. Send first file → `/attach 123 "Requirements"`
+2. Send second file → `/attach 123 "Design mockup"`
+3. Send third file → `/attach 123 "Meeting notes"`
+
+## 📋 Managing Attachments
+
+### View Task Attachments
+
+See all files attached to a task:
+
 ```
 /attachments 123
-/attachments 124
 ```
 
-**Response**:
-```
-📎 Attachments for Task #124
+This shows:
+- **File names** and types
+- **File sizes** and dates
+- **Descriptions** (if added)
+- **Attachment IDs** for management
 
-📊 Summary: 3 files, 15,234 bytes
+### Update File Descriptions
 
-🆔 ID: 5
-📄 File: project_requirements.pdf
-📏 Size: 2,456 bytes
-📅 Added: 2025-06-28 11:15:00
-📝 Description: Project requirements document
+Change the description of an attachment:
 
-🆔 ID: 6
-📄 File: design_mockup.png
-📏 Size: 8,456 bytes
-📅 Added: 2025-06-28 11:20:00
-
-🆔 ID: 7
-📄 File: meeting_notes.txt
-📏 Size: 4,322 bytes
-📅 Added: 2025-06-28 11:25:00
-📝 Description: Team meeting discussion points
-```
-
-### `/remove_attachment` - Remove Attachment
-Delete an attachment from a task.
-
-**Usage**: `/remove_attachment <attachment_id>`
-
-**Examples**:
-```
-/remove_attachment 5
-/remove_attachment 6
-```
-
-**Response**:
-```
-🗑️ Attachment removed successfully!
-
-📄 File: project_requirements.pdf
-🆔 ID: 5
-```
-
-### `/attachment_description` - Update Attachment Description
-Update the description of an attachment.
-
-**Usage**: `/attachment_description <attachment_id> <description>`
-
-**Examples**:
 ```
 /attachment_description 5 "Updated project requirements v2"
 /attachment_description 6 "Final design mockup"
 ```
 
-**Response**:
+### Remove Attachments
+
+Delete files you no longer need:
+
 ```
-✅ Description updated successfully!
-
-📄 File: project_requirements.pdf
-📝 Description: Updated project requirements v2
-🆔 ID: 5
+/remove_attachment 5
+/remove_attachment 6
 ```
 
-## 🔧 Technical Details
+## 🎯 Pro Tips
 
-### File Storage
-- Files are stored in a configurable local directory
-- Each file is renamed using an MD5 hash for security
-- Original filenames are preserved in the database
-- File paths are stored for efficient retrieval
+### File Organization
 
-### Security Features
-- **Hash-based naming**: Prevents filename conflicts and improves security
-- **File type validation**: Only allowed file types can be uploaded
-- **Size limits**: Prevents storage abuse
-- **Access control**: Files are associated with specific tasks
+**Use descriptive names:**
+```
+/attach 123 "Q1_2025_Project_Requirements.pdf"
+/attach 124 "Homepage_Design_Mockup_v2.png"
+/attach 125 "Client_Meeting_Notes_2025-07-02.txt"
+```
 
-### Database Schema
-```sql
-CREATE TABLE task_attachments (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    task_id INTEGER NOT NULL,
-    filename VARCHAR(255) NOT NULL,
-    original_filename VARCHAR(255) NOT NULL,
-    file_path VARCHAR(500) NOT NULL,
-    file_url VARCHAR(500),
-    file_size INTEGER NOT NULL,
-    mime_type VARCHAR(100) NOT NULL,
-    description TEXT,
-    is_public BOOLEAN DEFAULT FALSE,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (task_id) REFERENCES tasks(id)
-);
+**Add helpful descriptions:**
+```
+/attach 123 "Project requirements document"
+/attach 124 "Design mockup for homepage redesign"
+/attach 125 "Meeting notes from client discussion"
+```
+
+### Project Management
+
+**Organize by project phase:**
+```
+# Planning phase
+/attach 123 "Requirements_Document.pdf"
+/attach 123 "Project_Timeline.xlsx"
+
+# Design phase
+/attach 124 "Wireframes.png"
+/attach 124 "Design_Specs.pdf"
+
+# Development phase
+/attach 125 "Code_Review_Notes.txt"
+/attach 125 "Test_Results.pdf"
+```
+
+**Client project organization:**
+```
+/attach 123 "Client_Acme_Requirements.pdf"
+/attach 123 "Acme_Project_Proposal.docx"
+/attach 123 "Acme_Design_Mockups.zip"
+```
+
+### File Management
+
+**Regular cleanup:**
+- Remove outdated files
+- Update descriptions as projects evolve
+- Keep only relevant attachments
+
+**Backup important files:**
+- Don't rely solely on attachments for critical documents
+- Keep local copies of important files
+- Use attachments for convenience, not as primary storage
+
+## 🆘 Getting Help
+
+### File Attachment Help
+
+```
+/help attachments
+```
+
+Get help with file attachment commands.
+
+### Common Issues
+
+**File too large:**
+- Compress the file if possible
+- Split large files into smaller parts
+- Use cloud storage for very large files
+
+**File type not supported:**
+- Convert to a supported format
+- Use alternative file types
+- Contact support for format requests
+
+**Can't attach file:**
+- Check file size (max 10MB)
+- Verify file type is supported
+- Try sending the file again
+
+### Command Reference
+
+**Attaching Files:**
+- `/attach <task_id> [description]` - Attach file to task
+- `/attachments <task_id>` - View task attachments
+- `/attachment_description <id> <description>` - Update description
+- `/remove_attachment <id>` - Remove attachment
+
+## 🎯 Common Use Cases
+
+### Design Projects
+
+**Store design assets:**
+```
+/attach 123 "Logo_Design_Sketch.png"
+/attach 123 "Color_Palette.pdf"
+/attach 123 "Typography_Specs.pdf"
+/attach 123 "Final_Logo_Files.zip"
+```
+
+**Track design iterations:**
+```
+/attach 124 "Design_v1_Initial.png"
+/attach 124 "Design_v2_Client_Feedback.png"
+/attach 124 "Design_v3_Final.png"
+```
+
+### Client Work
+
+**Project documentation:**
+```
+/attach 125 "Client_Brief.pdf"
+/attach 125 "Project_Proposal.docx"
+/attach 125 "Contract_Agreement.pdf"
+/attach 125 "Invoice_Template.xlsx"
+```
+
+**Client communications:**
+```
+/attach 126 "Client_Email_Thread.txt"
+/attach 126 "Meeting_Recording.mp3"
+/attach 126 "Feedback_Summary.pdf"
+```
+
+### Personal Projects
+
+**Learning materials:**
+```
+/attach 127 "Course_Notes.txt"
+/attach 127 "Practice_Exercises.pdf"
+/attach 127 "Reference_Materials.zip"
+```
+
+**Personal planning:**
+```
+/attach 128 "Goals_2025.pdf"
+/attach 128 "Budget_Spreadsheet.xlsx"
+/attach 128 "Travel_Plans.txt"
+```
+
+### Development Projects
+
+**Code and documentation:**
+```
+/attach 129 "API_Documentation.pdf"
+/attach 129 "Database_Schema.sql"
+/attach 129 "Test_Results.txt"
+/attach 129 "Deployment_Notes.txt"
+```
+
+**Project assets:**
+```
+/attach 130 "Project_Logo.png"
+/attach 130 "Brand_Guidelines.pdf"
+/attach 130 "Assets_Package.zip"
 ```
 
 ## 📊 Best Practices
 
-### File Organization
-- **Use descriptive filenames**: Make it easy to identify files
-- **Add descriptions**: Provide context for each attachment
-- **Group related files**: Attach multiple files to the same task
-- **Regular cleanup**: Remove outdated attachments
+### File Naming
 
-### File Management
-- **Backup important files**: Don't rely solely on attachments for critical documents
-- **Monitor storage**: Keep track of attachment sizes
-- **Use appropriate formats**: Choose the right file type for your content
-- **Compress when possible**: Reduce file sizes for better performance
-
-### Security Considerations
-- **Validate file contents**: Ensure files are what they claim to be
-- **Limit access**: Only share attachments with authorized users
-- **Regular audits**: Review and clean up old attachments
-- **Backup strategy**: Implement proper backup procedures
-
-## 🚨 Troubleshooting
-
-### Common Issues
-
-**File too large**
+**Use consistent naming:**
 ```
-❌ Error: File too large. Maximum size: 10MB
-```
-**Solution**: Compress the file or split it into smaller parts.
-
-**Unsupported file type**
-```
-❌ Error: File type not allowed: .exe. Allowed: .pdf, .doc, .docx, .txt, .jpg, .jpeg, .png, .gif, .zip, .rar
-```
-**Solution**: Convert the file to a supported format.
-
-**Task not found**
-```
-❌ Error: Task 999 not found
-```
-**Solution**: Verify the task ID exists using `/list`.
-
-**Attachment not found**
-```
-❌ Error: Attachment 999 not found
-```
-**Solution**: Use `/attachments <task_id>` to see available attachments.
-
-### Performance Tips
-- **Optimize images**: Compress images before uploading
-- **Use appropriate formats**: Choose efficient file formats
-- **Regular cleanup**: Remove unused attachments
-- **Monitor storage**: Keep track of total attachment size
-
-## 🔄 Integration
-
-### Event System
-File attachment operations emit events for integration:
-- `file_attached` - When a file is successfully attached
-- `file_removed` - When a file is removed
-- `file_updated` - When file description is updated
-
-### API Access
-File attachments are accessible through the service layer:
-```python
-from larrybot.services.task_attachment_service import TaskAttachmentService
-
-# Attach a file
-result = await service.attach_file(task_id, file_data, filename)
-
-# Get attachments
-attachments = await service.get_task_attachments(task_id)
-
-# Remove attachment
-await service.remove_attachment(attachment_id)
+ProjectName_Type_Version.ext
+Example: Website_Design_Mockup_v2.png
 ```
 
-## 📈 Future Enhancements
+**Include dates when relevant:**
+```
+Meeting_Notes_2025-07-02.txt
+Client_Feedback_2025-06-15.pdf
+```
 
-### Planned Features
-- **Cloud storage integration**: Support for external storage providers
-- **File preview**: Inline preview of common file types
-- **Version control**: Track file versions and changes
-- **Sharing**: Share attachments with external users
-- **Search**: Full-text search within file contents
-- **OCR**: Extract text from images and PDFs
+### Organization
 
-### Roadmap
-- **Q3 2025**: Cloud storage integration
-- **Q4 2025**: File preview and search
-- **Q1 2026**: Version control and sharing
-- **Q2 2026**: OCR and advanced features 
+**Group related files:**
+- Attach multiple files to the same task
+- Use consistent descriptions
+- Keep files organized by project phase
+
+**Regular maintenance:**
+- Review attachments periodically
+- Remove outdated files
+- Update descriptions as needed
+
+### Security
+
+**File management:**
+- Only attach files you own or have permission to share
+- Be careful with sensitive information
+- Use appropriate file types for your content
+
+---
+
+**Keep your projects organized!** Start by attaching a file to a task: send a file to your bot, then reply with `/attach 123` to attach it to task #123.
+
+---
+
+**Next Steps:**
+- [Advanced Tasks](advanced-tasks.md) - Powerful task management features
+- [Analytics](analytics.md) - Understand your productivity patterns
+- [Calendar Integration](../commands/calendar-integration.md) - Sync with your schedule
+- [Examples](../examples.md) - See real-world file attachment scenarios 

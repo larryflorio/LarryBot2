@@ -306,7 +306,7 @@ print('Background queue:', get_background_queue_stats())
 - **[Configuration Guide](docs/getting-started/configuration.md)** - Environment and settings
 - **[User Guide](docs/user-guide/README.md)** - Command usage and examples
 - **[Developer Guide](docs/developer-guide/README.md)** - Architecture and development
-- **[API Reference](docs/api-reference/README.md)** - Complete API documentation
+- **[Developer Guide](docs/developer-guide/README.md)** - Technical documentation for developers
 - **[Action Button Guide](docs/user-guide/features/advanced-tasks.md)** - Interactive features
 - **✅ **NEW:** [Performance Guide](docs/developer-guide/performance/README.md)** - Optimization and best practices
 - **✅ **NEW:** [Performance Optimizations](docs/developer-guide/performance/optimizations.md)** - Implementation details
@@ -384,4 +384,15 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 **Version**: 2.1.0 - High-Performance Edition  
 **Total Commands**: 86  
 **Action Buttons**: ✅ Fully Implemented  
-**Performance**: ✅ High Performance (30-50% faster, 446x cached operations) 
+**Performance**: ✅ High Performance (30-50% faster, 446x cached operations)
+
+## LarryBot2: Now with Modern UX and Narrative Input
+
+- **Natural Language Input**: Just type what you want to do—no need to remember commands.
+- **Progressive Disclosure**: Only the most relevant actions are shown at each step. Tap "More Options" to reveal advanced features.
+- **Unified Button Builder**: All action buttons are consistent, visually clear, and context-sensitive.
+- **Smart Suggestions**: After key actions, the bot suggests next steps (e.g., add due date, review analytics).
+- **Seamless Fallback**: If the bot can't confidently interpret your input, it will suggest the most relevant commands and always offer `/help` and `/list`.
+- **Power User Friendly**: All classic commands remain available. You can always use `/help` to see the full list.
+
+See the user guide for details and examples. 

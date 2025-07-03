@@ -424,7 +424,7 @@ echo "=== Performance Check Complete ==="
 
 ---
 
-**Related Guides:** [Performance Guide](../../developer-guide/performance/README.md) | [Production Deployment](../../deployment/production.md)
+**Related Guides:** [Performance Guide](../../developer-guide/performance/README.md) | [Development Guide](../../developer-guide/development/deployment.md)
 
 #### Problem: "Invalid bot token"
 ```bash

@@ -1,96 +1,116 @@
-# Quick Start Guide
+# Quick Start Guide 🚀
 
-Get LarryBot2 up and running in minutes with this quick start guide.
+Get LarryBot2 up and running in minutes with this simple guide.
 
-## 🚀 Prerequisites
+## 🎯 What You Need
 
-- **Python 3.9+** - Download from [python.org](https://python.org)
-- **Telegram Bot Token** - Get from [@BotFather](https://t.me/BotFather)
-- **Git** - For cloning the repository
+- **A Telegram account** - Download from [telegram.org](https://telegram.org)
+- **Basic computer skills** - Ability to follow simple instructions
+- **5 minutes of time** - That's it!
 
 ## ⚡ 5-Minute Setup
 
-### 1. Clone and Setup
-```bash
-git clone <repository-url>
-cd LarryBot2
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-```
+### Step 1: Get Your Bot Token
 
-### 2. Configure Environment
-```bash
-# Create environment file
-cp .env.example .env
+1. **Open Telegram** and search for [@BotFather](https://t.me/BotFather)
+2. **Send `/newbot`** to create a new bot
+3. **Choose a name** for your bot (e.g., "My Productivity Bot")
+4. **Choose a username** (must end in 'bot', e.g., "myproductivitybot")
+5. **Copy the token** - it looks like `123456789:ABCdefGHIjklMNOpqrsTUVwxyz`
 
-# Edit .env with your bot token
-echo "TELEGRAM_TOKEN=your_bot_token_here" > .env
-```
+### Step 2: Get Your User ID
 
-### 3. Initialize Database
-```bash
-# Run database migrations
-alembic upgrade head
-```
+1. **Search for [@userinfobot](https://t.me/userinfobot)** in Telegram
+2. **Send any message** to the bot
+3. **Copy your user ID** - it's just a number like `123456789`
 
-### 4. Start the Bot
-```bash
-python -m larrybot
-```
+### Step 3: Set Up LarryBot2
 
-### 5. Test Basic Commands
-In Telegram, send these commands to your bot:
-- `/health` - Check if bot is running
-- `/add "Buy groceries"` - Create your first task
-- `/list` - See your tasks
+1. **Download LarryBot2** from the repository
+2. **Open the folder** in your computer
+3. **Create a file** called `.env` with this content:
+   ```
+   TELEGRAM_BOT_TOKEN=your_bot_token_here
+   ALLOWED_TELEGRAM_USER_ID=your_user_id_here
+   ```
+4. **Replace the values** with your actual token and user ID
 
-## 🎯 First Tasks
+### Step 4: Start Your Bot
+
+1. **Open a terminal/command prompt** in the LarryBot2 folder
+2. **Run these commands**:
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   pip install -r requirements.txt
+   alembic upgrade head
+   python -m larrybot
+   ```
+
+### Step 5: Test Your Bot
+
+1. **Open Telegram** and find your bot
+2. **Send `/start`** to begin
+3. **Try creating a task**: `/add "Buy groceries"`
+4. **You're ready!** 🎉
+
+## 🎯 Your First Tasks
 
 Try these commands to get familiar with LarryBot2:
 
-```bash
-# Create tasks
+### Create Tasks
+```
 /add "Complete project proposal"
-/addtask "Review code" High 2025-07-01 "Work"
+/add "Call client about project" high 2025-07-01
+```
 
-# List and manage
+### View Your Tasks
+```
 /list
-/done 1
+```
 
-# Check system
+### Mark Tasks Complete
+```
+/done 1
+```
+
+### Check System Status
+```
 /health
 ```
 
-## 🔧 Next Steps
+## 🔧 If Something Goes Wrong
 
-- **Calendar Integration**: See [Calendar Integration Guide](../user-guide/calendar-integration.md)
-- **Advanced Features**: Explore [Advanced Features](../user-guide/advanced-features.md)
-- **Plugin Development**: Learn [Plugin Development](../developer-guide/plugin-development.md)
+### Bot Not Responding?
+- Check your bot token in the `.env` file
+- Make sure the bot is running (you should see "Bot started" in the terminal)
+- Verify your user ID is correct
 
-## 🆘 Troubleshooting
+### Can't Find Your Bot?
+- Search for your bot's username in Telegram
+- Make sure you created the bot with @BotFather
+- Check that the username ends in 'bot'
 
-### Common Issues
+### Installation Errors?
+- Make sure you have Python 3.9 or higher installed
+- Try running the commands one by one
+- Check that you're in the correct folder
 
-**Bot not responding?**
-- Check your `TELEGRAM_TOKEN` in `.env`
-- Ensure the bot is running: `python -m larrybot`
-- Verify bot permissions with @BotFather
+## 🎉 What's Next?
 
-**Database errors?**
-- Run migrations: `alembic upgrade head`
-- Check database file permissions
+Now that you're set up, learn how to use LarryBot2 effectively:
 
-**Import errors?**
-- Activate virtual environment: `source venv/bin/activate`
-- Install dependencies: `pip install -r requirements.txt`
+- **[First Steps](first-steps.md)** - Learn your first commands
+- **[Task Management](../user-guide/commands/task-management.md)** - Master task creation and management
+- **[Reminders](../user-guide/commands/reminders.md)** - Set up smart reminders
+- **[Habits](../user-guide/commands/habits.md)** - Build productive habits
 
-### Getting Help
+## 🆘 Need Help?
 
-- Check the [Health Command](../user-guide/basic-commands.md#health-commands) for system status
-- Review [Basic Commands](../user-guide/basic-commands.md) for usage
-- See [Architecture Guide](../developer-guide/architecture.md) for technical details
+- **Check the [Troubleshooting Guide](troubleshooting.md)** for common issues
+- **Review the [Installation Guide](installation.md)** for detailed setup instructions
+- **Ask for help** on GitHub if you're still stuck
 
 ---
 
-*Ready to get started? Jump to [Basic Commands](../user-guide/basic-commands.md) to learn more!* 
+**Ready to boost your productivity?** Start with [First Steps](first-steps.md) to learn your first commands! 

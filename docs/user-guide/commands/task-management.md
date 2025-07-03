@@ -1,395 +1,394 @@
 ---
 title: Task Management Commands
-description: Create, edit, and manage tasks with LarryBot2's enhanced task management system
-last_updated: 2025-07-01
+description: Create, edit, and manage tasks with LarryBot2's powerful task management system
+last_updated: 2025-07-02
 ---
 
 # Task Management Commands 📋
 
-LarryBot2 provides a comprehensive task management system with **enhanced unified commands** that support both basic and advanced functionality through progressive enhancement. This guide covers all commands for creating, editing, and managing your tasks as of July 1, 2025.
+LarryBot2 makes task management effortless with powerful commands that help you stay organized and productive. Whether you're managing work projects, personal tasks, or daily routines, these commands will help you get things done.
 
-> **🆕 New in v2.1.6:** Major command consolidation completed! Enhanced commands now provide both basic and advanced functionality through intelligent parameter handling. All deprecated commands redirect seamlessly to enhanced versions.
+## 🎯 What You Can Do
 
-> **📋 Quick Reference**: 
-> - **Basic Users**: Use `/add`, `/list`, `/done`, `/edit`, `/remove` 
-> - **Advanced Users**: Add optional parameters for enhanced functionality
-> - **Migration**: All old commands (`/addtask`, `/tasks`) automatically redirect with helpful guidance
+- **Create tasks** with natural language
+- **Organize tasks** by priority, due date, and category
+- **Track progress** with status updates
+- **Find tasks quickly** with powerful search
+- **Manage multiple tasks** with bulk operations
+- **Get insights** into your productivity
 
-## 🌍 Timezone Handling
+## 📝 Creating Tasks
 
-All task due dates, creation times, and time tracking entries are displayed in your configured or automatically detected local timezone. Internally, all times are stored in UTC for reliability and consistency. Daylight Saving Time (DST) is handled automatically for all supported timezones.
+### Basic Task Creation
 
-- **Local Display**: Due dates, creation times, and time tracking are always shown in your local time.
-- **UTC Storage**: All times are stored in UTC in the database.
-- **Manual Override**: Use `/timezone` to set your timezone, or `/autotimezone` to reset to automatic detection.
-- **DST Support**: DST changes are handled automatically.
-- **Fallback**: If timezone detection fails, UTC is used as a safe default.
+The simplest way to create a task:
 
-> **Tip:** If your task times appear off, check your timezone setting with `/timezone`.
-
----
-
-## 🚀 **Enhanced Basic Commands**
-
-### `/add` - **Enhanced Task Creation** ⭐
-**Enhanced**: Now supports both basic AND advanced task creation with optional metadata.
-
-**Usage**: 
-- **Basic**: `/add <description>`
-- **Advanced**: `/add <description> [priority] [due_date] [category]`
-
-**Progressive Enhancement**: Start simple, add complexity when needed.
-
-#### **Basic Usage** (unchanged for existing users)
-```bash
+```
 /add Buy groceries
-/add Call client about project  
-/add Review quarterly reports
 ```
 
-#### **Advanced Usage** (new capability!)
-```bash
-# With priority
-/add Complete project proposal high
+This creates a basic task with default settings.
 
-# With priority and due date
-/add Complete project proposal high 2025-07-05
+### Advanced Task Creation
 
-# Full advanced usage
-/add Complete project proposal high 2025-07-05 work
-/add Buy birthday gift medium 2025-07-01 personal
-/add Schedule team meeting critical 2025-06-30 work
+Add more details to your tasks:
+
+```
+/add "Complete project proposal" high 2025-07-05 work
 ```
 
-**Parameters**:
-- `description` (required): Task description
-- `priority` (optional): `low`, `medium`, `high`, `critical`
-- `due_date` (optional): `YYYY-MM-DD` format
-- `category` (optional): Any category name
+This creates a high-priority work task due July 5th.
 
-#### **Response Examples**
+**Format:** `/add "description" [priority] [due_date] [category]`
 
-**Basic Creation**:
+**Examples:**
 ```
-✅ **Success**
-
-✅ Task added successfully!
-
-📋 **Details:**
-   • Task: Buy groceries
-   • ID: 123
-   • Status: Todo
-   • Created: 2025-06-30 10:30
-
-[👁️ View] [✅ Done] [✏️ Edit] [🗑️ Delete]
+/add "Call client about project" high 2025-07-01 work
+/add "Buy birthday gift" medium 2025-07-01 personal
+/add "Schedule team meeting" critical 2025-06-30 work
 ```
 
-**Advanced Creation**:
+### Task Priorities
+
+Set task priorities to focus on what matters most:
+
+- **`low`** - Not urgent, can wait
+- **`medium`** - Normal priority
+- **`high`** - Important, needs attention
+- **`critical`** - Urgent, must be done soon
+
+### Due Dates
+
+Set due dates in YYYY-MM-DD format:
+
 ```
-✅ **Success**
-
-✅ Enhanced task created successfully!
-
-📋 **Details:**
-   • Task: Complete project proposal
-   • ID: 124
-   • Status: Todo
-   • Priority: High 🔴
-   • Due: 2025-07-05 📅
-   • Category: work 🏷️
-   • Created: 2025-06-30 10:30
-
-[👁️ View] [✅ Done] [✏️ Edit] [🗑️ Delete]
+/add "Review quarterly reports" 2025-07-15
+/add "Submit expense report" 2025-07-01
 ```
 
-#### **Migration from `/addtask`**
-> **⚠️ Deprecated**: `/addtask` now redirects to enhanced `/add`
-> 
-> **Old**: `/addtask "Complete project" High 2025-07-05 work`  
-> **New**: `/add "Complete project" high 2025-07-05 work`
+### Categories
 
----
+Organize tasks by category:
 
-### `/list` - **Enhanced Task Listing** ⭐
-**Enhanced**: Now supports both basic listing AND advanced filtering with optional parameters.
+```
+/add "Buy groceries" personal
+/add "Complete project proposal" work
+/add "Exercise" health
+```
 
-**Usage**:
-- **Basic**: `/list` (shows incomplete tasks)
-- **Advanced**: `/list [status] [priority] [category]`
+## 📋 Managing Your Tasks
 
-**Progressive Enhancement**: Start with simple listing, add filters when needed.
+### View Your Tasks
 
-#### **Basic Usage** (unchanged for existing users)
-```bash
+See all your incomplete tasks:
+
+```
 /list
 ```
 
-#### **Advanced Usage** (new filtering capability!)
-```bash
-# Filter by status
-/list todo
-/list done
+This shows your tasks with interactive buttons for quick actions.
 
-# Filter by priority  
-/list high
-/list critical
+### Filter Your Tasks
 
-# Filter by category
-/list work
-/list personal
+Find specific tasks quickly:
 
-# Combined filtering
-/list todo high work
-/list done medium personal
-/list review critical
+```
+/list todo          # Show only todo tasks
+/list high          # Show only high-priority tasks
+/list work          # Show only work tasks
+/list todo high     # Show high-priority todo tasks
 ```
 
-**Filter Parameters**:
-- `status` (optional): `todo`, `in_progress`, `review`, `done`
-- `priority` (optional): `low`, `medium`, `high`, `critical`  
-- `category` (optional): Any category name
+### Search Your Tasks
 
-#### **Response Examples**
+Find tasks by description:
 
-**Basic Listing**:
 ```
-📋 **Incomplete Tasks** (3 found)
-
-1. 🟡 **Buy groceries** (ID: 123)
-   📝 Todo | Medium priority
-   📅 Due: Today
-   🏷️ Category: personal
-
-2. 🔴 **Complete project proposal** (ID: 124)  
-   📝 Todo | High priority
-   📅 Due: 2025-07-05
-   🏷️ Category: work
-
-3. 🟡 **Call client about project** (ID: 125)
-   📝 In Progress | Medium priority
-   📅 Due: 2025-07-01
-   🏷️ Category: work
-
-[👁️ View] [✅ Done] [✏️ Edit] [🗑️ Delete]
-[👁️ View] [✅ Done] [✏️ Edit] [🗑️ Delete]  
-[👁️ View] [✅ Done] [✏️ Edit] [🗑️ Delete]
-
-[➕ Add Task] [🔄 Refresh] [⬅️ Back]
+/search groceries
+/search project
+/search meeting
 ```
 
-**Advanced Filtering**:
+### Advanced Search
+
+Use powerful search filters:
+
 ```
-📋 **Filtered Tasks: Todo + High + work** (1 found)
-
-1. 🔴 **Complete project proposal** (ID: 124)
-   📝 Todo | High priority  
-   📅 Due: 2025-07-05
-   🏷️ Category: work
-
-[👁️ View] [✅ Done] [✏️ Edit] [🗑️ Delete]
-
-[➕ Add Task] [🔄 Refresh] [⬅️ Back]
+/search_advanced "project proposal" high work
 ```
 
-#### **Migration from `/tasks`**
-> **⚠️ Deprecated**: `/tasks` now redirects to enhanced `/list`
-> 
-> **Old**: `/tasks High work`  
-> **New**: `/list high work`
+## ✅ Completing Tasks
 
----
+### Mark Tasks Complete
 
-## 🎯 **Standard Task Commands**
+Click the **✅ Done** button next to a task, or use:
 
-### `/done` - Mark Task Complete
-Mark a task as completed with confirmation and action buttons.
-
-**Usage**: `/done <task_id>`
-
-**Examples**:
-```bash
+```
 /done 123
-/done 124
 ```
 
-**Response**:
+### Bulk Completion
+
+Complete multiple tasks at once:
+
 ```
-✅ **Success**
-
-✅ Task completed!
-
-📋 **Details:**
-   • Task: Buy groceries
-   • ID: 123
-   • Status: Done ✅
-   • Completed: 2025-06-30 10:45
-   • Duration: 2h 15m
-
-[👁️ View] [↩️ Undo] [🗑️ Delete]
+/bulk_status 1,2,3 done
 ```
 
-### `/edit` - Edit Task Description  
-Update the description of an existing task with inline editing support.
+This marks tasks 1, 2, and 3 as complete.
 
-**Usage**: `/edit <task_id> <new_description>`
+## ✏️ Editing Tasks
 
-**Examples**:
-```bash
-/edit 123 Buy groceries and household items
-/edit 124 Complete project proposal for Q3
+### Update Task Details
+
+Click the **✏️ Edit** button next to a task, or use:
+
+```
+/edit 123 "Updated task description"
 ```
 
-**Response**:
+### Change Task Priority
+
 ```
-✅ **Success**
-
-✏️ Task updated successfully!
-
-📋 **Details:**
-   • Task: Buy groceries and household items
-   • ID: 123
-   • Status: Updated ✏️
-   • Modified: 2025-06-30 10:50
-
-[👁️ View] [✅ Done] [✏️ Edit Again] [🗑️ Delete]
+/priority 123 high
 ```
 
-### `/remove` - Remove Task
-Delete a task permanently with confirmation dialog and safety checks.
+### Set Due Date
 
-**Usage**: `/remove <task_id>`
+```
+/due 123 2025-07-15
+```
 
-**Examples**:
-```bash
+### Change Category
+
+```
+/category 123 work
+```
+
+## 🗑️ Removing Tasks
+
+### Delete a Task
+
+Click the **🗑️ Delete** button next to a task, or use:
+
+```
 /remove 123
-/remove 124
 ```
 
-**Response (confirmation dialog)**:
+### Bulk Deletion
+
+Delete multiple tasks:
+
 ```
-🗑️ **Confirm Task Deletion**
-
-**Task**: Buy groceries and household items
-**ID**: 123
-**Status**: 📝 Todo
-**Priority**: Medium 🟡
-**Category**: personal 🏷️
-
-⚠️ **Warning**: This action cannot be undone.
-
-Are you sure you want to delete this task?
-
-[🗑️ Confirm Delete] [❌ Cancel]
+/bulk_delete 1,2,3
 ```
 
-**Response (after confirmation)**:
-```
-🗑️ **Task deleted successfully!**
+## 📊 Task Organization
 
-📋 **Details:**
-   • Task: Buy groceries and household items
-   • ID: 123
-   • Status: Deleted 🗑️
-   • Action: Task removed from database
+### Task Status
 
-[↩️ Undo Delete] [⬅️ Back to List]
+Track your progress with task status:
+
+- **`todo`** - Not started yet
+- **`in_progress`** - Currently working on it
+- **`review`** - Ready for review
+- **`done`** - Completed
+
+### Change Task Status
+
 ```
+/status 123 in_progress
+```
+
+### Bulk Status Updates
+
+```
+/bulk_status 1,2,3 in_progress
+```
+
+## 🔍 Finding Tasks
+
+### Filter by Status
+
+```
+/tasks todo
+/tasks done
+/tasks in_progress
+```
+
+### Filter by Priority
+
+```
+/tasks high
+/tasks critical
+/tasks medium
+```
+
+### Filter by Category
+
+```
+/tasks work
+/tasks personal
+/tasks health
+```
+
+### Advanced Filtering
+
+Combine multiple filters:
+
+```
+/filter_advanced status=todo priority=high category=work
+```
+
+### Time-Based Filtering
+
+Find tasks by time:
+
+```
+/today          # Tasks due today
+/week           # Tasks due this week
+/overdue        # Overdue tasks
+/time_range 2025-07-01 2025-07-31  # Tasks in date range
+```
+
+## 📈 Productivity Insights
+
+### Basic Analytics
+
+Get insights into your productivity:
+
+```
+/analytics
+```
+
+See your task completion rates and trends.
+
+### Detailed Analytics
+
+```
+/analytics_detailed
+```
+
+Get comprehensive productivity insights.
+
+### Productivity Report
+
+```
+/productivity_report
+```
+
+Generate a detailed productivity report.
+
+### Smart Suggestions
+
+Get intelligent task suggestions:
+
+```
+/suggest
+```
+
+LarryBot2 analyzes your patterns and suggests what to work on next.
+
+## 🎮 Interactive Features
+
+### Action Buttons
+
+Every task comes with interactive buttons:
+
+- **👁️ View** - See detailed task information
+- **✅ Done** - Mark task complete
+- **✏️ Edit** - Update task details
+- **🗑️ Delete** - Remove task
+
+### Navigation Buttons
+
+- **➕ Add Task** - Create a new task
+- **🔄 Refresh** - Update your task list
+- **⬅️ Back** - Go back to previous view
+
+## 🎯 Pro Tips
+
+### Use Natural Language
+
+LarryBot2 understands natural language:
+
+```
+/add "Call Sarah about the Johnson project tomorrow at 2pm" high work
+```
+
+### Quick Task Creation
+
+For simple tasks, just describe what you need to do:
+
+```
+/add "Pick up dry cleaning"
+/add "Send follow-up email"
+/add "Review meeting notes"
+```
+
+### Organize by Project
+
+Use categories to organize by project:
+
+```
+/add "Design homepage mockup" high 2025-07-10 website-project
+/add "Write content for about page" medium 2025-07-12 website-project
+```
+
+### Track Progress
+
+Update task status as you work:
+
+```
+/status 123 in_progress    # Start working
+/status 123 review         # Ready for review
+/done 123                  # Complete the task
+```
+
+### Use Bulk Operations
+
+Save time with bulk operations:
+
+```
+/bulk_status 1,2,3,4,5 in_progress  # Start multiple tasks
+/bulk_priority 1,2,3 high           # Set priority for multiple tasks
+/bulk_delete 10,11,12               # Remove multiple tasks
+```
+
+## 🆘 Getting Help
+
+### Command Help
+
+```
+/help
+```
+
+See all available commands.
+
+### Task Help
+
+```
+/help tasks
+```
+
+Get help with task management commands.
+
+### System Status
+
+```
+/health
+```
+
+Check if everything is working properly.
 
 ---
 
-## 🎮 **Action Buttons System**
-
-### **Per-Task Action Buttons**
-Every task display includes intelligent action buttons:
-
-- **👁️ View**: Show detailed task information with full metadata
-- **✅ Done**: Mark task complete (only for incomplete tasks)
-- **✏️ Edit**: Launch inline edit flow with text input
-- **🗑️ Delete**: Delete task with confirmation dialog
-
-### **Navigation Action Buttons**
-All task lists include navigation options:
-
-- **➕ Add Task**: Quick access to add new task
-- **🔄 Refresh**: Reload current list with fresh data  
-- **⬅️ Back**: Return to previous menu or main menu
-
-### **Smart Button Behavior**
-- **Context-Aware**: Buttons adapt based on task status
-- **Confirmation Dialogs**: Destructive actions require confirmation
-- **Inline Editing**: Edit operations use inline text input
-- **Progress Feedback**: Visual feedback during operations
+**Ready to get organized?** Start with a simple task: `/add "Learn LarryBot2 commands"` and explore the interactive features!
 
 ---
 
-## 🔄 **Migration Guide**
-
-### **Enhanced Commands Available**
-| Old Command | New Enhanced Command | Migration |
-|------------|---------------------|-----------|
-| `/addtask` | `/add` | Automatic redirect with examples |
-| `/tasks` | `/list` | Automatic redirect with filtering help |
-
-### **Seamless Transition**
-- **Zero Disruption**: Old commands continue working
-- **Educational Redirects**: Helpful migration messages
-- **Usage Examples**: Concrete examples for new syntax
-- **Gradual Migration**: Users can transition at their own pace
-
-### **Example Migration Messages**
-When using deprecated commands, you'll see helpful guidance:
-
-```
-🔄 **Command Enhanced!**
-
-The `/addtask` command has been enhanced and merged into `/add`.
-
-**Your old command**: `/addtask "Complete project" High 2025-07-05 work`
-**New enhanced syntax**: `/add "Complete project" high 2025-07-05 work`
-
-✨ **Benefits**: 
-• Single command for both basic and advanced task creation
-• Simpler syntax with optional parameters
-• Same powerful functionality with better user experience
-
-**Try it now**: `/add Complete project high 2025-07-05 work`
-```
-
----
-
-## 📚 **Best Practices**
-
-### **For New Users**
-1. **Start Simple**: Use basic `/add` and `/list` commands
-2. **Discover Gradually**: Add parameters as you need them
-3. **Use Action Buttons**: Click buttons for quick task operations
-4. **Explore Features**: Try advanced parameters when ready
-
-### **For Existing Users**  
-1. **Continue Current Usage**: Your existing commands still work
-2. **Explore Enhancements**: Try optional parameters for more power
-3. **Migrate Gradually**: Switch to enhanced syntax when convenient
-4. **Benefit from Unification**: Fewer commands to remember
-
-### **Command Efficiency Tips**
-- **Progressive Enhancement**: `/add task` → `/add task high` → `/add task high 2025-07-01`
-- **Smart Defaults**: Commands work intelligently with partial parameters
-- **Consistent Patterns**: All enhanced commands follow similar parameter patterns
-- **Action Buttons**: Use buttons for quick operations without typing commands
-
----
-
-**📖 Related Documentation:**
-- [Enhanced Filtering and Search](enhanced-filtering.md) - Enhanced `/search` command
-- [Analytics and Reporting](analytics-reporting.md) - Unified `/analytics` command  
-- [Bulk Operations](bulk-operations.md) - Bulk task operations
-- [API Reference](../../api-reference/commands.md) - Complete command reference
-
----
-
-**🎯 Quick Navigation:**
-- [Basic Commands](#enhanced-basic-commands) - Start here for essential task management
-- [Action Buttons](#action-buttons-system) - Interactive task operations  
-- [Migration Guide](#migration-guide) - Transitioning from old commands
-- [Best Practices](#best-practices) - Tips for efficient task management 
-*Last updated: July 1, 2025* 
+**Next Steps:**
+- [Reminders](../reminders.md) - Set up smart reminders
+- [Habits](../habits.md) - Build productive habits
+- [Calendar Integration](../calendar-integration.md) - Sync with Google Calendar
+- [Advanced Features](../features/advanced-tasks.md) - Learn advanced task capabilities

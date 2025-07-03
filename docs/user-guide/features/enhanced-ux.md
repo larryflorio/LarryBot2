@@ -10,6 +10,14 @@ last_updated: 2025-07-02
 
 LarryBot2's Enhanced UX System delivers a modern, professional user experience with improved visual hierarchy, smart navigation, and comprehensive error recovery.
 
+LarryBot2 features a modern, context-aware user experience:
+
+- **Progressive Disclosure:** Only the most relevant actions are shown at each step. Tap "More Options" to reveal advanced features.
+- **Unified Button Builder:** All action buttons are now consistent, visually clear, and context-sensitive.
+- **Smart Suggestions:** After key actions (like creating or completing a task), the bot suggests next steps (e.g., add due date, review analytics).
+- **Narrative Input:** You can interact with the bot using natural language, not just commands.
+- **Seamless Fallback:** If the bot can't confidently interpret your input, it will suggest the most relevant commands and always offer `/help` and `/list`.
+
 ## 🎯 Overview
 
 The Enhanced UX System transforms LarryBot2 into a professional-grade productivity assistant with:
@@ -210,6 +218,8 @@ recovery.provide_guidance()
 2. **Use contextual actions** for faster task completion
 3. **Explore advanced features** with progressive disclosure
 4. **Customize interactions** with available options
+
+For more, see the [Task Management Guide](../commands/task-management.md).
 
 ---
 

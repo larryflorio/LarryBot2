@@ -48,4 +48,4 @@ Provides in-depth system information including performance metrics, configuratio
 
 ---
 
-**Related Guides**: [System Commands](../commands/system-commands.md) → [Deployment Monitoring](../../deployment/monitoring.md) 
+**Related Guides**: [System Commands](../commands/system-commands.md) → [Performance Guide](../../developer-guide/performance/README.md) 

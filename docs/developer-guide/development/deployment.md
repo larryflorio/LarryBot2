@@ -66,4 +66,4 @@ alembic upgrade head
 
 ---
 
-**Related Guides**: [Configuration](../../getting-started/configuration.md) | [Monitoring](../../deployment/monitoring.md) 
+**Related Guides**: [Configuration](../../getting-started/configuration.md) | [Performance Guide](../performance/README.md) 

@@ -392,6 +392,26 @@ class UXComponentCache:
 4. **Performance test** UX component rendering times
 5. **Accessibility test** with screen readers and assistive technologies
 
+LarryBot2's enhanced UX system provides a modern, context-aware, and extensible user experience. Key components:
+
+- **ProgressiveDisclosureBuilder**: Dynamically reveals advanced options as the user interacts ("More Options" button, disclosure levels).
+- **UnifiedButtonBuilder**: Centralizes all inline keyboard/button creation for consistency and maintainability.
+- **ContextAwareButtonBuilder**: Builds keyboards based on user context, preferences, and task state.
+- **Smart Suggestions**: After key actions, the bot suggests next steps (e.g., add due date, review analytics).
+- **EnhancedNarrativeProcessor**: Handles natural language input, intent/entity extraction, and context management.
+
+## Extending the UX System
+- **Add new button types/actions**: Extend `ButtonType` and `ActionType` enums, update `UnifiedButtonBuilder`.
+- **Add new smart suggestions**: Update handlers (e.g., `_handle_task_view`, `_handle_task_done_operation`) to add context-aware suggestions.
+- **Add new disclosure levels**: Update `ProgressiveDisclosureBuilder` to add more advanced/expert actions.
+- **Integrate with plugins**: Plugins can use the unified button builder and progressive disclosure for their own entities.
+
+## Narrative Processor
+- Extend `EnhancedNarrativeProcessor` to add new intents/entities or improve context handling.
+- All narrative input is routed through this processor before falling back to commands.
+
+See code in `larrybot/utils/enhanced_ux_helpers.py` and `larrybot/nlp/enhanced_narrative_processor.py`.
+
 ---
 
 **Enhanced UX System Architecture** - Providing modern, professional user experience with robust technical implementation and comprehensive testing.
