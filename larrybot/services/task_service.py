@@ -6,6 +6,7 @@ from larrybot.models.task import Task
 from larrybot.models.task_comment import TaskComment
 import json
 import re
+from larrybot.utils.datetime_utils import get_utc_now
 
 class TaskService(BaseService):
     """
@@ -38,7 +39,7 @@ class TaskService(BaseService):
                 return self._handle_error(ValueError(f"Invalid priority: {priority}"))
             
             # Validate due date
-            if due_date and due_date < datetime.utcnow():
+            if due_date and due_date < get_utc_now():
                 return self._handle_error(ValueError("Due date cannot be in the past"))
             
             # Validate parent task exists
@@ -120,7 +121,7 @@ class TaskService(BaseService):
     async def update_task_due_date(self, task_id: int, due_date: datetime) -> Dict[str, Any]:
         """Update task due date."""
         try:
-            if due_date < datetime.utcnow():
+            if due_date < get_utc_now():
                 return self._handle_error(ValueError("Due date cannot be in the past"))
             
             task = self.task_repository.update_due_date(task_id, due_date)
@@ -184,7 +185,7 @@ class TaskService(BaseService):
                 return self._handle_error(ValueError(f"Failed to start time tracking for task {task_id}"))
             
             return self._create_success_response(
-                {"task_id": task_id, "started_at": datetime.utcnow()},
+                {"task_id": task_id, "started_at": get_utc_now()},
                 f"Time tracking started for task {task_id}"
             )
             
@@ -535,7 +536,7 @@ class TaskService(BaseService):
                 return self._handle_error(ValueError("Duration must be positive"))
             
             # Create a time entry with start time 1 hour ago and end time now
-            end_time = datetime.utcnow()
+            end_time = get_utc_now()
             start_time = end_time - timedelta(minutes=duration_minutes)
             
             success = self.task_repository.add_time_entry(task_id, start_time, end_time, description)

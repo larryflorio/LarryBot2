@@ -18,6 +18,8 @@ from larrybot.nlp.intent_recognizer import IntentRecognizer
 from larrybot.nlp.entity_extractor import EntityExtractor
 from larrybot.nlp.sentiment_analyzer import SentimentAnalyzer
 from larrybot.nlp.enhanced_narrative_processor import EnhancedNarrativeProcessor
+from larrybot.utils.datetime_utils import get_current_datetime
+from larrybot.utils.enhanced_ux_helpers import escape_markdown_v2
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -1113,7 +1115,7 @@ class TelegramBotHandler:
                     return
                 
                 # Calculate progress metrics
-                today = datetime.now().date()
+                today = get_current_datetime().date()
                 days_since_creation = (today - habit.created_at.date()).days + 1 if habit.created_at else 0
                 completion_rate = (habit.streak / days_since_creation * 100) if days_since_creation > 0 else 0
                 
@@ -1286,7 +1288,7 @@ class TelegramBotHandler:
                 best_habit = max(habits, key=lambda h: h.streak) if habits else None
                 
                 # Calculate completion rates
-                today = datetime.now().date()
+                today = get_current_datetime().date()
                 completed_today = 0
                 for habit in habits:
                     if habit.last_completed:
@@ -1366,7 +1368,7 @@ class TelegramBotHandler:
                     return
                 
                 # Calculate today's date for streak calculations
-                today = datetime.now().date()
+                today = get_current_datetime().date()
                 
                 # Format habit list with rich formatting and action buttons
                 message = f"🔄 **All Habits** \\({len(habits)} found\\)\n\n"
@@ -1568,7 +1570,7 @@ class TelegramBotHandler:
         help_text += f"*Total Commands*: {len(commands)}"
         
         try:
-            await update.message.reply_text(help_text, parse_mode='MarkdownV2')
+            await update.message.reply_text(escape_markdown_v2(help_text), parse_mode='MarkdownV2')
         except Exception as e:
             # Fallback to plain text if Markdown fails
             fallback_text = "📋 Available Commands\n\n"
@@ -1891,7 +1893,7 @@ class TelegramBotHandler:
                                 "Task": task.description,
                                 "ID": task_id,
                                 "Status": "Updated",
-                                "Modified": datetime.now().strftime("%Y-%m-%d %H:%M")
+                                "Modified": get_current_datetime().strftime("%Y-%m-%d %H:%M")
                             }
                         ),
                         parse_mode='MarkdownV2'
@@ -1990,7 +1992,7 @@ class TelegramBotHandler:
                 # Add smart suggestions based on task list
                 suggestions = []
                 high_priority_count = sum(1 for t in tasks if getattr(t, 'priority', 'Medium') in ['High', 'Critical'])
-                overdue_count = sum(1 for t in tasks if hasattr(t, 'due_date') and t.due_date and t.due_date < datetime.now())
+                overdue_count = sum(1 for t in tasks if hasattr(t, 'due_date') and t.due_date and t.due_date < get_current_datetime())
                 
                 if high_priority_count > 0:
                     suggestions.append(f"⚠️ **{high_priority_count} high priority tasks** need attention")

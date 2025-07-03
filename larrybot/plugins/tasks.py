@@ -8,7 +8,7 @@ from larrybot.core.event_utils import emit_task_event
 from larrybot.utils.ux_helpers import MessageFormatter, KeyboardBuilder
 from larrybot.services.task_service import TaskService
 from typing import Optional
-from datetime import datetime
+from larrybot.utils.datetime_utils import get_current_datetime
 
 # Global reference to event bus for task events
 _task_event_bus = None
@@ -80,7 +80,7 @@ async def add_task_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     
     if len(args) > 2:
         try:
-            due_date = datetime.strptime(args[2], "%Y-%m-%d")
+            due_date = get_current_datetime().strptime(args[2], "%Y-%m-%d")
         except ValueError:
             await update.message.reply_text(
                 MessageFormatter.format_error_message(
@@ -374,7 +374,7 @@ async def done_task_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                     "Task": task.description,
                     "ID": task_id,
                     "Status": "Done",
-                    "Completed": datetime.now().strftime("%Y-%m-%d %H:%M")
+                    "Completed": get_current_datetime().strftime("%Y-%m-%d %H:%M")
                 }
             ),
             parse_mode='MarkdownV2'
@@ -429,7 +429,7 @@ async def edit_task_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                     "Task": task.description,
                     "ID": task_id,
                     "Status": "Updated",
-                    "Modified": datetime.now().strftime("%Y-%m-%d %H:%M")
+                    "Modified": get_current_datetime().strftime("%Y-%m-%d %H:%M")
                 }
             ),
             parse_mode='MarkdownV2'

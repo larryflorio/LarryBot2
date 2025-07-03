@@ -8,6 +8,7 @@ from larrybot.models.task_comment import TaskComment
 from larrybot.models.task_dependency import TaskDependency
 from larrybot.models.task_time_entry import TaskTimeEntry
 from larrybot.models.client import Client
+from larrybot.utils.datetime_utils import get_utc_now
 
 
 class TestTaskService:
@@ -48,13 +49,13 @@ class TestTaskService:
             id=1,
             description="Test task",
             priority="High",
-            due_date=datetime.utcnow() + timedelta(days=7),
+            due_date=get_utc_now() + timedelta(days=7),
             category="Testing",
             status="Todo",
             done=False,
             started_at=None,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=get_utc_now(),
+            updated_at=get_utc_now(),
             tags='["test", "sample"]',
             estimated_hours=2.5,
             actual_hours=None,
@@ -68,7 +69,7 @@ class TestTaskService:
         comment.id = 1
         comment.task_id = 1
         comment.comment = "Test comment"
-        comment.created_at = datetime.utcnow()
+        comment.created_at = get_utc_now()
         return comment
 
     @pytest.mark.asyncio
@@ -81,7 +82,7 @@ class TestTaskService:
         result = await task_service.create_task_with_metadata(
             description="Test task",
             priority="High",
-            due_date=datetime.utcnow() + timedelta(days=7),
+            due_date=get_utc_now() + timedelta(days=7),
             category="Testing",
             estimated_hours=2.5,
             tags=["test", "sample"],
@@ -114,7 +115,7 @@ class TestTaskService:
         # Act
         result = await task_service.create_task_with_metadata(
             description="Test task",
-            due_date=datetime.utcnow() - timedelta(days=1)
+            due_date=get_utc_now() - timedelta(days=1)
         )
         
         # Assert
@@ -211,7 +212,7 @@ class TestTaskService:
         """Test successful due date update."""
         # Arrange
         mock_task_repository.update_due_date.return_value = sample_task
-        future_date = datetime.utcnow() + timedelta(days=7)
+        future_date = get_utc_now() + timedelta(days=7)
         
         # Act
         result = await task_service.update_task_due_date(1, future_date)
@@ -224,7 +225,7 @@ class TestTaskService:
     async def test_update_task_due_date_past_date(self, task_service):
         """Test due date update with past date."""
         # Act
-        result = await task_service.update_task_due_date(1, datetime.utcnow() - timedelta(days=1))
+        result = await task_service.update_task_due_date(1, get_utc_now() - timedelta(days=1))
         
         # Assert
         assert result['success'] is False
@@ -311,7 +312,7 @@ class TestTaskService:
     async def test_start_time_tracking_already_started(self, task_service, mock_task_repository, sample_task):
         """Test time tracking start when already started."""
         # Arrange
-        sample_task.started_at = datetime.utcnow()
+        sample_task.started_at = get_utc_now()
         mock_task_repository.get_task_by_id.return_value = sample_task
         
         # Act
@@ -325,7 +326,7 @@ class TestTaskService:
     async def test_stop_time_tracking_success(self, task_service, mock_task_repository, sample_task):
         """Test successful time tracking stop."""
         # Arrange
-        sample_task.started_at = datetime.utcnow() - timedelta(hours=2)
+        sample_task.started_at = get_utc_now() - timedelta(hours=2)
         mock_task_repository.get_task_by_id.return_value = sample_task
         mock_task_repository.stop_time_tracking.return_value = 120  # 2 hours in minutes
         
@@ -628,8 +629,8 @@ class TestTaskService:
         mock_task_repository.add_task_with_metadata.return_value = sample_task
         
         # Test current date (should be valid)
-        # Add a buffer to avoid race condition with datetime.utcnow()
-        current_date = datetime.utcnow() + timedelta(seconds=5)
+        # Add a buffer to avoid race condition with get_utc_now()
+        current_date = get_utc_now() + timedelta(seconds=5)
         mock_task_repository.add_task_with_metadata.return_value = sample_task
         result = await task_service.create_task_with_metadata(
             description="Test task",
@@ -638,7 +639,7 @@ class TestTaskService:
         assert result['success'] is True
         
         # Test far future date (should be valid)
-        far_future = datetime.utcnow() + timedelta(days=365)
+        far_future = get_utc_now() + timedelta(days=365)
         mock_task_repository.add_task_with_metadata.return_value = sample_task
         result = await task_service.create_task_with_metadata(
             description="Test task",
@@ -710,8 +711,8 @@ class TestTaskServiceComprehensive:
         task.parent_id = None
         task.tags = "[]"
         task.client_id = None
-        task.created_at = datetime.utcnow()
-        task.updated_at = datetime.utcnow()
+        task.created_at = get_utc_now()
+        task.updated_at = get_utc_now()
         return task
 
     # Error Handling and Validation Tests
@@ -731,7 +732,7 @@ class TestTaskServiceComprehensive:
     @pytest.mark.asyncio
     async def test_create_task_due_date_in_past(self, task_service, mock_task_repository):
         """Test create task with due date in the past."""
-        past_date = datetime.utcnow() - timedelta(days=1)
+        past_date = get_utc_now() - timedelta(days=1)
         result = await task_service.create_task_with_metadata(
             description="Test task",
             due_date=past_date
@@ -789,7 +790,7 @@ class TestTaskServiceComprehensive:
     @pytest.mark.asyncio
     async def test_update_due_date_past_date(self, task_service, mock_task_repository):
         """Test update due date with past date."""
-        past_date = datetime.utcnow() - timedelta(days=1)
+        past_date = get_utc_now() - timedelta(days=1)
         result = await task_service.update_task_due_date(1, past_date)
         
         assert result['success'] is False
@@ -799,7 +800,7 @@ class TestTaskServiceComprehensive:
     @pytest.mark.asyncio
     async def test_update_due_date_task_not_found(self, task_service, mock_task_repository):
         """Test update due date when task doesn't exist."""
-        future_date = datetime.utcnow() + timedelta(days=1)
+        future_date = get_utc_now() + timedelta(days=1)
         mock_task_repository.update_due_date.return_value = None
         
         result = await task_service.update_task_due_date(999, future_date)
@@ -851,7 +852,7 @@ class TestTaskServiceComprehensive:
     @pytest.mark.asyncio
     async def test_start_time_tracking_already_started(self, task_service, mock_task_repository, sample_task):
         """Test start time tracking when already started."""
-        sample_task.started_at = datetime.utcnow()
+        sample_task.started_at = get_utc_now()
         mock_task_repository.get_task_by_id.return_value = sample_task
         
         result = await task_service.start_time_tracking(1)
@@ -894,7 +895,7 @@ class TestTaskServiceComprehensive:
     @pytest.mark.asyncio
     async def test_stop_time_tracking_repository_failure(self, task_service, mock_task_repository, sample_task):
         """Test stop time tracking when repository operation fails."""
-        sample_task.started_at = datetime.utcnow()
+        sample_task.started_at = get_utc_now()
         mock_task_repository.get_task_by_id.return_value = sample_task
         mock_task_repository.stop_time_tracking.return_value = None
         
@@ -1133,7 +1134,7 @@ class TestTaskServiceComprehensive:
     @pytest.mark.asyncio
     async def test_get_tasks_by_time_range_invalid_range(self, task_service, mock_task_repository):
         """Test get tasks by time range with invalid date range."""
-        start_date = datetime.utcnow()
+        start_date = get_utc_now()
         end_date = start_date - timedelta(days=1)
         
         result = await task_service.get_tasks_by_time_range(start_date, end_date)
@@ -1152,7 +1153,7 @@ class TestTaskServiceComprehensive:
     @pytest.mark.asyncio
     async def test_productivity_report_invalid_date_range(self, task_service, mock_task_repository):
         """Test productivity report with invalid date range."""
-        start_date = datetime.utcnow()
+        start_date = get_utc_now()
         end_date = start_date - timedelta(days=1)
         
         result = await task_service.get_productivity_report(start_date, end_date)
@@ -1165,7 +1166,7 @@ class TestTaskServiceComprehensive:
     @pytest.mark.asyncio
     async def test_create_task_success_with_all_metadata(self, task_service, mock_task_repository, sample_task):
         """Test successful task creation with all metadata."""
-        future_date = datetime.utcnow() + timedelta(days=1)
+        future_date = get_utc_now() + timedelta(days=1)
         mock_task_repository.get_task_by_id.return_value = Mock()  # Parent exists
         mock_task_repository.add_task_with_metadata.return_value = sample_task
         
@@ -1202,7 +1203,7 @@ class TestTaskServiceComprehensive:
         mock_task_repository.update_status.return_value = sample_task
         
         # Test priority update
-        future_date = datetime.utcnow() + timedelta(days=1)
+        future_date = get_utc_now() + timedelta(days=1)
         
         result = await task_service.update_task_priority(1, "High")
         assert result['success'] is True
@@ -1226,7 +1227,7 @@ class TestTaskServiceComprehensive:
         # Test that all methods handle exceptions gracefully
         methods_to_test = [
             (task_service.update_task_priority, (1, "High")),
-            (task_service.update_task_due_date, (1, datetime.utcnow() + timedelta(days=1))),
+            (task_service.update_task_due_date, (1, get_utc_now() + timedelta(days=1))),
             (task_service.update_task_category, (1, "Work")),
             (task_service.update_task_status, (1, "Done")),
             (task_service.start_time_tracking, (1,)),

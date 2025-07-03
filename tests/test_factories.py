@@ -12,6 +12,7 @@ from tests.factories import (
     TaskCommentFactory, TaskDependencyFactory
 )
 from tests.utils import TestUtils, PerformanceTest
+from larrybot.utils.basic_datetime import get_current_datetime
 
 
 class TestTaskFactory:
@@ -63,7 +64,7 @@ class TestTaskFactory:
         """Test create_overdue method."""
         overdue_task = task_factory.create_overdue(description="Overdue Task")
         
-        assert overdue_task.due_date < datetime.now()
+        assert overdue_task.due_date < get_current_datetime()
         assert overdue_task.description == "Overdue Task"
     
     def test_task_factory_create_with_client(self, task_factory):
@@ -151,7 +152,7 @@ class TestReminderFactory:
         
         assert reminder is not None
         assert reminder.task_id == 1
-        assert reminder.remind_at > datetime.now()
+        assert reminder.remind_at > get_current_datetime()
         assert reminder.created_at is not None
     
     def test_reminder_factory_create_overdue(self, reminder_factory):
@@ -160,7 +161,7 @@ class TestReminderFactory:
             task_id=123
         )
         
-        assert overdue_reminder.remind_at < datetime.now()
+        assert overdue_reminder.remind_at < get_current_datetime()
         assert overdue_reminder.task_id == 123
     
     def test_reminder_factory_create_sent(self, reminder_factory):
@@ -169,7 +170,7 @@ class TestReminderFactory:
             task_id=456
         )
         
-        assert sent_reminder.remind_at < datetime.now()
+        assert sent_reminder.remind_at < get_current_datetime()
         assert sent_reminder.task_id == 456
 
 

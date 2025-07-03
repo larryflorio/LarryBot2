@@ -5,7 +5,7 @@ from larrybot.core.event_bus import EventBus
 from larrybot.storage.db import get_session
 from larrybot.storage.habit_repository import HabitRepository
 from larrybot.utils.ux_helpers import KeyboardBuilder, MessageFormatter
-from datetime import datetime, timedelta
+from larrybot.utils.datetime_utils import get_current_datetime
 from typing import Optional
 
 _habit_event_bus = None
@@ -141,7 +141,7 @@ async def habit_list_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
             return
         
         # Calculate today's date for streak calculations
-        today = datetime.now().date()
+        today = get_current_datetime().date()
         
         # Format habit list with rich formatting and action buttons
         message = f"🔄 **All Habits** \\({len(habits)} found\\)\n\n"
@@ -307,7 +307,7 @@ async def habit_progress_handler(update: Update, context: ContextTypes.DEFAULT_T
             return
         
         # Calculate progress metrics
-        today = datetime.now().date()
+        today = get_current_datetime().date()
         days_since_creation = (today - habit.created_at.date()).days + 1 if habit.created_at else 0
         completion_rate = (habit.streak / days_since_creation * 100) if days_since_creation > 0 else 0
         

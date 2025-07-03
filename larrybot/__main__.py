@@ -52,6 +52,7 @@ from larrybot.services.health_service import HealthService
 from larrybot.core.task_manager import get_task_manager, managed_task_context
 from larrybot.core.timezone import initialize_timezone_service
 from larrybot.utils.caching import cache_stats
+from larrybot.utils.datetime_utils import get_current_datetime
 from datetime import datetime
 import asyncio
 
@@ -80,7 +81,7 @@ async def async_main():
     logger = setup_enhanced_logging()
     logger.info("🚀 Starting LarryBot2 with unified AsyncIO architecture...")
     
-    start_time = datetime.now()
+    start_time = get_current_datetime()
     
     async with managed_task_context() as task_manager:
         try:
@@ -144,7 +145,7 @@ async def async_main():
             register_event_handler(bot_handler.application, config.ALLOWED_TELEGRAM_USER_ID)
             subscribe_to_events(event_bus)
             
-            startup_duration = (datetime.now() - start_time).total_seconds()
+            startup_duration = (get_current_datetime() - start_time).total_seconds()
             logger.info(f"✅ LarryBot2 startup completed in {startup_duration:.2f}s")
             logger.info("🎯 Performance optimizations active:")
             logger.info("   • Unified AsyncIO event loop (no cross-loop errors)")

@@ -1265,6 +1265,14 @@ class EnhancedUXSystem:
         return full_message, keyboard
 
 
+def escape_markdown_v2(text: str) -> str:
+    """Escape all special characters for Telegram MarkdownV2."""
+    if not text:
+        return text
+    escape_chars = r'_\*\[\]\(\)~`>#+\-=|{}.!'
+    return ''.join(f'\\{c}' if c in escape_chars else c for c in text)
+
+
 # Export the main classes for easy access
 __all__ = [
     'UnifiedButtonBuilder',

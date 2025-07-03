@@ -99,8 +99,9 @@ class TestBulkOperations:
         task_id = task.id
         
         # Test adding manual time entry
-        start_time = datetime.utcnow() - timedelta(hours=2)
-        end_time = datetime.utcnow() - timedelta(hours=1)
+        from larrybot.utils.basic_datetime import get_utc_now
+        start_time = get_utc_now() - timedelta(hours=2)
+        end_time = get_utc_now() - timedelta(hours=1)
         
         success = repo.add_time_entry(task_id, start_time, end_time, "Manual entry test")
         assert success
@@ -237,8 +238,9 @@ class TestBulkOperationsService:
         task_id = task.id
         
         # Add time entry
-        start_time = datetime.utcnow() - timedelta(hours=2)
-        end_time = datetime.utcnow() - timedelta(hours=1)
+        from larrybot.utils.basic_datetime import get_utc_now
+        start_time = get_utc_now() - timedelta(hours=2)
+        end_time = get_utc_now() - timedelta(hours=1)
         repo.add_time_entry(task_id, start_time, end_time, "Test entry")
         
         # Test time summary

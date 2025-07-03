@@ -366,8 +366,9 @@ async def list_reminders_handler(update: Update, context: ContextTypes.DEFAULT_T
             task = task_repo.get_task_by_id(reminder.task_id)
             task_description = task.description if task else f"Task {reminder.task_id}"
             
-            # Calculate time until reminder
-            time_until = reminder.remind_at - now
+            # Calculate time until reminder using safe datetime arithmetic
+            from larrybot.utils.datetime_utils import safe_datetime_arithmetic
+            time_until = safe_datetime_arithmetic(reminder.remind_at, now)
             
             if time_until.total_seconds() <= 0:
                 status_emoji = "🔴"  # Overdue
@@ -476,15 +477,17 @@ async def reminder_stats_handler(update: Update, context: ContextTypes.DEFAULT_T
         
         # Calculate statistics
         total_reminders = len(reminders)
-        now = datetime.now()
+        now = get_current_datetime()
         
-        overdue = sum(1 for r in reminders if r.remind_at <= now)
-        due_soon = sum(1 for r in reminders if 0 < (r.remind_at - now).total_seconds() <= 3600)  # 1 hour
-        due_today = sum(1 for r in reminders if 3600 < (r.remind_at - now).total_seconds() <= 86400)  # 1 day
-        future = sum(1 for r in reminders if (r.remind_at - now).total_seconds() > 86400)
+        # Calculate statistics using safe datetime arithmetic
+        from larrybot.utils.datetime_utils import safe_datetime_arithmetic
+        overdue = sum(1 for r in reminders if safe_datetime_arithmetic(r.remind_at, now).total_seconds() <= 0)
+        due_soon = sum(1 for r in reminders if 0 < safe_datetime_arithmetic(r.remind_at, now).total_seconds() <= 3600)  # 1 hour
+        due_today = sum(1 for r in reminders if 3600 < safe_datetime_arithmetic(r.remind_at, now).total_seconds() <= 86400)  # 1 day
+        future = sum(1 for r in reminders if safe_datetime_arithmetic(r.remind_at, now).total_seconds() > 86400)
         
         # Find next reminder
-        future_reminders = [r for r in reminders if r.remind_at > now]
+        future_reminders = [r for r in reminders if safe_datetime_arithmetic(r.remind_at, now).total_seconds() > 0]
         next_reminder = min(future_reminders, key=lambda r: r.remind_at) if future_reminders else None
         
         message = f"📊 **Reminder Statistics**\n\n"
@@ -501,7 +504,7 @@ async def reminder_stats_handler(update: Update, context: ContextTypes.DEFAULT_T
             task = task_repo.get_task_by_id(next_reminder.task_id)
             task_description = task.description if task else f"Task {next_reminder.task_id}"
             
-            time_until = next_reminder.remind_at - now
+            time_until = safe_datetime_arithmetic(next_reminder.remind_at, now)
             hours = int(time_until.total_seconds() // 3600)
             minutes = int((time_until.total_seconds() % 3600) // 60)
             

@@ -3,18 +3,21 @@ Enhanced Task model with advanced type safety for LarryBot2 Phase 2
 
 This module provides the Task model with comprehensive enum-based type safety,
 validation, and enterprise-grade data consistency.
+
+All datetime fields are stored as UTC and must be timezone-aware in the application layer.
 """
 
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, Float, ForeignKey, Enum
+from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, Float, ForeignKey, Enum, Index
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.ext.hybrid import hybrid_property
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 import json
 
 from larrybot.models import Base
 from larrybot.models.enums import TaskStatus, TaskPriority, validate_enum_value
-from larrybot.utils.datetime_utils import get_current_datetime, get_current_utc_datetime, is_overdue, days_until_due, hours_elapsed_since
+from larrybot.utils.basic_datetime import get_utc_now, get_current_datetime
+from larrybot.utils.datetime_utils import is_overdue, days_until_due, hours_elapsed_since
 
 
 class Task(Base):
@@ -44,7 +47,7 @@ class Task(Base):
     done: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     
     # Optional fields with proper typing
-    due_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    due_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     category: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     estimated_hours: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     actual_hours: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -71,18 +74,18 @@ class Task(Base):
     
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, 
-        default=datetime.utcnow, 
+        DateTime(timezone=True), 
+        default=get_utc_now, 
         nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, 
-        default=datetime.utcnow, 
-        onupdate=datetime.utcnow, 
+        DateTime(timezone=True), 
+        default=get_utc_now, 
+        onupdate=get_utc_now, 
         nullable=False
     )
-    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     
     # Relationships with proper typing
     client = relationship("Client", back_populates="tasks")
@@ -106,6 +109,24 @@ class Task(Base):
     # Self-referential relationship for subtasks
     parent = relationship("Task", remote_side=[id], back_populates="children")
     children = relationship("Task", back_populates="parent")
+    
+    # Additional fields for enhanced functionality
+    title: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    sla_hours: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    sla_deadline: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    task_metadata: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    external_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    source: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    
+    # Indexes for performance
+    __table_args__ = (
+        Index('idx_tasks_status', 'status'),
+        Index('idx_tasks_priority', 'priority'),
+        Index('idx_tasks_due_date', 'due_date'),
+        Index('idx_tasks_created_at', 'created_at'),
+        Index('idx_tasks_category', 'category'),
+        Index('idx_tasks_external_id', 'external_id'),
+    )
     
     def __init__(self, **kwargs):
         """Initialize task with enhanced validation."""
@@ -147,9 +168,9 @@ class Task(Base):
         
         # Set default timestamps if not provided
         if 'created_at' not in kwargs:
-            kwargs['created_at'] = get_current_utc_datetime()
+            kwargs['created_at'] = get_utc_now()
         if 'updated_at' not in kwargs:
-            kwargs['updated_at'] = get_current_utc_datetime()
+            kwargs['updated_at'] = get_utc_now()
         
         # Ensure defaults for required enum fields
         if 'status' not in kwargs:
@@ -184,7 +205,7 @@ class Task(Base):
         # Synchronize done field with status
         self.done = value.is_completed
         if value.is_completed and not self.completed_at:
-            self.completed_at = get_current_utc_datetime()
+            self.completed_at = get_utc_now()
     
     @property
     def priority_enum(self) -> Optional[TaskPriority]:
@@ -266,7 +287,7 @@ class Task(Base):
         if value:
             self.status = TaskStatus.DONE.value
             if not self.completed_at:
-                self.completed_at = datetime.utcnow()
+                self.completed_at = get_utc_now()
         else:
             # If unmarking as done, set to appropriate status
             if self.status_enum == TaskStatus.DONE:
@@ -313,7 +334,12 @@ class Task(Base):
         if not sla_hours:
             return None
         
-        hours_elapsed = hours_elapsed_since(self.created_at)
+        # Use safe datetime arithmetic to avoid timezone issues
+        if self.created_at is None:
+            return sla_hours
+        
+        delta = get_current_datetime() - self.created_at
+        hours_elapsed = delta.total_seconds() / 3600
         return max(0, sla_hours - hours_elapsed)
     
     @property
@@ -335,12 +361,16 @@ class Task(Base):
         if hours_spent <= 0:
             return None
         
-        # Calculate based on current velocity
-        remaining_hours = self.estimated_hours * (100 - self.progress) / 100
-        hours_per_day = hours_spent / max(1, (get_current_datetime() - self.created_at).days or 1)
+        # Calculate based on current velocity using safe datetime arithmetic
+        if self.created_at is None:
+            return None
+            
+        delta = get_current_datetime() - self.created_at
+        days_elapsed = delta.days or 1
+        hours_per_day = hours_spent / days_elapsed
         
         if hours_per_day > 0:
-            days_remaining = remaining_hours / hours_per_day
+            days_remaining = (self.estimated_hours - hours_spent) / hours_per_day
             return get_current_datetime() + timedelta(days=days_remaining)
         
         return None
@@ -411,7 +441,7 @@ class Task(Base):
         self.status = new_status
         
         # Update timestamps based on status transition
-        now = datetime.utcnow()
+        now = get_utc_now()
         
         if new_status == TaskStatus.IN_PROGRESS and not self.started_at:
             self.started_at = now
@@ -483,7 +513,13 @@ class Task(Base):
             'days_until_due': self.days_until_due,
             'sla_hours_remaining': self.sla_hours_remaining,
             'is_sla_violated': self.is_sla_violated,
-            'priority_score': self.calculate_priority_score()
+            'priority_score': self.calculate_priority_score(),
+            'title': self.title,
+            'sla_hours': self.sla_hours,
+            'sla_deadline': self.sla_deadline.isoformat() if self.sla_deadline else None,
+            'task_metadata': self.task_metadata,
+            'external_id': self.external_id,
+            'source': self.source
         }
         
         if include_relations:

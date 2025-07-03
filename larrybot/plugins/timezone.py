@@ -12,7 +12,7 @@ from telegram.ext import ContextTypes
 from larrybot.utils.decorators import command_handler
 from larrybot.core.timezone import get_timezone_service, initialize_timezone_service
 from larrybot.utils.datetime_utils import get_timezone_info, set_timezone, reset_timezone_to_auto
-from larrybot.utils.enhanced_ux_helpers import MessageFormatter
+from larrybot.utils.enhanced_ux_helpers import MessageFormatter, escape_markdown_v2
 from larrybot.utils.ux_helpers import KeyboardBuilder
 
 
@@ -61,11 +61,7 @@ async def timezone_info_handler(update: Update, context: ContextTypes.DEFAULT_TY
         # Create keyboard with timezone management options
         keyboard = KeyboardBuilder.build_timezone_keyboard()
         
-        await update.message.reply_text(
-            message,
-            reply_markup=keyboard,
-            parse_mode='MarkdownV2'
-        )
+        await update.message.reply_text(escape_markdown_v2(message), reply_markup=keyboard, parse_mode='MarkdownV2')
         
     except Exception as e:
         await update.message.reply_text(
@@ -186,10 +182,7 @@ async def list_timezones_handler(update: Update, context: ContextTypes.DEFAULT_T
         message += "💡 **Usage**: `/settimezone <timezone_name>`\n"
         message += "Example: `/settimezone America/New_York`"
         
-        await update.message.reply_text(
-            message,
-            parse_mode='MarkdownV2'
-        )
+        await update.message.reply_text(escape_markdown_v2(message), parse_mode='MarkdownV2')
         
     except Exception as e:
         await update.message.reply_text(
@@ -281,10 +274,7 @@ async def search_timezone_handler(update: Update, context: ContextTypes.DEFAULT_
         
         message += "\n💡 **Usage**: `/settimezone <timezone_name>`"
         
-        await update.message.reply_text(
-            message,
-            parse_mode='MarkdownV2'
-        )
+        await update.message.reply_text(escape_markdown_v2(message), parse_mode='MarkdownV2')
         
     except Exception as e:
         await update.message.reply_text(
@@ -315,10 +305,7 @@ async def current_time_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         message += f"🕐 **Time**: `{format_datetime_for_display(now, '%H:%M:%S')}`\n"
         message += f"📆 **Full**: `{format_datetime_for_display(now, '%A, %B %d, %Y at %I:%M %p')}`\n"
         
-        await update.message.reply_text(
-            message,
-            parse_mode='MarkdownV2'
-        )
+        await update.message.reply_text(escape_markdown_v2(message), parse_mode='MarkdownV2')
         
     except Exception as e:
         await update.message.reply_text(

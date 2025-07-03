@@ -13,13 +13,7 @@ from telegram.ext import ContextTypes
 from larrybot.core.performance import get_performance_collector, track_performance
 from larrybot.core.dependency_injection import ServiceLocator
 from larrybot.utils.ux_helpers import performance_monitor
-
-def escape_markdown_v2(text: str) -> str:
-    """Escape MarkdownV2 special characters."""
-    special_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
-    for char in special_chars:
-        text = text.replace(char, f'\\{char}')
-    return text
+from larrybot.utils.enhanced_ux_helpers import escape_markdown_v2
 
 def format_standardized_error(error_type: str, message: str, details: str = "") -> str:
     """Format a standardized error message for Telegram."""
@@ -61,11 +55,7 @@ class PerformancePlugin:
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
-                await update.message.reply_text(
-                    message,
-                    parse_mode='MarkdownV2',
-                    reply_markup=reply_markup
-                )
+                await update.message.reply_text(escape_markdown_v2(message), parse_mode='MarkdownV2', reply_markup=reply_markup)
                 
             except Exception as e:
                 logger.error(f"Error in performance dashboard: {e}")
@@ -74,7 +64,7 @@ class PerformancePlugin:
                     "Failed to load performance dashboard",
                     str(e)
                 )
-                await update.message.reply_text(error_msg, parse_mode='MarkdownV2')
+                await update.message.reply_text(escape_markdown_v2(error_msg), parse_mode='MarkdownV2')
     
     async def handle_performance_stats(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Display detailed performance statistics."""
@@ -104,7 +94,7 @@ class PerformancePlugin:
                 stats = self._calculate_detailed_stats(metrics)
                 message = self._format_stats_message(stats, hours)
                 
-                await update.message.reply_text(message, parse_mode='MarkdownV2')
+                await update.message.reply_text(escape_markdown_v2(message), parse_mode='MarkdownV2')
                 
             except Exception as e:
                 logger.error(f"Error in performance stats: {e}")
@@ -113,7 +103,7 @@ class PerformancePlugin:
                     "Failed to load performance statistics",
                     str(e)
                 )
-                await update.message.reply_text(error_msg, parse_mode='MarkdownV2')
+                await update.message.reply_text(escape_markdown_v2(error_msg), parse_mode='MarkdownV2')
     
     async def handle_performance_alerts(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Display current performance alerts."""
@@ -141,11 +131,7 @@ class PerformancePlugin:
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
-                await update.message.reply_text(
-                    message,
-                    parse_mode='MarkdownV2',
-                    reply_markup=reply_markup
-                )
+                await update.message.reply_text(escape_markdown_v2(message), parse_mode='MarkdownV2', reply_markup=reply_markup)
                 
             except Exception as e:
                 logger.error(f"Error in performance alerts: {e}")
@@ -154,7 +140,7 @@ class PerformancePlugin:
                     "Failed to load performance alerts",
                     str(e)
                 )
-                await update.message.reply_text(error_msg, parse_mode='MarkdownV2')
+                await update.message.reply_text(escape_markdown_v2(error_msg), parse_mode='MarkdownV2')
     
     async def handle_performance_clear(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Clear performance metrics."""
@@ -178,7 +164,7 @@ class PerformancePlugin:
                     message = f"🧹 *Performance Metrics Cleared*\n\n" \
                              f"Cleared {cleared_count} metrics older than {hours} hour(s)\\."
                 
-                await update.message.reply_text(message, parse_mode='MarkdownV2')
+                await update.message.reply_text(escape_markdown_v2(message), parse_mode='MarkdownV2')
                 
             except Exception as e:
                 logger.error(f"Error clearing performance metrics: {e}")
@@ -187,7 +173,7 @@ class PerformancePlugin:
                     "Failed to clear performance metrics",
                     str(e)
                 )
-                await update.message.reply_text(error_msg, parse_mode='MarkdownV2')
+                await update.message.reply_text(escape_markdown_v2(error_msg), parse_mode='MarkdownV2')
     
     async def handle_callback_query(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle performance-related callback queries."""
@@ -214,7 +200,7 @@ class PerformancePlugin:
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
                 await query.edit_message_text(
-                    message,
+                    escape_markdown_v2(message),
                     parse_mode='MarkdownV2',
                     reply_markup=reply_markup
                 )
@@ -238,7 +224,7 @@ class PerformancePlugin:
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
                 await query.edit_message_text(
-                    message,
+                    escape_markdown_v2(message),
                     parse_mode='MarkdownV2',
                     reply_markup=reply_markup
                 )
@@ -257,7 +243,7 @@ class PerformancePlugin:
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
                 await query.edit_message_text(
-                    message,
+                    escape_markdown_v2(message),
                     parse_mode='MarkdownV2',
                     reply_markup=reply_markup
                 )
@@ -275,7 +261,7 @@ class PerformancePlugin:
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
                 await query.edit_message_text(
-                    message,
+                    escape_markdown_v2(message),
                     parse_mode='MarkdownV2',
                     reply_markup=reply_markup
                 )
@@ -283,7 +269,7 @@ class PerformancePlugin:
         except Exception as e:
             logger.error(f"Error handling performance callback: {e}")
             await query.message.reply_text(
-                f"❌ Error handling performance action: {escape_markdown_v2(str(e))}",
+                escape_markdown_v2(f"❌ Error handling performance action: {str(e)}"),
                 parse_mode='MarkdownV2'
             )
     

@@ -13,6 +13,7 @@ import json
 import re
 from larrybot.utils.ux_helpers import KeyboardBuilder, MessageFormatter, ChartBuilder, AnalyticsFormatter
 from larrybot.utils.datetime_utils import get_current_datetime, get_today_date, get_start_of_day, get_end_of_day, get_start_of_week, get_end_of_week, parse_date_string
+from larrybot.utils.enhanced_ux_helpers import escape_markdown_v2
 
 # Global reference to event bus for task events
 _advanced_task_event_bus = None
@@ -111,7 +112,7 @@ async def add_task_with_metadata_handler(update: Update, context: ContextTypes.D
         try:
             due_date = parse_date_string(args[2], "%Y-%m-%d")
         except ValueError:
-            await update.message.reply_text("Invalid date format. Use YYYY-MM-DD")
+            await update.message.reply_text(escape_markdown_v2("Invalid date format. Use YYYY-MM-DD"), parse_mode='MarkdownV2')
             return
     if len(args) > 3:
         category = args[3]
@@ -207,7 +208,7 @@ async def due_date_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     try:
         due_date = parse_date_string(context.args[1], "%Y-%m-%d")
     except ValueError:
-        await update.message.reply_text("Invalid date format. Use YYYY-MM-DD")
+        await update.message.reply_text(escape_markdown_v2("Invalid date format. Use YYYY-MM-DD"), parse_mode='MarkdownV2')
         return
     
     task_service = _get_task_service()
@@ -583,7 +584,7 @@ async def comments_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         else:
             msg = f"💬 **Comments for Task #{task_id}**\n\nNo comments found."
         
-        await update.message.reply_text(msg, parse_mode='MarkdownV2')
+        await update.message.reply_text(escape_markdown_v2(msg), parse_mode='MarkdownV2')
     else:
         await update.message.reply_text(
             MessageFormatter.format_error_message(
@@ -689,7 +690,7 @@ async def overdue_tasks_handler(update: Update, context: ContextTypes.DEFAULT_TY
         else:
             msg = "No overdue tasks! 🎉"
         
-        await update.message.reply_text(msg)
+        await update.message.reply_text(escape_markdown_v2(msg))
     else:
         await update.message.reply_text(f"❌ Error: {result['message']}")
 
@@ -717,7 +718,7 @@ async def today_tasks_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         else:
             msg = "No tasks due today! 🎉"
         
-        await update.message.reply_text(msg)
+        await update.message.reply_text(escape_markdown_v2(msg))
     else:
         await update.message.reply_text(f"❌ Error: {result['message']}")
 
@@ -745,7 +746,7 @@ async def week_tasks_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         else:
             msg = "No tasks due this week! 🎉"
         
-        await update.message.reply_text(msg)
+        await update.message.reply_text(escape_markdown_v2(msg))
     else:
         await update.message.reply_text(f"❌ Error: {result['message']}")
 
@@ -915,7 +916,7 @@ async def _basic_search_fallback(update: Update, query: str, case_sensitive: boo
             else:
                 message = f"No tasks found matching '{query}'"
             
-            await update.message.reply_text(message)
+            await update.message.reply_text(escape_markdown_v2(message))
         else:
             await update.message.reply_text(f"❌ Error: {result['message']}")
     except Exception as e:
@@ -1065,11 +1066,7 @@ async def analytics_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             if complexity == "basic":
                 message += f"\n\n💡 **Tip**: Try `/analytics detailed` or `/analytics advanced` for more insights!"
             
-            await update.message.reply_text(
-                message,
-                reply_markup=keyboard,
-                parse_mode='MarkdownV2'
-            )
+            await update.message.reply_text(escape_markdown_v2(message), parse_mode='MarkdownV2')
         else:
             await update.message.reply_text(
                 MessageFormatter.format_error_message(
@@ -1112,10 +1109,7 @@ async def _basic_analytics_fallback(update: Update) -> None:
             message = f"📊 **Basic Analytics** \\(Fallback\\)\n\n"
             message += AnalyticsFormatter.format_task_analytics(analytics)
             
-            await update.message.reply_text(
-                message,
-                parse_mode='MarkdownV2'
-            )
+            await update.message.reply_text(escape_markdown_v2(message))
         else:
             await update.message.reply_text(
                 f"❌ Error: {result['message']}"
@@ -1193,10 +1187,7 @@ async def analytics_detailed_handler(update: Update, context: ContextTypes.DEFAU
                 metrics.get('consistency', 0), 100, 15, "Consistency"
             ) + "\n"
         
-        await update.message.reply_text(
-            message,
-            parse_mode='MarkdownV2'
-        )
+        await update.message.reply_text(escape_markdown_v2(message), parse_mode='MarkdownV2')
     else:
         await update.message.reply_text(
             MessageFormatter.format_error_message(
@@ -1497,7 +1488,7 @@ async def time_summary_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             msg += f"💬 Comments: {summary['comments_count']}\n"
             msg += f"📊 Efficiency: {summary['efficiency']:.1f}%"
             
-            await update.message.reply_text(msg)
+            await update.message.reply_text(escape_markdown_v2(msg))
         else:
             await update.message.reply_text(f"❌ Error: {result['message']}")
     except ValueError:

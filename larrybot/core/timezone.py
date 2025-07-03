@@ -17,6 +17,7 @@ except ImportError:
     ZoneInfo = None
     available_timezones = None
 import pytz
+from larrybot.utils.basic_datetime import get_current_datetime
 
 logger = logging.getLogger(__name__)
 
@@ -113,38 +114,35 @@ class TimeZoneService:
         except Exception:
             pass
         
-        # Method 3: Use datetime.now() to get local timezone
-        try:
-            local_now = datetime.now()
-            utc_now = datetime.now(timezone.utc)
-            offset = local_now.replace(tzinfo=None) - utc_now.replace(tzinfo=None)
-            
-            # Find timezone with matching offset
-            if ZONEINFO_AVAILABLE and available_timezones:
-                for tz_name in available_timezones():
-                    try:
-                        tz = ZoneInfo(tz_name)
-                        tz_now = datetime.now(tz)
-                        tz_offset = tz_now.replace(tzinfo=None) - utc_now.replace(tzinfo=None)
-                        
-                        if abs((tz_offset - offset).total_seconds()) < 60:  # Within 1 minute
-                            return tz
-                    except Exception:
-                        continue
-            else:
-                # Fallback to pytz for timezone detection
-                for tz_name in pytz.all_timezones:
-                    try:
-                        tz = pytz.timezone(tz_name)
-                        tz_now = datetime.now(tz)
-                        tz_offset = tz_now.replace(tzinfo=None) - utc_now.replace(tzinfo=None)
-                        
-                        if abs((tz_offset - offset).total_seconds()) < 60:  # Within 1 minute
-                            return tz
-                    except Exception:
-                        continue
-        except Exception:
-            pass
+        # Method 3: Use get_current_datetime() to get local timezone
+        local_now = get_current_datetime()
+        utc_now = datetime.now(timezone.utc)
+        offset = local_now.replace(tzinfo=None) - utc_now.replace(tzinfo=None)
+        
+        # Find timezone with matching offset
+        if ZONEINFO_AVAILABLE and available_timezones:
+            for tz_name in available_timezones():
+                try:
+                    tz = ZoneInfo(tz_name)
+                    tz_now = datetime.now(tz)
+                    tz_offset = tz_now.replace(tzinfo=None) - utc_now.replace(tzinfo=None)
+                    
+                    if abs((tz_offset - offset).total_seconds()) < 60:  # Within 1 minute
+                        return tz
+                except Exception:
+                    continue
+        else:
+            # Fallback to pytz for timezone detection
+            for tz_name in pytz.all_timezones:
+                try:
+                    tz = pytz.timezone(tz_name)
+                    tz_now = datetime.now(tz)
+                    tz_offset = tz_now.replace(tzinfo=None) - utc_now.replace(tzinfo=None)
+                    
+                    if abs((tz_offset - offset).total_seconds()) < 60:  # Within 1 minute
+                        return tz
+                except Exception:
+                    continue
         
         return None
     

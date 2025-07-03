@@ -9,6 +9,7 @@ from larrybot.services.base_service import BaseService
 from typing import Dict, Any, List
 import psutil
 import sqlite3
+from larrybot.utils.datetime_utils import get_current_datetime
 from datetime import datetime
 import os
 import time
@@ -30,7 +31,7 @@ class HealthService(BaseService):
             "cpu": self._check_cpu_health(),
             "disk": self._check_disk_health(),
             "plugins": await self._check_plugins_health(),
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": get_current_datetime().isoformat(),
         }
         
         # Determine overall status
@@ -233,7 +234,7 @@ class HealthService(BaseService):
         return {
             "database": await self._check_database_health(),
             "memory": self._check_memory_health(),
-            "timestamp": datetime.now().isoformat()
+            "timestamp": get_current_datetime().isoformat()
         }
     
     async def get_detailed_health(self) -> Dict[str, Any]:

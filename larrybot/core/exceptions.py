@@ -9,7 +9,7 @@ import logging
 import traceback
 from enum import Enum
 from typing import Dict, Any, Optional, List, Union
-from datetime import datetime
+from larrybot.utils.datetime_utils import get_utc_now
 import json
 
 logger = logging.getLogger(__name__)
@@ -105,7 +105,7 @@ class LarryBotException(Exception):
         self.context = context or {}
         self.suggested_action = suggested_action or self._generate_suggested_action()
         self.original_exception = original_exception
-        self.timestamp = datetime.utcnow()
+        self.timestamp = get_utc_now()
         self.traceback_info = traceback.format_exc() if original_exception else None
         
     def _generate_user_message(self) -> str:

@@ -8,6 +8,7 @@ performance testing, and standardized assertions.
 import time
 from typing import Any, Dict, List, Callable
 from datetime import datetime, timedelta
+from larrybot.utils.datetime_utils import get_current_datetime
 
 
 class TestUtils:
@@ -41,9 +42,9 @@ class TestUtils:
     @staticmethod
     def time_operation(operation: Callable, *args, **kwargs) -> Dict[str, Any]:
         """Time an operation and return result and duration."""
-        start_time = datetime.now()
+        start_time = get_current_datetime()
         result = operation(*args, **kwargs)
-        end_time = datetime.now()
+        end_time = get_current_datetime()
         duration = (end_time - start_time).total_seconds()
         return {
             'result': result,
@@ -134,12 +135,12 @@ class DataUtils:
     @staticmethod
     def create_future_datetime(days: int = 1, seconds: int = 5) -> datetime:
         """Create a datetime in the future with buffer to avoid race conditions."""
-        return datetime.now() + timedelta(days=days, seconds=seconds)
+        return get_current_datetime() + timedelta(days=days, seconds=seconds)
     
     @staticmethod
     def create_past_datetime(days: int = 1) -> datetime:
         """Create a datetime in the past."""
-        return datetime.now() - timedelta(days=days)
+        return get_current_datetime() - timedelta(days=days)
     
     @staticmethod
     def create_unique_name(prefix: str = "Test") -> str:

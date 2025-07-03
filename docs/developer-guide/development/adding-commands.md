@@ -501,3 +501,104 @@ async def test_status_command_error(mock_update, mock_context, mock_task_service
 
 ### Unit Tests
 ```
+
+## 🕒 Datetime Handling in Commands
+
+When developing commands that involve dates and times, always use the timezone-safe datetime utilities:
+
+### **Best Practices for Datetime Operations**
+```python
+from larrybot.utils.basic_datetime import get_utc_now, get_current_datetime
+from larrybot.utils.datetime_utils import format_datetime_for_display, parse_datetime_input
+
+@command("remind")
+async def remind_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Set a reminder with timezone-safe datetime handling."""
+    
+    # For database storage - use UTC
+    created_at = get_utc_now()
+    
+    # For user input parsing - handle timezone conversion
+    reminder_time = parse_datetime_input("tomorrow 9am")
+    
+    # For user display - convert to local timezone
+    display_time = format_datetime_for_display(reminder_time)
+    
+    await update.message.reply_text(f"Reminder set for: {display_time}")
+```
+
+### **Timezone-Safe Command Patterns**
+```python
+# ✅ CORRECT: Use timezone-aware utilities
+from larrybot.utils.basic_datetime import get_current_datetime
+from larrybot.utils.datetime_utils import format_datetime_for_display
+
+@command("now")
+async def current_time_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show current time in user's timezone."""
+    current_time = get_current_datetime()
+    display_time = format_datetime_for_display(current_time)
+    await update.message.reply_text(f"Current time: {display_time}")
+
+# ❌ INCORRECT: Direct datetime usage
+import datetime
+@command("now_bad")
+async def bad_time_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # This will cause timezone issues
+    current_time = datetime.now()  # Banned in new system
+```
+
+### **Handling User Input**
+```python
+from larrybot.utils.datetime_utils import parse_datetime_input, validate_datetime_input
+
+@command("schedule")
+async def schedule_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Schedule a task with timezone-aware input parsing."""
+    
+    # Parse user input with timezone awareness
+    user_input = " ".join(context.args)
+    try:
+        scheduled_time = parse_datetime_input(user_input)
+        display_time = format_datetime_for_display(scheduled_time)
+        
+        await update.message.reply_text(f"Task scheduled for: {display_time}")
+    except ValueError as e:
+        await update.message.reply_text(f"Invalid time format: {e}")
+```
+
+### **Date Range Commands**
+```python
+from larrybot.utils.datetime_utils import get_date_range, format_date_range
+
+@command("tasks")
+async def tasks_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show tasks for a date range with timezone-safe handling."""
+    
+    # Parse date range with timezone awareness
+    start_date, end_date = get_date_range("this week")
+    
+    # Format for display
+    range_display = format_date_range(start_date, end_date)
+    
+    # Query tasks with timezone-correct filtering
+    tasks = await task_service.get_tasks_in_range(start_date, end_date)
+    
+    await update.message.reply_text(f"Tasks for {range_display}: {len(tasks)} found")
+```
+
+### **Testing Commands with Datetime**
+```python
+# Test command with timezone-safe mocking
+@patch('larrybot.utils.basic_datetime.get_current_datetime')
+def test_time_command(mock_current_time):
+    mock_current_time.return_value = create_future_datetime(hours=1)
+    
+    # Test command implementation
+    result = await current_time_command(mock_update, mock_context)
+    
+    # Verify timezone-safe display
+    assert "UTC" not in result.text
+```
+
+> **Command Development Note**: All new commands must use the timezone-safe datetime utilities to ensure consistent behavior and prevent timezone-related bugs. The old `datetime.now()` and `datetime.utcnow()` patterns are no longer supported.

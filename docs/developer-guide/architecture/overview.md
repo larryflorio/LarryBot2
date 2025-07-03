@@ -291,18 +291,58 @@ LarryBot integrates advanced NLP features to enhance user experience and product
 
 ## 🕒 Timezone and Datetime Handling
 
-LarryBot2 uses a centralized timezone management system for all time-sensitive features. The `TimeZoneService` (larrybot/core/timezone.py) and `datetime_utils` (larrybot/utils/datetime_utils.py) modules provide robust, maintainable, and consistent timezone handling across the codebase.
+LarryBot2 uses a **centralized, timezone-safe datetime system** for all time-sensitive features. The system is designed to prevent timezone-related bugs and ensure consistent behavior across all operations.
 
-- **UTC Storage**: All datetimes are stored in UTC in the database for consistency and reliability.
-- **Local Display**: All times shown to users are transparently converted to and from the user's configured/system timezone.
-- **Automatic Detection**: The system detects the local timezone at startup, with manual override and fallback to UTC.
-- **DST Handling**: Daylight Saving Time is handled automatically.
-- **Best Practices**:
-  - Always use the provided timezone utilities for all datetime operations in plugins and integrations.
-  - All datetime comparisons, filtering, and analytics should use the timezone-aware utilities.
-  - Never use naive datetime operations or direct datetime.now()/utcnow() in business logic.
+### **Core Components**
+- **`larrybot/utils/basic_datetime.py`** - Core datetime utilities with no dependencies
+- **`larrybot/utils/datetime_utils.py`** - Advanced timezone-aware utilities
+- **`larrybot/core/timezone.py`** - Timezone service for conversions and detection
 
-> See the developer guide and API reference for code examples and integration tips.
+### **Key Principles**
+- **UTC Storage**: All datetimes are stored in UTC in the database for consistency
+- **Local Display**: All times shown to users are converted to local timezone
+- **Timezone Awareness**: All datetime operations use timezone-aware utilities
+- **No Naive Datetimes**: Direct `datetime.now()`/`datetime.utcnow()` usage is prohibited
+
+### **Best Practices**
+```python
+# ✅ CORRECT: Use timezone-aware utilities
+from larrybot.utils.basic_datetime import get_utc_now, get_current_datetime
+from larrybot.utils.datetime_utils import format_datetime_for_display
+
+# For database storage (UTC)
+created_at = get_utc_now()
+
+# For user display (local timezone)
+display_time = format_datetime_for_display(get_current_datetime())
+
+# ❌ INCORRECT: Direct datetime usage
+import datetime
+created_at = datetime.utcnow()  # Banned - causes timezone issues
+```
+
+### **Migration from Legacy Code**
+If you have existing code using direct datetime functions, replace them:
+
+| Old Pattern | New Pattern |
+|-------------|-------------|
+| `datetime.utcnow()` | `get_utc_now()` |
+| `datetime.now()` | `get_current_datetime()` |
+| `dt.strftime()` | `format_datetime_for_display(dt)` |
+
+### **Testing with Timezone-Aware Datetimes**
+```python
+# Test utilities now use timezone-aware datetimes
+from tests.utils import create_future_datetime, create_past_datetime
+from larrybot.utils.basic_datetime import get_current_datetime
+
+# Create test datetimes
+future_dt = create_future_datetime(days=1)
+past_dt = create_past_datetime(days=1)
+current_dt = get_current_datetime()
+```
+
+> **Important**: All datetime operations in LarryBot2 are now timezone-safe by design. This prevents common timezone-related bugs and ensures consistent behavior across different environments.
 
 ---
 

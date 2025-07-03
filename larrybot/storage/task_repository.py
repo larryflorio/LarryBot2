@@ -9,7 +9,7 @@ import json
 from sqlalchemy import or_, and_, func, text, desc, asc
 from larrybot.utils.caching import cached, cache_invalidate, cache_clear
 from larrybot.utils.background_processing import background_task, submit_background_job
-from larrybot.utils.datetime_utils import get_current_datetime, get_current_utc_datetime, get_today_date, get_start_of_day, get_end_of_day
+from larrybot.utils.datetime_utils import get_current_datetime, get_current_utc_datetime, get_today_date, get_start_of_day, get_end_of_day, get_utc_now
 import logging
 from larrybot.models.enums import TaskStatus
 
@@ -370,8 +370,9 @@ class TaskRepository:
         # Query directly to ensure we have a session-attached object
         task = self.session.query(Task).filter_by(id=task_id).first()
         if task and task.started_at:
+            from larrybot.utils.datetime_utils import safe_datetime_arithmetic, get_current_utc_datetime
             end_time = get_current_utc_datetime()
-            duration = (end_time - task.started_at).total_seconds() / 3600  # Convert to hours
+            duration = safe_datetime_arithmetic(end_time, task.started_at).total_seconds() / 3600  # Convert to hours
             task.actual_hours = (task.actual_hours or 0) + duration
             task.started_at = None
             self.session.commit()
@@ -561,7 +562,7 @@ class TaskRepository:
         if due_after:
             filters.append(Task.due_date > due_after)
         if overdue_only:
-            filters.append(Task.due_date < datetime.utcnow())
+            filters.append(Task.due_date < get_utc_now())
             filters.append(Task.done == False)
         if client_id:
             filters.append(Task.client_id == client_id)
@@ -659,7 +660,7 @@ class TaskRepository:
         if due_after:
             filters.append(Task.due_date >= due_after)
         if overdue_only:
-            filters.append(Task.due_date < datetime.utcnow())
+            filters.append(Task.due_date < get_utc_now())
             filters.append(Task.done == False)
         if client_id:
             filters.append(Task.client_id == client_id)
@@ -976,7 +977,7 @@ class TaskRepository:
         ).group_by(Task.status).all()
         
         # Overdue tasks
-        now = datetime.utcnow()
+        now = get_utc_now()
         overdue_count = self.session.query(Task).filter(
             Task.due_date < now,
             Task.done == False
@@ -998,7 +999,7 @@ class TaskRepository:
         job_id = submit_background_job(
             self._compute_task_statistics,
             priority=3,  # Medium priority
-            job_id=f"task_stats_{int(datetime.utcnow().timestamp())}"
+            job_id=f"task_stats_{int(get_utc_now().timestamp())}"
         )
         return job_id
 
@@ -1011,7 +1012,7 @@ class TaskRepository:
         """Compute advanced analytics (called from cache or background)."""
         logger.debug(f"Computing advanced analytics for {days} days")
         
-        end_date = datetime.utcnow()
+        end_date = get_utc_now()
         start_date = end_date - timedelta(days=days)
         
         # Tasks created in period
@@ -1119,7 +1120,7 @@ class TaskRepository:
             self._compute_advanced_analytics,
             days,
             priority=4,  # Lower priority - heavy computation
-            job_id=f"advanced_analytics_{days}d_{int(datetime.utcnow().timestamp())}"
+            job_id=f"advanced_analytics_{days}d_{int(get_utc_now().timestamp())}"
         )
         return job_id
 

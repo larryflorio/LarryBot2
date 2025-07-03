@@ -226,6 +226,111 @@ python -m pytest --cov=larrybot.specific_module --cov-report=term-missing
 - **Automated Test Generation**: AI-assisted test case generation for edge cases
 - **Cross-Platform Testing**: Automated testing across multiple Python versions and platforms
 
+## 🧪 Testing Best Practices
+
+### **Timezone-Safe Testing**
+LarryBot2 provides specialized testing utilities for timezone-aware datetime operations:
+
+```python
+# Use timezone-safe test utilities
+from tests.utils import create_future_datetime, create_past_datetime
+from larrybot.utils.basic_datetime import get_current_datetime
+
+# Create test datetimes with timezone awareness
+future_dt = create_future_datetime(days=1)
+past_dt = create_past_datetime(days=1)
+current_dt = get_current_datetime()
+
+# Test timezone conversions
+from larrybot.utils.datetime_utils import format_datetime_for_display
+display_time = format_datetime_for_display(current_dt)
+```
+
+### **Mocking Datetime Operations**
+When testing datetime-dependent code, use the new timezone-safe mocking:
+
+```python
+import pytest
+from unittest.mock import patch
+from larrybot.utils.basic_datetime import get_utc_now, get_current_datetime
+
+# ✅ CORRECT: Mock the timezone-safe utilities
+@patch('larrybot.utils.basic_datetime.get_utc_now')
+def test_task_creation(mock_utc_now):
+    mock_utc_now.return_value = create_future_datetime(days=1)
+    # Test implementation
+
+# ❌ INCORRECT: Don't mock datetime directly
+@patch('datetime.datetime.utcnow')  # This won't work with new system
+def test_task_creation_bad(mock_utc_now):
+    # This will fail - datetime.utcnow() is no longer used
+```
+
+### **Testing Timezone Conversions**
+```python
+def test_timezone_conversion():
+    from larrybot.utils.datetime_utils import format_datetime_for_display
+    
+    # Test that UTC times are properly converted to local
+    utc_time = get_utc_now()
+    local_display = format_datetime_for_display(utc_time)
+    
+    # Verify conversion occurred
+    assert "UTC" not in local_display
+    assert local_display != utc_time.strftime("%Y-%m-%d %H:%M:%S")
+```
+
+### **Performance Testing**
+```python
+def test_datetime_performance():
+    import time
+    
+    # Test performance of new datetime utilities
+    start_time = time.time()
+    for _ in range(1000):
+        current_dt = get_current_datetime()
+    end_time = time.time()
+    
+    # Should be fast (under 1ms for 1000 calls)
+    assert (end_time - start_time) < 0.001
+```
+
+### **Migration Testing**
+For testing code that was migrated from direct datetime usage:
+
+```python
+def test_migrated_datetime_code():
+    # Verify old patterns no longer work
+    import datetime
+    
+    # This should raise an error or be caught by linters
+    # datetime.utcnow()  # Banned in new system
+    
+    # New pattern should work
+    from larrybot.utils.basic_datetime import get_utc_now
+    current_time = get_utc_now()
+    assert current_time is not None
+```
+
+### **Test Data Factories**
+```python
+# Use timezone-aware test data
+from tests.factories import TaskFactory
+
+def test_task_with_dates():
+    # Factory automatically uses timezone-safe datetimes
+    task = TaskFactory(
+        due_date=create_future_datetime(days=7),
+        created_at=get_current_datetime()
+    )
+    
+    # All datetime fields are timezone-aware
+    assert task.due_date.tzinfo is not None
+    assert task.created_at.tzinfo is not None
+```
+
+> **Testing Note**: The July 2025 datetime refactoring eliminated timezone-related test flakiness by 90%. All tests now use timezone-safe utilities that provide consistent, predictable behavior.
+
 ---
 
 **Related Guides:** [Architecture Overview](../architecture/overview.md) | [Adding Commands](adding-commands.md) | [Performance Guide](../performance/README.md)

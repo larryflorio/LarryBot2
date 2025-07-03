@@ -8,6 +8,7 @@ and easy customization. Factories reduce maintenance burden and improve test con
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 from larrybot.models import Task, Client, Habit, Reminder, TaskComment, TaskDependency
+from larrybot.utils.datetime_utils import get_current_datetime, get_utc_now
 
 
 class BaseFactory:
@@ -46,15 +47,15 @@ class TaskFactory(BaseFactory):
             'priority': 'Medium',
             'status': 'Todo',
             'category': 'General',
-            'due_date': datetime.now() + timedelta(days=1),
+            'due_date': get_current_datetime() + timedelta(days=1),
             'estimated_hours': 2.0,
             'actual_hours': None,
             'started_at': None,
             'parent_id': None,
             'tags': '["test", "automated"]',
             'client_id': None,
-            'created_at': datetime.now(),
-            'updated_at': datetime.now()
+            'created_at': get_current_datetime(),
+            'updated_at': get_current_datetime()
         }
     
     def create_todo(self, **kwargs) -> Task:
@@ -63,7 +64,7 @@ class TaskFactory(BaseFactory):
     
     def create_in_progress(self, **kwargs) -> Task:
         """Create an in-progress task."""
-        return self.build(status='In Progress', done=False, started_at=datetime.now(), **kwargs)
+        return self.build(status='In Progress', done=False, started_at=get_current_datetime(), **kwargs)
     
     def create_done(self, **kwargs) -> Task:
         """Create a completed task."""
@@ -75,7 +76,7 @@ class TaskFactory(BaseFactory):
     
     def create_overdue(self, **kwargs) -> Task:
         """Create an overdue task."""
-        return self.build(due_date=datetime.now() - timedelta(days=1), **kwargs)
+        return self.build(due_date=get_current_datetime() - timedelta(days=1), **kwargs)
     
     def create_with_client(self, client_id: int, **kwargs) -> Task:
         """Create a task assigned to a client."""
@@ -95,7 +96,7 @@ class ClientFactory(BaseFactory):
     def get_defaults(self) -> Dict[str, Any]:
         return {
             'name': f'Test Client {self._get_unique_id()}',
-            'created_at': datetime.now()
+            'created_at': get_current_datetime()
         }
     
     def create_with_tasks(self, task_count: int = 3, **kwargs) -> Client:
@@ -118,7 +119,7 @@ class HabitFactory(BaseFactory):
             'name': f'Test Habit {self._get_unique_id()}',
             'streak': 0,
             'last_completed': None,
-            'created_at': datetime.now()
+            'created_at': get_current_datetime()
         }
     
     def create_with_streak(self, streak: int, **kwargs) -> Habit:
@@ -127,7 +128,7 @@ class HabitFactory(BaseFactory):
     
     def create_completed_today(self, **kwargs) -> Habit:
         """Create a habit completed today."""
-        return self.build(last_completed=datetime.now().date(), **kwargs)
+        return self.build(last_completed=get_current_datetime().date(), **kwargs)
 
 
 class ReminderFactory(BaseFactory):
@@ -139,17 +140,17 @@ class ReminderFactory(BaseFactory):
     def get_defaults(self) -> Dict[str, Any]:
         return {
             'task_id': 1,
-            'remind_at': datetime.now() + timedelta(hours=1),
-            'created_at': datetime.now()
+            'remind_at': get_current_datetime() + timedelta(hours=1),
+            'created_at': get_current_datetime()
         }
     
     def create_overdue(self, **kwargs) -> Reminder:
         """Create an overdue reminder."""
-        return self.build(remind_at=datetime.now() - timedelta(hours=1), **kwargs)
+        return self.build(remind_at=get_current_datetime() - timedelta(hours=1), **kwargs)
     
     def create_sent(self, **kwargs) -> Reminder:
         """Create a reminder that should have been sent (past due)."""
-        return self.build(remind_at=datetime.now() - timedelta(hours=1), **kwargs)
+        return self.build(remind_at=get_current_datetime() - timedelta(hours=1), **kwargs)
 
 
 class TaskCommentFactory(BaseFactory):
@@ -162,7 +163,7 @@ class TaskCommentFactory(BaseFactory):
         return {
             'task_id': 1,
             'comment': f'Test Comment {self._get_unique_id()}',
-            'created_at': datetime.now()
+            'created_at': get_current_datetime()
         }
 
 
@@ -176,5 +177,5 @@ class TaskDependencyFactory(BaseFactory):
         return {
             'task_id': 1,
             'dependency_id': 2,
-            'created_at': datetime.now()
+            'created_at': get_current_datetime()
         } 

@@ -18,6 +18,7 @@ from larrybot.core.exceptions import (
     LarryBotException, DatabaseError, ValidationError, NetworkError,
     ServiceError, ErrorCode, ErrorSeverity, log_exception, wrap_exception
 )
+from larrybot.utils.datetime_utils import get_utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -248,7 +249,7 @@ class ErrorResponseBuilder:
                 "message": exception.user_message,
                 "error": exception.message,  # Backward compatibility
                 "suggested_action": exception.suggested_action,
-                "timestamp": exception.timestamp.isoformat()
+                "timestamp": get_utc_now().isoformat()
             }
             
             if include_details:
@@ -265,7 +266,7 @@ class ErrorResponseBuilder:
                 "message": wrapped.user_message,
                 "error": wrapped.message,  # Backward compatibility
                 "suggested_action": wrapped.suggested_action,
-                "timestamp": wrapped.timestamp.isoformat()
+                "timestamp": get_utc_now().isoformat()
             }
             
             if include_details:
@@ -294,7 +295,7 @@ class ErrorResponseBuilder:
         response = {
             "success": True,
             "message": message,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": get_utc_now().isoformat()
         }
         
         if data is not None:

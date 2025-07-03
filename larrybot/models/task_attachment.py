@@ -4,7 +4,10 @@ from datetime import datetime
 from larrybot.models import Base
 
 class TaskAttachment(Base):
-    """SQLAlchemy model for task file attachments."""
+    """
+    SQLAlchemy model for task file attachments.
+    All datetime fields are stored as UTC and must be timezone-aware in the application layer.
+    """
     __tablename__ = 'task_attachments'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -17,8 +20,8 @@ class TaskAttachment(Base):
     mime_type = Column(String(100), nullable=False)
     description = Column(Text, nullable=True)
     is_public = Column(Boolean, default=False, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     # Relationships
     task = relationship("Task", back_populates="attachments")

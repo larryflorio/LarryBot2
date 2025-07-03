@@ -10,6 +10,7 @@ from larrybot.core.plugin_loader import PluginLoader
 from larrybot.storage.db import get_session
 from larrybot.models import Base
 from typing import Generator
+from larrybot.utils.datetime_utils import get_current_datetime
 
 
 @pytest.fixture(scope="session")
@@ -113,7 +114,7 @@ def sample_reminder_data():
     from datetime import datetime, timedelta
     return {
         "task_id": 1,
-        "remind_at": datetime.now() + timedelta(hours=1)
+        "remind_at": get_current_datetime() + timedelta(hours=1)
     }
 
 

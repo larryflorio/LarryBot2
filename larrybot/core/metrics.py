@@ -13,6 +13,7 @@ import time
 import psutil
 import threading
 from collections import defaultdict
+from larrybot.utils.datetime_utils import get_current_datetime
 
 
 @dataclass
@@ -52,7 +53,7 @@ class MetricsCollector:
                 command=command,
                 execution_time=execution_time,
                 success=success,
-                timestamp=datetime.now(),
+                timestamp=get_current_datetime(),
                 error_message=error_message
             )
             self.command_metrics.append(metric)
@@ -80,7 +81,7 @@ class MetricsCollector:
                     memory_usage=memory_usage,
                     cpu_usage=cpu_usage,
                     active_connections=active_connections,
-                    timestamp=datetime.now()
+                    timestamp=get_current_datetime()
                 )
                 self.system_metrics.append(metric)
                 
@@ -94,7 +95,7 @@ class MetricsCollector:
     def get_command_stats(self, hours: int = 24) -> Dict:
         """Get command execution statistics for the specified time period."""
         with self._lock:
-            cutoff_time = datetime.now().timestamp() - (hours * 3600)
+            cutoff_time = get_current_datetime().timestamp() - (hours * 3600)
             recent_metrics = [
                 m for m in self.command_metrics 
                 if m.timestamp.timestamp() > cutoff_time
@@ -133,7 +134,7 @@ class MetricsCollector:
     def get_system_stats(self, hours: int = 24) -> Dict:
         """Get system performance statistics for the specified time period."""
         with self._lock:
-            cutoff_time = datetime.now().timestamp() - (hours * 3600)
+            cutoff_time = get_current_datetime().timestamp() - (hours * 3600)
             recent_metrics = [
                 m for m in self.system_metrics 
                 if m.timestamp.timestamp() > cutoff_time
@@ -165,7 +166,7 @@ class MetricsCollector:
     def get_user_activity(self, hours: int = 24) -> Dict:
         """Get user activity statistics for the specified time period."""
         with self._lock:
-            cutoff_time = datetime.now().timestamp() - (hours * 3600)
+            cutoff_time = get_current_datetime().timestamp() - (hours * 3600)
             recent_metrics = [
                 m for m in self.command_metrics 
                 if m.timestamp.timestamp() > cutoff_time
@@ -192,7 +193,7 @@ class MetricsCollector:
     def clear_old_metrics(self, hours: int = 24) -> None:
         """Clear metrics older than the specified hours."""
         with self._lock:
-            cutoff_time = datetime.now().timestamp() - (hours * 3600)
+            cutoff_time = get_current_datetime().timestamp() - (hours * 3600)
             
             self.command_metrics = [
                 m for m in self.command_metrics 

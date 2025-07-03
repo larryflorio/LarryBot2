@@ -129,34 +129,55 @@ Google OAuth client secret for calendar integration.
 4. Create OAuth 2.0 credentials
 5. Download the client secret file
 
-### Timezone Configuration
+## 🕒 Timezone Configuration
 
-LarryBot2 supports robust, centralized timezone management for all time-sensitive features (reminders, due dates, analytics, etc.).
+LarryBot2 uses an **automatic timezone detection system** that requires minimal configuration while providing robust timezone handling.
 
-#### `TIMEZONE`
-Manually override the system timezone. Set to a valid IANA timezone name (e.g., `America/New_York`).
+### **Automatic Timezone Detection**
+The system automatically detects your local timezone at startup:
+- **Primary**: Uses system timezone detection
+- **Fallback**: Defaults to UTC if detection fails
+- **Override**: Manual timezone setting available via configuration
 
-```bash
-TIMEZONE=America/New_York
+### **Configuration Options**
+```yaml
+# Optional: Override automatic timezone detection
+timezone:
+  # Force specific timezone (e.g., "America/New_York", "Europe/London")
+  override: null
+  
+  # Display format for user-facing timestamps
+  display_format: "%Y-%m-%d %H:%M:%S"
+  
+  # Database storage format (always UTC)
+  storage_format: "%Y-%m-%d %H:%M:%S UTC"
 ```
 
-#### `TIMEZONE_AUTO_DETECT`
-Enable automatic detection of the system's local timezone (default: `true`). If `TIMEZONE` is set, it takes precedence.
+### **Timezone-Safe Operations**
+All datetime operations in LarryBot2 are now timezone-safe by design:
+- **Database Storage**: All times stored in UTC for consistency
+- **User Display**: All times automatically converted to local timezone
+- **Calculations**: All datetime arithmetic uses timezone-aware operations
+- **No Configuration Required**: Works out-of-the-box with automatic detection
 
+### **Migration from Legacy Systems**
+If upgrading from older versions:
+1. **No manual migration required** - automatic detection handles everything
+2. **Existing data preserved** - UTC timestamps remain compatible
+3. **Improved reliability** - eliminates timezone-related bugs
+4. **Better performance** - optimized datetime operations
+
+### **Verification**
+Check your timezone configuration:
 ```bash
-TIMEZONE_AUTO_DETECT=true
+# Run the bot and check timezone detection
+python -m larrybot
+
+# Look for timezone detection messages in startup logs
+# Example: "Timezone detected: America/New_York"
 ```
 
-#### Timezone Handling Details
-- **Automatic Detection**: By default, LarryBot2 detects your system timezone at startup.
-- **Manual Override**: Set `TIMEZONE` to force a specific timezone.
-- **DST Handling**: Daylight Saving Time is handled automatically for all supported timezones.
-- **Fallback**: If detection fails, UTC is used as a safe default.
-- **UTC Storage**: All datetimes are stored in UTC in the database for consistency and reliability.
-- **Local Display**: All times shown to users (reminders, due dates, analytics, etc.) are transparently converted to your configured/system timezone.
-- **Commands**: Use `/timezone` to view/set your timezone, and `/autotimezone` to reset to auto-detection.
-
-> **Best Practice:** Always check your timezone setting after deployment or server migration to ensure reminders and due dates are accurate.
+> **Note**: The timezone system was completely refactored in July 2025 to eliminate timezone-related bugs and improve performance. All datetime operations are now timezone-safe by default.
 
 ## 🔒 Security Configuration
 

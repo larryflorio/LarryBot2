@@ -5,6 +5,7 @@ from typing import Optional
 class CalendarToken(Base):
     """
     SQLAlchemy model for storing OAuth tokens for calendar integrations.
+    All datetime fields are stored as UTC and must be timezone-aware in the application layer.
     """
     __tablename__ = 'calendar_tokens'
 
@@ -12,5 +13,5 @@ class CalendarToken(Base):
     provider = Column(String, nullable=False)  # e.g., 'google'
     access_token = Column(String, nullable=False)
     refresh_token = Column(String, nullable=True)
-    expiry = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=func.now(), nullable=False) 
+    expiry = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False) 

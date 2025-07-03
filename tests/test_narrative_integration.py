@@ -7,6 +7,7 @@ pytestmark = pytest.mark.asyncio
 from unittest.mock import Mock, AsyncMock, patch
 from telegram import Update, User, Message, Chat
 from telegram.ext import ContextTypes
+import asyncio
 
 from larrybot.handlers.bot import TelegramBotHandler
 from larrybot.config.loader import Config
@@ -19,9 +20,21 @@ class TestNarrativeIntegration:
     
     def setup_method(self):
         """Set up test fixtures."""
+        # Set up event loop for TelegramBotHandler initialization
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
         self.config = Config()
         self.registry = CommandRegistry()
-        self.handler = TelegramBotHandler(self.config, self.registry)
+        
+        # Mock the Application builder to avoid event loop issues
+        with patch('telegram.ext.Application.builder') as mock_builder:
+            mock_app = Mock()
+            mock_builder.return_value.token.return_value.request.return_value.build.return_value = mock_app
+            self.handler = TelegramBotHandler(self.config, self.registry)
         
         # Mock user
         self.user = Mock(spec=User)

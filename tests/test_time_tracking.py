@@ -1,5 +1,5 @@
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 from larrybot.storage.task_repository import TaskRepository
 from larrybot.models.task import Task
@@ -14,13 +14,11 @@ class TestTimeTracking:
         task = db_task_factory(description="Time tracking test task", estimated_hours=None)
         task_id = task.id  # Store ID immediately
 
-        fake_start = datetime(2024, 1, 1, 12, 0, 0)
+        fake_start = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
         fake_end = fake_start + timedelta(hours=1)
 
-        # Patch datetime.utcnow to simulate start time
-        with patch("larrybot.storage.task_repository.datetime") as mock_datetime:
-            mock_datetime.utcnow.return_value = fake_start
-            mock_datetime.side_effect = lambda *a, **kw: datetime(*a, **kw)
+        # Patch the timezone-aware datetime functions to simulate start time
+        with patch("larrybot.utils.datetime_utils.get_current_utc_datetime", return_value=fake_start):
             success = repo.start_time_tracking(task_id)
             assert success
 
@@ -28,10 +26,8 @@ class TestTimeTracking:
         task = repo.get_task_by_id(task_id)
         assert task.started_at is not None
 
-        # Patch datetime.utcnow to simulate stop time
-        with patch("larrybot.storage.task_repository.datetime") as mock_datetime:
-            mock_datetime.utcnow.return_value = fake_end
-            mock_datetime.side_effect = lambda *a, **kw: datetime(*a, **kw)
+        # Patch the timezone-aware datetime functions to simulate stop time
+        with patch("larrybot.utils.datetime_utils.get_current_utc_datetime", return_value=fake_end):
             duration = repo.stop_time_tracking(task_id)
             assert duration is not None
             assert duration > 0

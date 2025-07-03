@@ -17,6 +17,7 @@ from collections import defaultdict, deque
 import logging
 import weakref
 from enum import Enum
+from larrybot.utils.basic_datetime import get_utc_now
 
 # Performance monitoring logger
 perf_logger = logging.getLogger('performance')
@@ -48,7 +49,7 @@ class PerformanceMetrics:
     cache_hit_rate: float
     database_queries: int
     background_jobs: int
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=get_utc_now)
     metric_type: MetricType = MetricType.OPERATION
     severity: Severity = Severity.INFO
     context: Dict[str, Any] = field(default_factory=dict)
@@ -208,7 +209,7 @@ class PerformanceCollector:
     
     def _clean_old_metrics(self) -> None:
         """Remove metrics older than retention period."""
-        cutoff_time = datetime.utcnow() - timedelta(hours=self.retention_hours)
+        cutoff_time = get_utc_now() - timedelta(hours=self.retention_hours)
         
         self._metrics = [
             m for m in self._metrics 
@@ -254,7 +255,7 @@ class PerformanceCollector:
         with self._lock:
             recent_metrics = [
                 m for m in self._metrics 
-                if m.timestamp > datetime.utcnow() - timedelta(hours=1)
+                if m.timestamp > get_utc_now() - timedelta(hours=1)
             ]
             
             if not recent_metrics:
@@ -268,7 +269,7 @@ class PerformanceCollector:
                 'trends': self._get_performance_trends(),
                 'top_operations': self._get_top_operations(),
                 'active_operations': len(self._active_operations),
-                'timestamp': datetime.utcnow().isoformat()
+                'timestamp': get_utc_now().isoformat()
             }
     
     def _empty_dashboard(self) -> Dict[str, Any]:
@@ -281,7 +282,7 @@ class PerformanceCollector:
             'trends': {},
             'top_operations': [],
             'active_operations': 0,
-            'timestamp': datetime.utcnow().isoformat()
+            'timestamp': get_utc_now().isoformat()
         }
     
     def _get_summary_stats(self, metrics: List[PerformanceMetrics]) -> Dict[str, Any]:
@@ -339,7 +340,7 @@ class PerformanceCollector:
         recent_critical = [
             m for m in self._recent_metrics 
             if m.severity == Severity.CRITICAL and 
-               m.timestamp > datetime.utcnow() - timedelta(minutes=15)
+               m.timestamp > get_utc_now() - timedelta(minutes=15)
         ]
         
         for metric in recent_critical:
@@ -360,7 +361,7 @@ class PerformanceCollector:
                     'type': 'long_running_operation',
                     'operation': op_id.split('_')[0],
                     'duration': duration,
-                    'timestamp': datetime.utcnow().isoformat(),
+                    'timestamp': get_utc_now().isoformat(),
                     'message': f"Long-running operation: {op_id.split('_')[0]} running for {duration:.1f}s"
                 })
         
@@ -405,7 +406,7 @@ class PerformanceCollector:
     
     def export_metrics(self, hours: int = 24) -> List[Dict[str, Any]]:
         """Export metrics for external analysis."""
-        cutoff_time = datetime.utcnow() - timedelta(hours=hours)
+        cutoff_time = get_utc_now() - timedelta(hours=hours)
         
         with self._lock:
             recent_metrics = [
@@ -426,7 +427,7 @@ class PerformanceCollector:
                 self._recent_metrics.clear()
                 return original_count
             
-            cutoff_time = datetime.utcnow() - timedelta(hours=hours)
+            cutoff_time = get_utc_now() - timedelta(hours=hours)
             self._metrics = [
                 m for m in self._metrics 
                 if m.timestamp > cutoff_time

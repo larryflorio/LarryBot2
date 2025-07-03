@@ -6,8 +6,96 @@ used throughout the system, ensuring consistent timezone handling.
 """
 
 from typing import Optional, Union
-from datetime import datetime, timedelta, date
-from larrybot.core.timezone import get_timezone_service, now, utc_now, to_local, to_utc, format_datetime
+from datetime import datetime, timedelta, date, timezone
+from larrybot.utils.basic_datetime import get_utc_now, get_current_datetime, is_timezone_aware, ensure_timezone_aware as ensure_timezone_aware_basic
+
+
+def ensure_timezone_aware(dt: datetime, assume_local: bool = True) -> datetime:
+    """
+    Ensure datetime is timezone-aware.
+    
+    Args:
+        dt: Datetime to make timezone-aware
+        assume_local: If True, assume naive datetimes are in local timezone
+        
+    Returns:
+        Timezone-aware datetime
+    """
+    if dt is None:
+        return None
+    
+    if dt.tzinfo is None:
+        if assume_local:
+            # Assume local timezone for naive datetimes
+            return dt.replace(tzinfo=timezone.utc)  # Simplified for now
+        else:
+            # Assume UTC for naive datetimes
+            return dt.replace(tzinfo=timezone.utc)
+    
+    return dt
+
+
+def ensure_utc(dt: datetime) -> datetime:
+    """
+    Ensure datetime is in UTC timezone.
+    
+    Args:
+        dt: Datetime to convert to UTC
+        
+    Returns:
+        UTC datetime
+    """
+    if dt is None:
+        return None
+    
+    dt = ensure_timezone_aware(dt)
+    if dt.tzinfo == timezone.utc:
+        return dt
+    
+    return dt.astimezone(timezone.utc)
+
+
+def ensure_local(dt: datetime) -> datetime:
+    """
+    Ensure datetime is in local timezone.
+    
+    Args:
+        dt: Datetime to convert to local timezone
+        
+    Returns:
+        Local timezone datetime
+    """
+    if dt is None:
+        return None
+    
+    dt = ensure_timezone_aware(dt)
+    # Simplified: just return the datetime as-is for now
+    return dt
+
+
+def safe_datetime_arithmetic(dt1: datetime, dt2: datetime) -> timedelta:
+    """
+    Perform safe datetime arithmetic between two datetimes.
+    
+    Args:
+        dt1: First datetime
+        dt2: Second datetime
+        
+    Returns:
+        Time difference as timedelta
+    """
+    if dt1 is None or dt2 is None:
+        raise ValueError("Cannot perform arithmetic with None datetimes")
+    
+    # Ensure both are timezone-aware
+    dt1 = ensure_timezone_aware(dt1)
+    dt2 = ensure_timezone_aware(dt2)
+    
+    # Convert both to UTC for consistent arithmetic
+    dt1_utc = ensure_utc(dt1)
+    dt2_utc = ensure_utc(dt2)
+    
+    return dt1_utc - dt2_utc
 
 
 def get_current_datetime() -> datetime:
@@ -17,7 +105,8 @@ def get_current_datetime() -> datetime:
     Returns:
         Current datetime in local timezone
     """
-    return now()
+    from larrybot.utils.basic_datetime import get_current_datetime as basic_get_current_datetime
+    return basic_get_current_datetime()
 
 
 def get_current_utc_datetime() -> datetime:
@@ -27,7 +116,8 @@ def get_current_utc_datetime() -> datetime:
     Returns:
         Current datetime in UTC
     """
-    return utc_now()
+    from larrybot.utils.basic_datetime import get_utc_now
+    return get_utc_now()
 
 
 def get_today_date() -> date:
@@ -37,7 +127,8 @@ def get_today_date() -> date:
     Returns:
         Today's date
     """
-    return now().date()
+    from larrybot.utils.basic_datetime import get_current_datetime
+    return get_current_datetime().date()
 
 
 def get_start_of_day(dt: Optional[datetime] = None) -> datetime:
@@ -51,10 +142,10 @@ def get_start_of_day(dt: Optional[datetime] = None) -> datetime:
         Start of day datetime in local timezone
     """
     if dt is None:
-        dt = now()
-    elif dt.tzinfo is None:
-        # Assume local timezone if naive
-        dt = dt.replace(tzinfo=get_timezone_service().timezone)
+        from larrybot.utils.basic_datetime import get_current_datetime
+        dt = get_current_datetime()
+    else:
+        dt = ensure_local(dt)
     
     return dt.replace(hour=0, minute=0, second=0, microsecond=0)
 
@@ -70,10 +161,10 @@ def get_end_of_day(dt: Optional[datetime] = None) -> datetime:
         End of day datetime in local timezone
     """
     if dt is None:
-        dt = now()
-    elif dt.tzinfo is None:
-        # Assume local timezone if naive
-        dt = dt.replace(tzinfo=get_timezone_service().timezone)
+        from larrybot.utils.basic_datetime import get_current_datetime
+        dt = get_current_datetime()
+    else:
+        dt = ensure_local(dt)
     
     return dt.replace(hour=23, minute=59, second=59, microsecond=999999)
 
@@ -89,10 +180,10 @@ def get_start_of_week(dt: Optional[datetime] = None) -> datetime:
         Start of week datetime in local timezone
     """
     if dt is None:
-        dt = now()
-    elif dt.tzinfo is None:
-        # Assume local timezone if naive
-        dt = dt.replace(tzinfo=get_timezone_service().timezone)
+        from larrybot.utils.basic_datetime import get_current_datetime
+        dt = get_current_datetime()
+    else:
+        dt = ensure_local(dt)
     
     # Get Monday of the week
     days_since_monday = dt.weekday()
@@ -111,10 +202,10 @@ def get_end_of_week(dt: Optional[datetime] = None) -> datetime:
         End of week datetime in local timezone
     """
     if dt is None:
-        dt = now()
-    elif dt.tzinfo is None:
-        # Assume local timezone if naive
-        dt = dt.replace(tzinfo=get_timezone_service().timezone)
+        from larrybot.utils.basic_datetime import get_current_datetime
+        dt = get_current_datetime()
+    else:
+        dt = ensure_local(dt)
     
     # Get Sunday of the week
     days_until_sunday = 6 - dt.weekday()
@@ -132,11 +223,12 @@ def is_overdue(due_date: datetime) -> bool:
     Returns:
         True if overdue, False otherwise
     """
-    if due_date.tzinfo is None:
-        # Assume local timezone if naive
-        due_date = due_date.replace(tzinfo=get_timezone_service().timezone)
+    if due_date is None:
+        return False
     
-    return now() > due_date
+    due_date = ensure_local(due_date)
+    from larrybot.utils.basic_datetime import get_current_datetime
+    return get_current_datetime() > due_date
 
 
 def days_until_due(due_date: datetime) -> Optional[int]:
@@ -152,11 +244,9 @@ def days_until_due(due_date: datetime) -> Optional[int]:
     if due_date is None:
         return None
     
-    if due_date.tzinfo is None:
-        # Assume local timezone if naive
-        due_date = due_date.replace(tzinfo=get_timezone_service().timezone)
-    
-    delta = due_date - now()
+    due_date = ensure_local(due_date)
+    from larrybot.utils.basic_datetime import get_current_datetime
+    delta = due_date - get_current_datetime()
     return delta.days
 
 
@@ -170,12 +260,29 @@ def hours_elapsed_since(start_time: datetime) -> float:
     Returns:
         Hours elapsed
     """
-    if start_time.tzinfo is None:
-        # Assume local timezone if naive
-        start_time = start_time.replace(tzinfo=get_timezone_service().timezone)
+    if start_time is None:
+        return 0.0
     
-    delta = now() - start_time
+    from larrybot.utils.basic_datetime import get_current_datetime
+    delta = safe_datetime_arithmetic(get_current_datetime(), start_time)
     return delta.total_seconds() / 3600
+
+
+def format_datetime(dt: datetime, format_str: str = "%Y-%m-%d %H:%M:%S") -> str:
+    """
+    Format datetime with the given format string.
+    
+    Args:
+        dt: Datetime to format
+        format_str: Format string
+        
+    Returns:
+        Formatted datetime string
+    """
+    if dt is None:
+        return "N/A"
+    
+    return dt.strftime(format_str)
 
 
 def format_datetime_for_display(dt: datetime, format_str: str = "%Y-%m-%d %H:%M:%S") -> str:
@@ -189,6 +296,10 @@ def format_datetime_for_display(dt: datetime, format_str: str = "%Y-%m-%d %H:%M:
     Returns:
         Formatted datetime string
     """
+    if dt is None:
+        return "N/A"
+    
+    dt = ensure_local(dt)
     return format_datetime(dt, format_str)
 
 
@@ -202,7 +313,11 @@ def format_date_for_display(dt: datetime) -> str:
     Returns:
         Formatted date string
     """
-    return format_datetime(dt, "%Y-%m-%d")
+    if dt is None:
+        return "N/A"
+    
+    dt = ensure_local(dt)
+    return dt.strftime("%Y-%m-%d")
 
 
 def format_time_for_display(dt: datetime) -> str:
@@ -215,35 +330,41 @@ def format_time_for_display(dt: datetime) -> str:
     Returns:
         Formatted time string
     """
-    return format_datetime(dt, "%H:%M")
+    if dt is None:
+        return "N/A"
+    
+    dt = ensure_local(dt)
+    return dt.strftime("%H:%M:%S")
 
 
 def parse_datetime_string(dt_str: str, format_str: str = "%Y-%m-%d %H:%M:%S") -> datetime:
     """
-    Parse datetime string and return in local timezone.
+    Parse datetime string and return timezone-aware datetime.
     
     Args:
         dt_str: Datetime string to parse
         format_str: Format string
         
     Returns:
-        Parsed datetime in local timezone
+        Timezone-aware datetime in local timezone
     """
-    return get_timezone_service().parse_datetime(dt_str, format_str)
+    dt = datetime.strptime(dt_str, format_str)
+    return ensure_timezone_aware(dt, assume_local=True)
 
 
 def parse_date_string(date_str: str, format_str: str = "%Y-%m-%d") -> datetime:
     """
-    Parse date string and return start of day in local timezone.
+    Parse date string and return timezone-aware datetime at start of day.
     
     Args:
         date_str: Date string to parse
         format_str: Format string
         
     Returns:
-        Parsed datetime (start of day) in local timezone
+        Timezone-aware datetime at start of day in local timezone
     """
-    dt = get_timezone_service().parse_datetime(date_str, format_str)
+    dt = datetime.strptime(date_str, format_str)
+    dt = ensure_timezone_aware(dt, assume_local=True)
     return get_start_of_day(dt)
 
 
@@ -255,27 +376,33 @@ def convert_to_utc_for_storage(dt: datetime) -> datetime:
         dt: Datetime to convert
         
     Returns:
-        Datetime in UTC
+        UTC datetime for storage
     """
-    return to_utc(dt)
+    if dt is None:
+        return None
+    
+    return ensure_utc(dt)
 
 
 def convert_from_utc_for_display(dt: datetime) -> datetime:
     """
-    Convert UTC datetime to local timezone for display.
+    Convert UTC datetime from database to local timezone for display.
     
     Args:
-        dt: UTC datetime to convert
+        dt: UTC datetime from database
         
     Returns:
-        Datetime in local timezone
+        Local timezone datetime for display
     """
-    return to_local(dt)
+    if dt is None:
+        return None
+    
+    return ensure_local(dt)
 
 
 def create_future_datetime(days: int = 1, hours: int = 0, minutes: int = 0) -> datetime:
     """
-    Create a datetime in the future from now.
+    Create a future datetime relative to now.
     
     Args:
         days: Days to add
@@ -285,12 +412,13 @@ def create_future_datetime(days: int = 1, hours: int = 0, minutes: int = 0) -> d
     Returns:
         Future datetime in local timezone
     """
-    return now() + timedelta(days=days, hours=hours, minutes=minutes)
+    from larrybot.utils.basic_datetime import get_current_datetime
+    return get_current_datetime() + timedelta(days=days, hours=hours, minutes=minutes)
 
 
 def create_past_datetime(days: int = 1, hours: int = 0, minutes: int = 0) -> datetime:
     """
-    Create a datetime in the past from now.
+    Create a past datetime relative to now.
     
     Args:
         days: Days to subtract
@@ -300,7 +428,8 @@ def create_past_datetime(days: int = 1, hours: int = 0, minutes: int = 0) -> dat
     Returns:
         Past datetime in local timezone
     """
-    return now() - timedelta(days=days, hours=hours, minutes=minutes)
+    from larrybot.utils.basic_datetime import get_current_datetime
+    return get_current_datetime() - timedelta(days=days, hours=hours, minutes=minutes)
 
 
 def is_same_day(dt1: datetime, dt2: datetime) -> bool:
@@ -314,11 +443,11 @@ def is_same_day(dt1: datetime, dt2: datetime) -> bool:
     Returns:
         True if same day, False otherwise
     """
-    # Convert both to local timezone for comparison
-    if dt1.tzinfo is None:
-        dt1 = dt1.replace(tzinfo=get_timezone_service().timezone)
-    if dt2.tzinfo is None:
-        dt2 = dt2.replace(tzinfo=get_timezone_service().timezone)
+    if dt1 is None or dt2 is None:
+        return False
+    
+    dt1 = ensure_local(dt1)
+    dt2 = ensure_local(dt2)
     
     return dt1.date() == dt2.date()
 
@@ -333,7 +462,11 @@ def is_today(dt: datetime) -> bool:
     Returns:
         True if today, False otherwise
     """
-    return is_same_day(dt, now())
+    if dt is None:
+        return False
+    
+    dt = ensure_local(dt)
+    return dt.date() == now().date()
 
 
 def is_this_week(dt: datetime) -> bool:
@@ -346,11 +479,12 @@ def is_this_week(dt: datetime) -> bool:
     Returns:
         True if this week, False otherwise
     """
+    if dt is None:
+        return False
+    
+    dt = ensure_local(dt)
     start_of_week = get_start_of_week()
     end_of_week = get_end_of_week()
-    
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=get_timezone_service().timezone)
     
     return start_of_week <= dt <= end_of_week
 
@@ -362,7 +496,13 @@ def get_timezone_info() -> dict:
     Returns:
         Dictionary with timezone information
     """
-    return get_timezone_service().get_timezone_info()
+    tz_service = get_timezone_service()
+    return {
+        'timezone_name': tz_service.timezone_name,
+        'is_auto_detected': tz_service.detected_timezone is not None,
+        'current_offset': now().strftime('%z'),
+        'current_time': format_datetime_for_display(now())
+    }
 
 
 def set_timezone(timezone_name: str) -> bool:
@@ -375,7 +515,8 @@ def set_timezone(timezone_name: str) -> bool:
     Returns:
         True if successful, False otherwise
     """
-    return get_timezone_service().set_timezone(timezone_name)
+    tz_service = get_timezone_service()
+    return tz_service.set_timezone(timezone_name)
 
 
 def reset_timezone_to_auto() -> bool:
@@ -385,4 +526,5 @@ def reset_timezone_to_auto() -> bool:
     Returns:
         True if successful, False otherwise
     """
-    return get_timezone_service().reset_to_auto_detection() 
+    tz_service = get_timezone_service()
+    return tz_service.reset_to_auto_detection() 

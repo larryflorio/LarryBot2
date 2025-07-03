@@ -5,6 +5,7 @@ import datetime
 class Habit(Base):
     """
     SQLAlchemy model for a habit.
+    All datetime fields are stored as UTC and must be timezone-aware in the application layer.
     """
     __tablename__ = 'habits'
 
@@ -12,4 +13,4 @@ class Habit(Base):
     name = Column(String, unique=True, nullable=False)
     streak = Column(Integer, default=0, nullable=False)
     last_completed = Column(Date, nullable=True)
-    created_at = Column(DateTime, default=func.now(), nullable=False) 
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False) 
