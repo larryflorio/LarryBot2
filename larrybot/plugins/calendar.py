@@ -66,10 +66,11 @@ async def agenda_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                         parse_mode='MarkdownV2'
                     )
                     return
+                tokens = [token]  # Single account
             else:
-                # Show agenda for primary account
-                token = repo.get_primary_token("google")
-                if not token:
+                # Show agenda for all active accounts
+                tokens = repo.get_active_tokens("google")
+                if not tokens:
                     await update.message.reply_text(
                         MessageFormatter.format_info_message(
                             "📅 Calendar Not Connected",
@@ -97,126 +98,159 @@ async def agenda_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 )
                 return
             
-            creds = Credentials(
-                token=token.access_token,
-                refresh_token=token.refresh_token,
-                token_uri="https://oauth2.googleapis.com/token",
-                client_id=secrets["client_id"],
-                client_secret=secrets["client_secret"],
-                expiry=token.expiry,
-                scopes=SCOPES
-            )
+            all_events = []
+            account_names = []
             
-            # Refresh token if needed
-            if creds.expired and creds.refresh_token:
+            # Fetch events from all accounts
+            for token in tokens:
+                creds = Credentials(
+                    token=token.access_token,
+                    refresh_token=token.refresh_token,
+                    token_uri="https://oauth2.googleapis.com/token",
+                    client_id=secrets["client_id"],
+                    client_secret=secrets["client_secret"],
+                    expiry=token.expiry,
+                    scopes=SCOPES
+                )
+                
+                # Refresh token if needed
+                if creds.expired and creds.refresh_token:
+                    try:
+                        await run_in_thread(creds.refresh, Request())
+                        # Save updated token
+                        repo.update_token(
+                            provider="google",
+                            account_id=token.account_id,
+                            access_token=creds.token,
+                            refresh_token=creds.refresh_token,
+                            expiry=creds.expiry
+                        )
+                    except Exception as e:
+                        # Skip this account if token refresh fails
+                        print(f"Warning: Token refresh failed for account {token.account_name}: {e}")
+                        continue
+                
+                # Fetch events for this account
                 try:
-                    await run_in_thread(creds.refresh, Request())
-                    # Save updated token
-                    repo.update_token(
-                        provider="google",
-                        account_id=token.account_id,
-                        access_token=creds.token,
-                        refresh_token=creds.refresh_token,
-                        expiry=creds.expiry
+                    service = await run_in_thread(build, "calendar", "v3", credentials=creds)
+                    
+                    # Get today's events
+                    today = datetime.now(timezone.utc).date()
+                    start_of_day = datetime.combine(today, datetime.min.time(), tzinfo=timezone.utc)
+                    end_of_day = datetime.combine(today, datetime.max.time(), tzinfo=timezone.utc)
+                    
+                    events_result = await run_in_thread(
+                        service.events().list,
+                        calendarId="primary",
+                        timeMin=start_of_day.isoformat(),
+                        timeMax=end_of_day.isoformat(),
+                        maxResults=20,  # Increased for multi-account
+                        singleEvents=True,
+                        orderBy="startTime"
                     )
+                    events = await run_in_thread(events_result.execute)
+                    items = events.get("items", [])
+                    
+                    # Add account info to each event
+                    for event in items:
+                        event['_account_name'] = token.account_name
+                        event['_account_id'] = token.account_id
+                        event['_account_email'] = token.account_email
+                        all_events.append(event)
+                    
+                    account_names.append(token.account_name)
+                    
                 except Exception as e:
-                    await update.message.reply_text(
-                        MessageFormatter.format_error_message(
-                            "Token Refresh Failed",
-                            f"Failed to refresh token: {e}"
-                        ),
-                        parse_mode='MarkdownV2'
-                    )
-                    return
+                    # Skip this account if event fetch fails
+                    print(f"Warning: Failed to fetch events for account {token.account_name}: {e}")
+                    continue
             
-            # Fetch events
-            try:
-                service = await run_in_thread(build, "calendar", "v3", credentials=creds)
-                
-                # Get today's events
-                today = datetime.now(timezone.utc).date()
-                start_of_day = datetime.combine(today, datetime.min.time(), tzinfo=timezone.utc)
-                end_of_day = datetime.combine(today, datetime.max.time(), tzinfo=timezone.utc)
-                
-                events_result = await run_in_thread(
-                    service.events().list,
-                    calendarId="primary",
-                    timeMin=start_of_day.isoformat(),
-                    timeMax=end_of_day.isoformat(),
-                    maxResults=10,
-                    singleEvents=True,
-                    orderBy="startTime"
-                )
-                events = await run_in_thread(events_result.execute)
-                items = events.get("items", [])
-                
-                if not items:
-                    account_info = f" \\({token.account_name}\\)" if account_id else ""
-                    await update.message.reply_text(
-                        MessageFormatter.format_info_message(
-                            f"📅 Today's Agenda{account_info}",
-                            {
-                                "Status": "No events scheduled for today",
-                                "Date": today.strftime('%Y-%m-%d'),
-                                "Account": token.account_name,
-                                "Suggestion": "Enjoy your free time or add some tasks!"
-                            }
-                        ),
-                        parse_mode='MarkdownV2'
-                    )
-                    return
-                
-                # Build rich agenda message
-                account_info = f" \\({token.account_name}\\)" if account_id else ""
-                message = f"📅 **Today's Agenda**{account_info} \\({today.strftime('%B %d, %Y')}\\)\n\n"
-                message += f"📋 **{len(items)} Events Scheduled**\n\n"
-                
-                for i, event in enumerate(items, 1):
-                    start = event["start"].get("dateTime", event["start"].get("date"))
-                    summary = event.get("summary") or "(No title)"
-                    location = event.get("location", "")
-                    description = event.get("description", "")
-                    
-                    # Format time
-                    if "T" in start:  # Has time
-                        try:
-                            event_time = datetime.fromisoformat(start.replace('Z', '+00:00'))
-                            time_str = event_time.strftime('%H:%M')
-                        except:
-                            time_str = start
-                    else:  # All-day event
-                        time_str = "All day"
-                    
-                    message += f"{i}\\. **{MessageFormatter.escape_markdown(summary)}**\n"
-                    message += f"   🕐 {time_str}\n"
-                    
-                    if location:
-                        message += f"   📍 {MessageFormatter.escape_markdown(location)}\n"
-                    
-                    if description:
-                        # Truncate long descriptions
-                        desc_preview = description[:100] + "..." if len(description) > 100 else description
-                        message += f"   📝 {MessageFormatter.escape_markdown(desc_preview)}\n"
-                    
-                    message += "\n"
-                
-                # Create navigation keyboard
-                keyboard = KeyboardBuilder.build_calendar_keyboard()
-                
+            if not all_events:
+                account_info = f" \\({', '.join(account_names)}\\)" if account_id else ""
                 await update.message.reply_text(
-                    message,
-                    reply_markup=keyboard,
-                    parse_mode='MarkdownV2'
-                )
-                
-            except Exception as e:
-                await update.message.reply_text(
-                    MessageFormatter.format_error_message(
-                        "Failed to fetch events",
-                        f"Error: {e}"
+                    MessageFormatter.format_info_message(
+                        f"📅 Today's Agenda{account_info}",
+                        {
+                            "Status": "No events scheduled for today",
+                            "Date": today.strftime('%Y-%m-%d'),
+                            "Accounts": ", ".join(account_names),
+                            "Suggestion": "Enjoy your free time or add some tasks!"
+                        }
                     ),
                     parse_mode='MarkdownV2'
                 )
+                return
+            
+            # Sort all events by start time
+            all_events.sort(key=lambda x: x["start"].get("dateTime", x["start"].get("date")))
+            
+            # Build rich agenda message
+            today = datetime.now(timezone.utc).date()
+            message = f"📅 **Today's Agenda** \\({today.strftime('%B %d, %Y')}\\)\n\n"
+            message += f"📋 **{len(all_events)} Events Scheduled**\n\n"
+            
+            # Find the next upcoming event (first event that hasn't started yet)
+            now = datetime.now(timezone.utc)
+            next_event_index = None
+            
+            for i, event in enumerate(all_events):
+                start = event["start"].get("dateTime", event["start"].get("date"))
+                if "T" in start:  # Has time
+                    try:
+                        event_time = datetime.fromisoformat(start.replace('Z', '+00:00'))
+                        if event_time > now:
+                            next_event_index = i
+                            break
+                    except:
+                        pass
+            
+            for i, event in enumerate(all_events, 1):
+                start = event["start"].get("dateTime", event["start"].get("date"))
+                summary = event.get("summary") or "(No title)"
+                location = event.get("location", "")
+                description = event.get("description", "")
+                account_name = event.get("_account_name", "Unknown")
+                account_email = event.get("_account_email", "")
+                
+                # Format time in 12-hour format
+                if "T" in start:  # Has time
+                    try:
+                        event_time = datetime.fromisoformat(start.replace('Z', '+00:00'))
+                        time_str = event_time.strftime('%I:%M %p')  # 12-hour format with AM/PM
+                    except:
+                        time_str = start
+                else:  # All-day event
+                    time_str = "All day"
+                
+                # Add next event indicator
+                next_indicator = "⏭️ " if (i-1) == next_event_index else ""
+                
+                message += f"{next_indicator}{i}\\. **{MessageFormatter.escape_markdown(summary)}**\n"
+                message += f"   🕐 {time_str}\n"
+                
+                # Show custom name if available, otherwise show email
+                calendar_label = account_name if account_name and account_name != "Unknown" else account_email
+                message += f"   📅 {MessageFormatter.escape_markdown(calendar_label)}\n"
+                
+                if location:
+                    message += f"   📍 {MessageFormatter.escape_markdown(location)}\n"
+                
+                if description:
+                    # Truncate long descriptions
+                    desc_preview = description[:100] + "..." if len(description) > 100 else description
+                    message += f"   📝 {MessageFormatter.escape_markdown(desc_preview)}\n"
+                
+                message += "\n"
+            
+            # Create navigation keyboard
+            keyboard = KeyboardBuilder.build_calendar_keyboard()
+            
+            await update.message.reply_text(
+                message,
+                reply_markup=keyboard,
+                parse_mode='MarkdownV2'
+            )
+            
     except Exception as e:
         await update.message.reply_text(
             MessageFormatter.format_error_message(
@@ -299,15 +333,15 @@ async def connect_google_handler(update: Update, context: ContextTypes.DEFAULT_T
             )
             return
         
-        # Get account name from args or use default
-        account_name = " ".join(context.args) if context.args else "Google Calendar"
+        # Get account name from args if provided
+        account_name = " ".join(context.args) if context.args else None
         
         # No account limit check for single-user local bot
         await update.message.reply_text(
             MessageFormatter.format_info_message(
                 "🔗 Connecting Google Calendar",
                 {
-                    "Account Name": account_name,
+                    "Account Name": account_name or "Will be set after connection",
                     "Instructions": "A browser window will open for Google authentication",
                     "Steps": "1. Complete the authentication process\n2. Grant calendar access\n3. Return here when done",
                     "Security": "Your credentials are stored securely"
@@ -341,25 +375,32 @@ async def connect_google_handler(update: Update, context: ContextTypes.DEFAULT_T
                 repo.add_token(
                     provider="google",
                     account_id=account_id,
-                    account_name=account_name,
+                    account_name=account_name or "Unknown",  # Use "Unknown" if no name provided
                     access_token=creds.token,
                     refresh_token=creds.refresh_token,
                     expiry=creds.expiry,
                     account_email=account_email
                 )
             
+            # Success message
+            success_message = MessageFormatter.format_success_message(
+                "✅ Google Calendar Connected!",
+                {
+                    "Account ID": account_id,
+                    "Email": account_email or "Not available",
+                    "Status": "Successfully connected and token stored",
+                    "Next Steps": f"Use `/agenda {account_id}` to view your calendar"
+                }
+            )
+            
+            # Add custom name prompt if no name was provided
+            if not account_name:
+                success_message += "\n\n💡 **Set a Custom Name:**\n"
+                success_message += f"Use `/account_rename {account_id} [your_custom_name]` to set a friendly name for this calendar\\.\n"
+                success_message += "Example: `/account_rename " + account_id + " Personal`"
+            
             await update.message.reply_text(
-                MessageFormatter.format_success_message(
-                    "✅ Google Calendar Connected!",
-                    {
-                        "Account Name": account_name,
-                        "Account ID": account_id,
-                        "Email": account_email or "Not available",
-                        "Status": "Successfully connected and token stored",
-                        "Next Steps": f"Use `/agenda {account_id}` to view your calendar",
-                        "Features": "View events, sync calendar, manage schedule"
-                    }
-                ),
+                success_message,
                 parse_mode='MarkdownV2'
             )
         except Exception as e:
@@ -787,7 +828,7 @@ async def calendar_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             
             account_info = f" \\({token.account_name}\\)" if account_id else ""
             message = f"📅 **Calendar Overview**{account_info} \\({days} days\\)\n\n"
-            message += "Calendar integration is working! More features coming soon."
+            message += "Calendar integration is working\\! More features coming soon\\."
             
             keyboard = KeyboardBuilder.build_calendar_keyboard()
             

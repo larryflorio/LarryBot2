@@ -168,7 +168,7 @@ class TestAdvancedTasksPlugin:
         await add_task_with_metadata_handler(mock_update, mock_context)
         
         # Assert
-        mock_update.message.reply_text.assert_called_once_with("Invalid date format. Use YYYY-MM-DD")
+        mock_update.message.reply_text.assert_called_once_with("Invalid date format\\. Use YYYY\\-MM\\-DD", parse_mode='MarkdownV2')
 
     @pytest.mark.asyncio
     async def test_add_task_with_metadata_handler_service_error(self, mock_update, mock_context, mock_task_service):
@@ -275,7 +275,7 @@ class TestAdvancedTasksPlugin:
         await due_date_handler(mock_update, mock_context)
         
         # Assert
-        mock_update.message.reply_text.assert_called_once_with("Invalid date format. Use YYYY-MM-DD")
+        mock_update.message.reply_text.assert_called_once_with("Invalid date format\\. Use YYYY\\-MM\\-DD", parse_mode='MarkdownV2')
 
     @pytest.mark.asyncio
     async def test_category_handler_success(self, mock_update, mock_context, mock_task_service):

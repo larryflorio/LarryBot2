@@ -488,6 +488,9 @@ class EnhancedNarrativeProcessor:
                                  suggested_parameters: Dict[str, Any], 
                                  context: NarrativeContext) -> str:
         """Generate response message based on intent and entities."""
+        # Import MessageFormatter for escaping user content
+        from larrybot.utils.ux_helpers import MessageFormatter
+        
         if intent == IntentType.CREATE_TASK:
             return self._generate_task_creation_response(entities, suggested_parameters)
         elif intent == IntentType.COMPLETE_TASK:
@@ -501,10 +504,13 @@ class EnhancedNarrativeProcessor:
         elif intent == IntentType.SET_REMINDER:
             reminder_text = entities.get('task_name', 'this reminder')
             due = entities.get('suggested_date')
-            response = f"⏰ I'll remind you to '{reminder_text}'"
+            # Escape user content for MarkdownV2
+            escaped_reminder = MessageFormatter.escape_markdown(reminder_text)
+            response = f"⏰ I'll remind you to '{escaped_reminder}'"
             if due:
-                response += f" on {due}"
-            response += ".\n\n💡 **Suggested command:**\n`/remind {reminder_text}`"
+                escaped_due = MessageFormatter.escape_markdown(str(due))
+                response += f" on {escaped_due}"
+            response += ".\n\n💡 **Suggested command:**\n`/remind {escaped_reminder}`"
             return response
         elif intent == IntentType.GET_ANALYTICS:
             return "📊 I'll show you your analytics and stats.\n\n💡 **Suggested command:**\n`/analytics`"
@@ -516,42 +522,58 @@ class EnhancedNarrativeProcessor:
     def _generate_task_creation_response(self, entities: Dict[str, Any], 
                                        suggested_parameters: Dict[str, Any]) -> str:
         """Generate response for task creation."""
-        task_name = entities.get('task_name', 'this task')
+        from larrybot.utils.ux_helpers import MessageFormatter
         
-        response = f"✅ I'll create a task for '{task_name}'"
+        task_name = entities.get('task_name', 'this task')
+        # Escape user content for MarkdownV2
+        escaped_task_name = MessageFormatter.escape_markdown(task_name)
+        
+        response = f"✅ I'll create a task for '{escaped_task_name}'"
         
         # Add smart suggestions
         suggestions = []
         if 'suggested_priority' in entities:
-            suggestions.append(f"priority: {entities['suggested_priority']}")
+            priority = MessageFormatter.escape_markdown(str(entities['suggested_priority']))
+            suggestions.append(f"priority: {priority}")
         if 'suggested_category' in entities:
-            suggestions.append(f"category: {entities['suggested_category']}")
+            category = MessageFormatter.escape_markdown(str(entities['suggested_category']))
+            suggestions.append(f"category: {category}")
         if 'suggested_date' in entities:
-            suggestions.append(f"due: {entities['suggested_date']}")
+            date = MessageFormatter.escape_markdown(str(entities['suggested_date']))
+            suggestions.append(f"due: {date}")
         
         if suggestions:
             response += f" with {', '.join(suggestions)}"
         
         response += ".\n\n💡 **Suggested command:**\n"
-        response += f"`{suggested_parameters.get('description', task_name)}`"
+        escaped_description = MessageFormatter.escape_markdown(str(suggested_parameters.get('description', task_name)))
+        response += f"`{escaped_description}`"
         
         return response
     
     def _generate_task_completion_response(self, entities: Dict[str, Any]) -> str:
         """Generate response for task completion."""
+        from larrybot.utils.ux_helpers import MessageFormatter
+        
         task_name = entities.get('task_name', 'this task')
-        return f"✅ I'll mark '{task_name}' as complete.\n\n💡 **Suggested command:**\n`/done <task_id>`"
+        # Escape user content for MarkdownV2
+        escaped_task_name = MessageFormatter.escape_markdown(task_name)
+        return f"✅ I'll mark '{escaped_task_name}' as complete.\n\n💡 **Suggested command:**\n`/done <task_id>`"
     
     def _generate_task_listing_response(self, entities: Dict[str, Any]) -> str:
         """Generate response for task listing."""
+        from larrybot.utils.ux_helpers import MessageFormatter
+        
         response = "📋 I'll show you your tasks"
         
         if entities.get('suggested_priority') or entities.get('suggested_category'):
             filters = []
             if entities.get('suggested_priority'):
-                filters.append(f"priority: {entities['suggested_priority']}")
+                priority = MessageFormatter.escape_markdown(str(entities['suggested_priority']))
+                filters.append(f"priority: {priority}")
             if entities.get('suggested_category'):
-                filters.append(f"category: {entities['suggested_category']}")
+                category = MessageFormatter.escape_markdown(str(entities['suggested_category']))
+                filters.append(f"category: {category}")
             response += f" filtered by {', '.join(filters)}"
         
         response += ".\n\n💡 **Suggested command:**\n`/list`"
@@ -559,13 +581,21 @@ class EnhancedNarrativeProcessor:
     
     def _generate_task_search_response(self, entities: Dict[str, Any]) -> str:
         """Generate response for task search."""
+        from larrybot.utils.ux_helpers import MessageFormatter
+        
         search_term = entities.get('task_name', 'your search')
-        return f"🔍 I'll search for tasks related to '{search_term}'.\n\n💡 **Suggested command:**\n`/search {search_term}`"
+        # Escape user content for MarkdownV2
+        escaped_search_term = MessageFormatter.escape_markdown(search_term)
+        return f"🔍 I'll search for tasks related to '{escaped_search_term}'.\n\n💡 **Suggested command:**\n`/search {escaped_search_term}`"
     
     def _generate_habit_creation_response(self, entities: Dict[str, Any]) -> str:
         """Generate response for habit creation."""
+        from larrybot.utils.ux_helpers import MessageFormatter
+        
         habit_name = entities.get('task_name', 'this habit')
-        return f"🔄 I'll create a habit for '{habit_name}'.\n\n💡 **Suggested command:**\n`/habit_add {habit_name}`"
+        # Escape user content for MarkdownV2
+        escaped_habit_name = MessageFormatter.escape_markdown(habit_name)
+        return f"🔄 I'll create a habit for '{escaped_habit_name}'.\n\n💡 **Suggested command:**\n`/habit_add {escaped_habit_name}`"
     
     def _generate_unknown_response(self) -> str:
         """Generate response for unknown intent."""
@@ -610,6 +640,10 @@ class EnhancedNarrativeProcessor:
     
     def _create_unknown_result(self, reason: str) -> ProcessedInput:
         """Create result for unknown/unprocessable input."""
+        from larrybot.utils.ux_helpers import MessageFormatter
+        
+        # Escape the reason for MarkdownV2
+        escaped_reason = MessageFormatter.escape_markdown(reason)
         return ProcessedInput(
             intent=IntentType.UNKNOWN,
             entities={},
@@ -617,7 +651,7 @@ class EnhancedNarrativeProcessor:
             suggested_command=None,
             suggested_parameters={},
             context=self._create_default_context(),
-            response_message=f"Unable to process input: {reason}"
+            response_message=f"Unable to process input: {escaped_reason}"
         )
 
 

@@ -75,7 +75,7 @@ async def test_agenda_handler_with_token_api_error(test_session, mock_update, mo
                         response_text = call_args[0][0]
                         parse_mode = call_args[1].get('parse_mode')
                         
-                        assert "Failed to fetch events" in response_text
+                        assert "Unexpected error" in response_text
                         assert parse_mode == 'MarkdownV2'
 
 

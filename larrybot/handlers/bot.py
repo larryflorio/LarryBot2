@@ -217,6 +217,8 @@ class TelegramBotHandler:
             await self._handle_calendar_callback(query, context)
         elif callback_data.startswith("filter_"):
             await self._handle_filter_callback(query, context)
+        elif callback_data == "add_task":
+            await self._handle_add_task(query, context)
         else:
             # Unknown callback data
             await query.edit_message_text(
@@ -1944,12 +1946,20 @@ class TelegramBotHandler:
                 await query.edit_message_text(
                     MessageFormatter.format_error_message(
                         "❌ Refresh failed",
-                        "Please try again later\\."
+                        "Please try again later."
                     ),
                     parse_mode='MarkdownV2'
                 )
             except Exception as nested_e:
                 logger.error(f"Failed to send error message: {nested_e}")
+                # Fallback to simple text without Markdown if escaping fails
+                try:
+                    await query.edit_message_text(
+                        "❌ Refresh failed. Please try again later.",
+                        parse_mode=None
+                    )
+                except Exception:
+                    pass  # Last resort - don't let error handling cause more errors
 
     async def _handle_tasks_refresh_operation(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle the actual tasks refresh operation with progressive disclosure and smart suggestions."""
@@ -2002,7 +2012,9 @@ class TelegramBotHandler:
                     suggestions.append("💡 **Tip:** Use filters to focus on specific tasks")
                 
                 if suggestions:
-                    message += "\n\n" + "\n".join(suggestions)
+                    # Escape suggestions for MarkdownV2 format
+                    escaped_suggestions = [MessageFormatter.escape_markdown(suggestion) for suggestion in suggestions]
+                    message += "\n\n" + "\n".join(escaped_suggestions)
                 
                 # Build progressive keyboard with smart actions
                 custom_actions = [
@@ -2047,14 +2059,18 @@ class TelegramBotHandler:
                 )
                 
                 # Add custom actions row
-                keyboard.inline_keyboard.append([
+                # Create new keyboard with additional custom actions since inline_keyboard is read-only
+                existing_buttons = list(keyboard.inline_keyboard)
+                custom_action_buttons = [
                     UnifiedButtonBuilder.create_button(
                         text=action["text"],
                         callback_data=action["callback_data"],
                         button_type=action["type"],
                         custom_emoji=action["emoji"]
                     ) for action in custom_actions
-                ])
+                ]
+                existing_buttons.append(custom_action_buttons)
+                keyboard = InlineKeyboardMarkup(existing_buttons)
             
             await query.edit_message_text(
                 message,
@@ -2110,7 +2126,9 @@ class TelegramBotHandler:
                 # Build message with suggestions
                 message = MessageFormatter.format_success_message("Task Details", details)
                 if suggestions:
-                    message += "\n\n" + "\n".join(suggestions)
+                    # Escape suggestions for MarkdownV2 format
+                    escaped_suggestions = [MessageFormatter.escape_markdown(suggestion) for suggestion in suggestions]
+                    message += "\n\n" + "\n".join(escaped_suggestions)
                 
                 # Get disclosure level from context (default to 1 for progressive disclosure)
                 disclosure_level = context.user_data.get(f'task_disclosure_{task_id}', 1)
@@ -2136,6 +2154,42 @@ class TelegramBotHandler:
                 ),
                 parse_mode='MarkdownV2'
             )
+
+    async def _handle_add_task(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handle add task button press - guide user to use the /add command."""
+        from larrybot.utils.ux_helpers import MessageFormatter
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        
+        # Set user in add task mode for better UX
+        context.user_data['add_task_mode'] = True
+        
+        message = "📝 **Add New Task**\n\n"
+        message += "**How to add a task:**\n"
+        message += "• Use `/add <description>` for a simple task\n"
+        message += "• Use `/add <description> priority:<level>` for priority\n"
+        message += "• Use `/add <description> due:<date>` for due date\n"
+        message += "• Use `/add <description> client:<name>` for client assignment\n\n"
+        message += "**Examples:**\n"
+        message += "• `/add Review quarterly reports`\n"
+        message += "• `/add Call client priority:High due:tomorrow`\n"
+        message += "• `/add Prepare presentation client:John Doe`\n\n"
+        message += "**Tip:** You can combine multiple options in one command!"
+        
+        # Escape the message for MarkdownV2
+        escaped_message = MessageFormatter.escape_markdown(message)
+        
+        keyboard = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("📋 View Tasks", callback_data="tasks_refresh"),
+                InlineKeyboardButton("❌ Cancel", callback_data="cancel_action")
+            ]
+        ])
+        
+        await query.edit_message_text(
+            escaped_message,
+            reply_markup=keyboard,
+            parse_mode='MarkdownV2'
+        )
 
     async def _handle_client_view(self, query, context: ContextTypes.DEFAULT_TYPE, client_id: int) -> None:
         """Show detailed view of a client with action buttons and navigation."""
