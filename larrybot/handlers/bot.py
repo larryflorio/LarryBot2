@@ -20,6 +20,12 @@ from larrybot.nlp.sentiment_analyzer import SentimentAnalyzer
 from larrybot.nlp.enhanced_narrative_processor import EnhancedNarrativeProcessor
 from larrybot.utils.datetime_utils import get_current_datetime
 from larrybot.utils.enhanced_ux_helpers import escape_markdown_v2
+import random
+from datetime import datetime, timedelta
+from larrybot.services.task_service import TaskService
+from larrybot.storage.db import get_session
+from larrybot.storage.habit_repository import HabitRepository
+from larrybot.utils.datetime_utils import get_current_datetime
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -50,8 +56,9 @@ class TelegramBotHandler:
         # Add global error handler to prevent crashes
         self.application.add_error_handler(self._global_error_handler)
         
-        self._register_core_handlers()
+        # Register commands first, then handlers to ensure proper registration order
         self._register_core_commands()
+        self._register_core_handlers()
         
         # NLP pipeline initialization
         self.intent_recognizer = IntentRecognizer()
@@ -91,8 +98,13 @@ class TelegramBotHandler:
         self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self._handle_text_message))
         
         # Dynamically add handlers for all registered commands (except /start and /help)
-        for command in self.command_registry._commands:
-            if command not in ("/start", "/help"):
+        for command, handler in self.command_registry._commands.items():
+            if command in ("/start", "/help"):
+                continue
+            # If the handler is a bound method of this instance, register it directly
+            if hasattr(handler, "__self__") and handler.__self__ is self:
+                self.application.add_handler(CommandHandler(command.lstrip("/"), handler))
+            else:
                 self.application.add_handler(CommandHandler(command.lstrip("/"), self._dispatch_command))
 
     def _register_core_commands(self) -> None:
@@ -116,6 +128,14 @@ class TelegramBotHandler:
             category="system"
         )
         self.command_registry.register("/start", self._start, start_metadata)
+        
+        daily_metadata = CommandMetadata(
+            name="/daily",
+            description="Send a daily report of events, overdue tasks, due today, and habits.",
+            usage="/daily",
+            category="system"
+        )
+        self.command_registry.register("/daily", self.daily_command, daily_metadata)
 
     async def _handle_callback_query(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """
@@ -1694,6 +1714,10 @@ class TelegramBotHandler:
         except RuntimeError:
             print("Could not set event loop before bot start", flush=True)
         
+        # Schedule daily report at 9am
+        from larrybot.scheduler import schedule_daily_report
+        schedule_daily_report(self, self.config.ALLOWED_TELEGRAM_USER_ID, hour=9, minute=0)
+        
         # Start the bot
         self.application.run_polling()
     
@@ -2953,3 +2977,124 @@ class TelegramBotHandler:
                 except Exception as fallback_e:
                     logger.error(f"Failed to send fallback error message: {fallback_e}")
                     # Don't let error handling cause more errors 
+
+    async def _send_daily_report(self, update=None, context=None, chat_id=None):
+        """Send a comprehensive daily report with tasks, habits, and motivational content."""
+        logger.info("Generating daily report")
+        try:
+            # Get today's date
+            today = get_current_datetime().date()
+            start_of_today = datetime.combine(today, datetime.min.time())
+            end_of_today = datetime.combine(today, datetime.max.time())
+            
+            # Fetch tasks
+            with next(get_session()) as session:
+                task_repository = TaskRepository(session)
+                task_service = TaskService(task_repository)
+                overdue_result = await task_service.get_tasks_with_filters(overdue_only=True)
+                due_today_result = await task_service.get_tasks_with_filters(due_after=start_of_today, due_before=end_of_today)
+                overdue_tasks = overdue_result['data'] if overdue_result['success'] else []
+                due_today_tasks = due_today_result['data'] if due_today_result['success'] else []
+                
+                # Fetch habits
+                habit_repo = HabitRepository(session)
+                habits = habit_repo.list_habits()
+                habits_due = []
+                for habit in habits:
+                    last_completed = habit.last_completed.date() if habit.last_completed else None
+                    if last_completed != today:
+                        habits_due.append(habit)
+            
+            # Fetch events (stub: replace with real calendar integration)
+            events = []  # TODO: Integrate with calendar plugin
+            # Example: events = [("11:30 AM", "Operation Save Fishy", "1h")]
+            
+            # Motivational quotes
+            quotes = [
+                "Well begun is half done.",
+                "Success is the sum of small efforts repeated day in and day out.",
+                "The secret of getting ahead is getting started.",
+                "You don't have to be great to start, but you have to start to be great.",
+                "Discipline is the bridge between goals and accomplishment."
+            ]
+            quote = random.choice(quotes)
+            
+            # Format message
+            lines = []
+            lines.append(f"🗓️ **Daily Report – {today.strftime('%A, %b %d')}**\n")
+            # Events
+            lines.append("**Today's Events:**")
+            if events:
+                for time, name, duration in events:
+                    lines.append(f"- {time} — {name} (**{duration}**)")
+            else:
+                lines.append("- _No events scheduled._")
+            lines.append("")
+            # Overdue tasks
+            lines.append("🚨 **Overdue Tasks:**")
+            if overdue_tasks:
+                for t in overdue_tasks[:5]:
+                    client = f" _(Client: {t.get('client_name')})_" if t.get('client_name') else ""
+                    lines.append(f"- ❗ {t['description']}{client}")
+                if len(overdue_tasks) > 5:
+                    lines.append(f"- ...and {len(overdue_tasks) - 5} more overdue tasks")
+            else:
+                lines.append("- _No overdue tasks!_")
+            lines.append("")
+            # Due today
+            lines.append("📅 **Due Today:**")
+            if due_today_tasks:
+                for t in due_today_tasks[:5]:
+                    client = f" _(Client: {t.get('client_name')})_" if t.get('client_name') else ""
+                    lines.append(f"- {t['description']}{client}")
+                if len(due_today_tasks) > 5:
+                    lines.append(f"- ...and {len(due_today_tasks) - 5} more due today")
+            else:
+                lines.append("- _No tasks due today!_")
+            lines.append("")
+            # Habits
+            lines.append("🔄 **Habits Due Today:**")
+            if habits_due:
+                for h in habits_due:
+                    streak = f" — 🔥 Streak: {h.streak} days" if h.streak > 1 else ""
+                    lines.append(f"- {h.name}{streak}")
+            else:
+                lines.append("- _No habits due today!_")
+            lines.append("")
+            # Quote
+            lines.append(f"💡 _\"{quote}\"_")
+            message = "\n".join(lines)
+            logger.info("Daily report generated successfully")
+            
+            # Send message
+            if update:
+                await update.message.reply_text(message, parse_mode='Markdown')
+            elif context and chat_id:
+                await context.bot.send_message(chat_id=chat_id, text=message, parse_mode='Markdown')
+            else:
+                logger.error("No valid message target provided for daily report")
+                
+        except Exception as e:
+            logger.error(f"Exception in _send_daily_report: {e}")
+            raise  # Re-raise to be handled by calling method
+
+    async def daily_command(self, update, context):
+        """Handle /daily command to send daily report."""
+        logger.info("Daily command invoked by user")
+        
+        # Check authorization
+        if not self._is_authorized(update):
+            await update.message.reply_text("🚫 Unauthorized access.")
+            return
+        
+        try:
+            await self._send_daily_report(update, context)
+        except Exception as e:
+            logger.error(f"Error in daily command: {e}")
+            await update.message.reply_text(
+                MessageFormatter.format_error_message(
+                    "Failed to generate daily report",
+                    "Please try again later."
+                ),
+                parse_mode='MarkdownV2'
+            )
