@@ -19,6 +19,13 @@ def test_register_commands(command_registry, event_bus):
     assert "/agenda" in registered_commands
     assert "/connect_google" in registered_commands
     assert "/disconnect" in registered_commands
+    assert "/accounts" in registered_commands
+    assert "/account_primary" in registered_commands
+    assert "/account_rename" in registered_commands
+    assert "/account_deactivate" in registered_commands
+    assert "/account_reactivate" in registered_commands
+    assert "/account_delete" in registered_commands
+    assert "/calendar_all" in registered_commands
 
 
 @pytest.mark.asyncio
@@ -33,7 +40,7 @@ async def test_agenda_handler_no_token(test_session, mock_update, mock_context):
         response_text = call_args[0][0]
         parse_mode = call_args[1].get('parse_mode')
         
-        assert "Google Calendar is not connected" in response_text
+        assert "No Google Calendar accounts connected" in response_text
         assert parse_mode == 'MarkdownV2'
 
 
@@ -46,6 +53,8 @@ async def test_agenda_handler_with_token_api_error(test_session, mock_update, mo
     repo = CalendarTokenRepository(test_session)
     token = repo.add_token(
         provider="google",
+        account_id="test_account",
+        account_name="Test Account",
         access_token="test_access_token",
         refresh_token="test_refresh_token",
         expiry=datetime.now(timezone.utc).replace(year=datetime.now(timezone.utc).year + 1)  # Future expiry
@@ -97,21 +106,47 @@ async def test_connect_google_handler_already_connected(test_session, mock_updat
     repo = CalendarTokenRepository(test_session)
     token = repo.add_token(
         provider="google",
+        account_id="test_account",
+        account_name="Test Account",
         access_token="test_access_token",
         refresh_token="test_refresh_token",
         expiry=datetime.now(timezone.utc)
     )
     
-    with patch("larrybot.plugins.calendar.get_session", return_value=iter([test_session])):
+    with patch("larrybot.plugins.calendar.get_session", return_value=iter([test_session, test_session])):
         with patch("os.path.exists", return_value=True):
-            await connect_google_handler(mock_update, mock_context)
-            
-            call_args = mock_update.message.reply_text.call_args
-            response_text = call_args[0][0]
-            parse_mode = call_args[1].get('parse_mode')
-            
-            assert "Google Calendar is already connected" in response_text
-            assert parse_mode == 'MarkdownV2'
+            # Patch OAuth flow to simulate successful connection
+            with patch("larrybot.plugins.calendar.InstalledAppFlow") as mock_flow_class:
+                mock_flow = MagicMock()
+                mock_creds = MagicMock()
+                mock_creds.token = "new_access_token"
+                mock_creds.refresh_token = "new_refresh_token"
+                # Use a real datetime for expiry
+                import datetime as dt
+                mock_creds.expiry = dt.datetime.now(dt.timezone.utc)
+                mock_flow.run_local_server.return_value = mock_creds
+                mock_flow_class.from_client_secrets_file.return_value = mock_flow
+                with patch("larrybot.plugins.calendar.run_in_thread") as mock_run_in_thread:
+                    # Simulate userinfo API
+                    def run_in_thread_side_effect(func, *args, **kwargs):
+                        if hasattr(func, '__name__') and func.__name__ == 'build':
+                            mock_service = MagicMock()
+                            mock_userinfo = MagicMock()
+                            # Ensure .get().execute() returns a real dict with a string email
+                            mock_userinfo.get.return_value.execute.return_value = {"email": "test2@example.com"}
+                            mock_service.userinfo.return_value = mock_userinfo
+                            return mock_service
+                        return mock_creds
+                    mock_run_in_thread.side_effect = run_in_thread_side_effect
+                    
+                    await connect_google_handler(mock_update, mock_context)
+                    
+                    # Should allow connecting another account (no limit)
+                    assert mock_update.message.reply_text.call_count == 2
+                    first_call = mock_update.message.reply_text.call_args_list[0]
+                    assert "Connecting Google Calendar" in first_call[0][0]
+                    second_call = mock_update.message.reply_text.call_args_list[1]
+                    assert "Google Calendar Connected" in second_call[0][0]
 
 
 @pytest.mark.asyncio
@@ -126,7 +161,7 @@ async def test_disconnect_handler_no_token(test_session, mock_update, mock_conte
         response_text = call_args[0][0]
         parse_mode = call_args[1].get('parse_mode')
         
-        assert "No Google Calendar connection found" in response_text
+        assert "No Connection Found" in response_text
         assert parse_mode == 'MarkdownV2'
 
 
@@ -139,6 +174,8 @@ async def test_disconnect_handler_success(test_session, mock_update, mock_contex
     repo = CalendarTokenRepository(test_session)
     token = repo.add_token(
         provider="google",
+        account_id="test_account",
+        account_name="Test Account",
         access_token="test_access_token",
         refresh_token="test_refresh_token",
         expiry=datetime.now(timezone.utc)
@@ -161,18 +198,18 @@ async def test_disconnect_handler_success(test_session, mock_update, mock_contex
 @pytest.mark.asyncio
 async def test_run_in_thread_helper():
     """Test the run_in_thread helper function."""
-    def test_function():
-        return "test_result"
+    def test_func(x, y):
+        return x + y
     
-    result = await run_in_thread(test_function)
-    assert result == "test_result"
+    result = await run_in_thread(test_func, 2, 3)
+    assert result == 5
 
 
 @pytest.mark.asyncio
 async def test_run_in_thread_with_args():
-    """Test run_in_thread with arguments."""
-    def test_function(arg1, arg2, kwarg=None):
-        return f"{arg1}_{arg2}_{kwarg}"
+    """Test the run_in_thread helper function with keyword arguments."""
+    def test_func(x, y, z=0):
+        return x + y + z
     
-    result = await run_in_thread(test_function, "test", "1", kwarg="2")
-    assert result == "test_1_2" 
+    result = await run_in_thread(test_func, 2, 3, z=5)
+    assert result == 10 
