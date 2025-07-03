@@ -238,16 +238,15 @@ async def agenda_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             
             # Build rich agenda message
             today = datetime.now(timezone.utc).date()
-            message = f"📅 **Today's Agenda** \\({today.strftime('%B %d, %Y')}\\)\n\n"
-            message += f"📋 **{len(all_events)} Events Scheduled**\n\n"
+            message = f"📅 *Today's Agenda* \({MessageFormatter.escape_markdown(today.strftime('%B %d, %Y'))}\)\n\n"
+            message += f"📋 *{len(all_events)} Events Scheduled*\n\n"
             
             # Find the next upcoming event (first event that hasn't started yet)
             now = datetime.now(timezone.utc)
             next_event_index = None
-            
             for i, event in enumerate(all_events):
                 start = event["start"].get("dateTime", event["start"].get("date"))
-                if "T" in start:  # Has time
+                if "T" in start:
                     try:
                         event_time = datetime.fromisoformat(start.replace('Z', '+00:00'))
                         if event_time > now:
@@ -257,45 +256,67 @@ async def agenda_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                         pass
             
             for i, event in enumerate(all_events, 1):
+                # Horizontal line between events
+                if i > 1:
+                    message += "────────────\n"
+                
                 start = event["start"].get("dateTime", event["start"].get("date"))
+                end = event["end"].get("dateTime", event["end"].get("date")) if "end" in event else None
                 summary = event.get("summary") or "(No title)"
                 location = event.get("location", "")
                 description = event.get("description", "")
                 account_name = event.get("_account_name", "Unknown")
                 account_email = event.get("_account_email", "")
                 
-                # Format time in 12-hour format
-                if "T" in start:  # Has time
+                # Format time and duration
+                if "T" in start:
                     try:
                         event_time = datetime.fromisoformat(start.replace('Z', '+00:00'))
-                        time_str = event_time.strftime('%I:%M %p')  # 12-hour format with AM/PM
+                        time_str = event_time.strftime('%I:%M %p')
                     except:
                         time_str = start
-                else:  # All-day event
+                else:
                     time_str = "All day"
+                duration_str = ""
+                if end and "T" in start and "T" in end:
+                    try:
+                        start_dt = datetime.fromisoformat(start.replace('Z', '+00:00'))
+                        end_dt = datetime.fromisoformat(end.replace('Z', '+00:00'))
+                        duration = end_dt - start_dt
+                        total_minutes = int(duration.total_seconds() // 60)
+                        hours = total_minutes // 60
+                        minutes = total_minutes % 60
+                        if hours and minutes:
+                            duration_str = f" ({hours}h {minutes}m)"
+                        elif hours:
+                            duration_str = f" ({hours}h)"
+                        elif minutes:
+                            duration_str = f" ({minutes}m)"
+                    except:
+                        duration_str = ""
                 
-                # Add next event indicator
+                # Highlight next event
                 next_indicator = "⏭️ " if (i-1) == next_event_index else ""
                 
-                message += f"{next_indicator}{i}\\. **{MessageFormatter.escape_markdown(summary)}**\n"
-                message += f"   🕐 {time_str}\n"
+                # Bold event name (MarkdownV2)
+                safe_summary = MessageFormatter.escape_markdown(summary)
+                message += f"{next_indicator}{i}\\. *{safe_summary}*\n"
                 
-                # Show custom name if available, otherwise show email
-                calendar_label = account_name if account_name and account_name != "Unknown" else account_email
-                message += f"   📅 {MessageFormatter.escape_markdown(calendar_label)}\n"
-                
+                # Indented details
+                message += f"   🕐 {MessageFormatter.escape_markdown(time_str + duration_str)}\n"
+                if account_name and account_name != "Unknown":
+                    message += f"   🗂️ {MessageFormatter.escape_markdown(account_name)}\n"
+                elif account_email:
+                    message += f"   🗂️ {MessageFormatter.escape_markdown(account_email)}\n"
                 if location:
                     message += f"   📍 {MessageFormatter.escape_markdown(location)}\n"
-                
-                # Check for video call link first
+                # Video link
                 video_link = extract_video_call_link(event)
                 if video_link:
-                    message += f"   🎥 **{video_link['platform']}**: {MessageFormatter.escape_markdown(video_link['url'])}\n"
+                    message += f"   🎥 {MessageFormatter.escape_markdown(video_link['platform'])}: {MessageFormatter.escape_markdown(video_link['url'])}\n"
                 elif description:
-                    # Fallback: show short description if no video link
                     desc_preview = description[:50] + "..." if len(description) > 50 else description
                     message += f"   📝 {MessageFormatter.escape_markdown(desc_preview)}\n"
-                
                 message += "\n"
             
             # Create navigation keyboard
