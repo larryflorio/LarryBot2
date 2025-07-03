@@ -16,6 +16,7 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 import asyncio
 from functools import partial
+import re
 
 SCOPES = [
     "https://www.googleapis.com/auth/calendar.readonly",
@@ -33,7 +34,7 @@ def register(event_bus: EventBus, command_registry: CommandRegistry) -> None:
     command_registry.register("/disconnect", disconnect_handler)
     command_registry.register("/calendar_sync", calendar_sync_handler)
     command_registry.register("/calendar_events", calendar_events_handler)
-    
+
     # New multi-account commands
     command_registry.register("/accounts", accounts_handler)
     command_registry.register("/account_primary", account_primary_handler)
@@ -42,6 +43,57 @@ def register(event_bus: EventBus, command_registry: CommandRegistry) -> None:
     command_registry.register("/account_reactivate", account_reactivate_handler)
     command_registry.register("/account_delete", account_delete_handler)
     command_registry.register("/calendar_all", calendar_all_handler)
+
+
+def extract_video_call_link(event):
+    """Extract primary video call link from event."""
+    video_platforms = {
+        'meet.google.com': 'Google Meet',
+        'zoom.us': 'Zoom',
+        'teams.microsoft.com': 'Microsoft Teams',
+        'webex.com': 'Cisco Webex',
+        'bluejeans.com': 'BlueJeans',
+        'gotomeeting.com': 'GoToMeeting',
+        'join.skype.com': 'Skype',
+        'discord.gg': 'Discord',
+        'slack.com': 'Slack',
+        'whereby.com': 'Whereby',
+        'jitsi.org': 'Jitsi',
+        'meet.jit.si': 'Jitsi',
+        'bigbluebutton.org': 'BigBlueButton'
+    }
+    
+    # Check conference data first (Google Meet, Zoom, etc.)
+    conference_data = event.get('conferenceData', {})
+    entry_points = conference_data.get('entryPoints', [])
+    
+    for entry_point in entry_points:
+        if entry_point.get('entryPointType') == 'video':
+            uri = entry_point.get('uri', '')
+            for domain, platform in video_platforms.items():
+                if domain in uri:
+                    return {
+                        'url': uri,
+                        'platform': platform,
+                        'label': entry_point.get('label', '')
+                    }
+    
+    # Check description for video links
+    description = event.get('description', '')
+    if description:
+        for domain, platform in video_platforms.items():
+            if domain in description:
+                # Extract URL using regex
+                url_pattern = rf'https?://[^\s<>"]*{re.escape(domain)}[^\s<>"]*'
+                match = re.search(url_pattern, description)
+                if match:
+                    return {
+                        'url': match.group(0),
+                        'platform': platform,
+                        'label': 'Video Call'
+                    }
+    
+    return None
 
 
 @command_handler("/agenda", "Show today's agenda", "Usage: /agenda [account_id]", "calendar")
@@ -235,9 +287,13 @@ async def agenda_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 if location:
                     message += f"   📍 {MessageFormatter.escape_markdown(location)}\n"
                 
-                if description:
-                    # Truncate long descriptions
-                    desc_preview = description[:100] + "..." if len(description) > 100 else description
+                # Check for video call link first
+                video_link = extract_video_call_link(event)
+                if video_link:
+                    message += f"   🎥 **{video_link['platform']}**: {MessageFormatter.escape_markdown(video_link['url'])}\n"
+                elif description:
+                    # Fallback: show short description if no video link
+                    desc_preview = description[:50] + "..." if len(description) > 50 else description
                     message += f"   📝 {MessageFormatter.escape_markdown(desc_preview)}\n"
                 
                 message += "\n"
@@ -822,7 +878,7 @@ async def calendar_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                         parse_mode='MarkdownV2'
                     )
                     return
-            
+        
             # Load credentials and fetch events (similar to agenda_handler)
             # ... (implementation similar to agenda_handler but for multiple days)
             

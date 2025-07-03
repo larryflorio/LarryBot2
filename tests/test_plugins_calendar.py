@@ -6,7 +6,8 @@ from larrybot.plugins.calendar import (
     agenda_handler,
     connect_google_handler,
     disconnect_handler,
-    run_in_thread
+    run_in_thread,
+    extract_video_call_link
 )
 from larrybot.storage.calendar_token_repository import CalendarTokenRepository
 
@@ -212,4 +213,99 @@ async def test_run_in_thread_with_args():
         return x + y + z
     
     result = await run_in_thread(test_func, 2, 3, z=5)
-    assert result == 10 
+    assert result == 10
+
+
+def test_extract_video_call_link():
+    """Test video call link extraction from calendar events."""
+    # Test Google Meet conference data
+    google_meet_event = {
+        'conferenceData': {
+            'entryPoints': [
+                {
+                    'entryPointType': 'video',
+                    'uri': 'https://meet.google.com/abc-defg-hij',
+                    'label': 'meet.google.com/abc-defg-hij'
+                }
+            ]
+        }
+    }
+    
+    result = extract_video_call_link(google_meet_event)
+    assert result is not None
+    assert result['platform'] == 'Google Meet'
+    assert result['url'] == 'https://meet.google.com/abc-defg-hij'
+    
+    # Test Zoom link in description
+    zoom_event = {
+        'description': 'Join our meeting: https://zoom.us/j/123456789?pwd=abc123'
+    }
+    
+    result = extract_video_call_link(zoom_event)
+    assert result is not None
+    assert result['platform'] == 'Zoom'
+    assert 'zoom.us' in result['url']
+    
+    # Test Teams link in description
+    teams_event = {
+        'description': 'Meeting link: https://teams.microsoft.com/l/meetup-join/19:meeting_abc123'
+    }
+    
+    result = extract_video_call_link(teams_event)
+    assert result is not None
+    assert result['platform'] == 'Microsoft Teams'
+    assert 'teams.microsoft.com' in result['url']
+    
+    # Test event with no video link
+    regular_event = {
+        'description': 'This is a regular meeting with no video call.'
+    }
+    
+    result = extract_video_call_link(regular_event)
+    assert result is None
+    
+    # Test event with no description
+    empty_event = {}
+    
+    result = extract_video_call_link(empty_event)
+    assert result is None
+
+
+def test_url_obfuscation():
+    """Test URL obfuscation to prevent Telegram link embedding."""
+    from larrybot.utils.ux_helpers import MessageFormatter
+    
+    # Test basic URL obfuscation
+    test_url = "https://meet.google.com/abc-defg-hij"
+    obfuscated = MessageFormatter.obfuscate_url(test_url)
+    
+    # Should contain zero-width characters
+    assert '\u200b' in obfuscated
+    
+    # Should be visually identical when displayed
+    # (zero-width characters are invisible)
+    assert len(obfuscated) > len(test_url)
+    
+    # Should still contain the original URL characters
+    for char in test_url:
+        assert char in obfuscated
+    
+    # Test empty URL
+    assert MessageFormatter.obfuscate_url("") == ""
+    assert MessageFormatter.obfuscate_url(None) == None
+    
+    # Test various URL formats
+    urls_to_test = [
+        "https://zoom.us/j/123456789",
+        "https://teams.microsoft.com/l/meetup-join/19:meeting_abc123",
+        "https://webex.com/meeting/123456",
+        "https://discord.gg/abc123"
+    ]
+    
+    for url in urls_to_test:
+        obfuscated = MessageFormatter.obfuscate_url(url)
+        assert '\u200b' in obfuscated
+        assert len(obfuscated) > len(url)
+        # All original characters should be present
+        for char in url:
+            assert char in obfuscated 

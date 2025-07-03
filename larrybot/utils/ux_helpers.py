@@ -686,6 +686,28 @@ class MessageFormatter:
         return text
     
     @staticmethod
+    def obfuscate_url(url: str) -> str:
+        """
+        Obfuscate URL to prevent Telegram link embedding.
+        
+        Inserts zero-width Unicode characters between URL characters to break
+        Telegram's automatic URL detection while keeping the URL visually identical
+        and copyable.
+        
+        Args:
+            url: URL to obfuscate
+            
+        Returns:
+            Obfuscated URL string
+        """
+        if not url:
+            return url
+        
+        # Insert zero-width space character between each character
+        # This breaks Telegram's URL detection but keeps it visually identical
+        return '\u200b'.join(url)
+    
+    @staticmethod
     def format_task_list(tasks: list, title: str = "Tasks") -> str:
         """
         Format a list of tasks with rich formatting.
