@@ -1485,13 +1485,89 @@ class TelegramBotHandler:
             return
         
         user_info = self.config.get_single_user_info()
-        await update.message.reply_text(
-            f"🎉 **Welcome to LarryBot2!**\n\n"
-            f"✅ **Authorized User**: {user_info['authorized_user_id']}\n"
-            f"🤖 **Bot Status**: {'Connected' if user_info['bot_token_configured'] else 'Not Configured'}\n"
-            f"📊 **Rate Limit**: {user_info['rate_limit_per_minute']} commands/minute\n\n"
-            f"Use `/help` to see available commands."
+        
+        # Get user's first name from Telegram
+        user_first_name = update.effective_user.first_name if update.effective_user.first_name else "there"
+        
+        welcome_message = (
+            f"🎉 **Welcome, {user_first_name}!**\n\n"
+            
+            f"🎯 **What I Can Do For You:**\n\n"
+            f"📋 **Task Management**\n"
+            f"• Create tasks with natural language: `/add \"Call client tomorrow at 2pm\"`\n"
+            f"• Set priorities, due dates, and categories\n"
+            f"• Track time spent on tasks\n"
+            f"• Bulk operations for efficiency\n\n"
+            
+            f"📅 **Smart Scheduling**\n"
+            f"• Google Calendar integration\n"
+            f"• Intelligent reminders and notifications\n"
+            f"• Time zone awareness\n"
+            f"• Agenda management\n\n"
+            
+            f"📈 **Productivity Insights**\n"
+            f"• Analytics and progress tracking\n"
+            f"• Performance monitoring\n"
+            f"• Productivity reports\n"
+            f"• Smart task suggestions\n\n"
+            
+            f"🔄 **Habit Building**\n"
+            f"• Track daily habits\n"
+            f"• Streak monitoring\n"
+            f"• Progress visualization\n"
+            f"• Habit analytics\n\n"
+            
+            f"👥 **Client Management**\n"
+            f"• Organize tasks by client\n"
+            f"• Client-specific analytics\n"
+            f"• Project tracking\n"
+            f"• Time allocation insights\n\n"
+            
+            f"🎮 **Quick Start Commands:**\n"
+            f"• `/add \"Your first task\"` - Create a task\n"
+            f"• `/list` - View all tasks\n"
+            f"• `/today` - See today's agenda\n"
+            f"• `/analytics` - View productivity insights\n"
+            f"• `/help` - Full command reference\n\n"
+            
+            f"💡 **Pro Tips:**\n"
+            f"• Use natural language for task creation\n"
+            f"• Try `/suggest` for intelligent task recommendations\n"
+            f"• Use `/bulk_operations` for managing multiple tasks\n"
+            f"• Check `/health` for system status\n\n"
+            
+            f"🔧 **Need Help?**\n"
+            f"• `/help` - Complete command reference\n"
+            f"• `/health` - System status and diagnostics\n"
+            f"• `/examples` - See usage examples\n\n"
+            
+            f"🌟 **Ready to boost your productivity?** Use the buttons below to get started!"
         )
+        
+        # Create action buttons using confirmed working callback handlers
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        
+        keyboard = [
+            [
+                InlineKeyboardButton("➕ Add Task", callback_data="add_task"),
+                InlineKeyboardButton("📋 View Tasks", callback_data="menu_tasks"),
+                InlineKeyboardButton("🔄 Refresh Tasks", callback_data="tasks_refresh")
+            ],
+            [
+                InlineKeyboardButton("🔄 Habits", callback_data="menu_habits"),
+                InlineKeyboardButton("👥 Clients", callback_data="menu_clients"),
+                InlineKeyboardButton("📅 Today's Calendar", callback_data="calendar_today")
+            ],
+            [
+                InlineKeyboardButton("📊 Analytics", callback_data="menu_analytics"),
+                InlineKeyboardButton("⏰ Reminders", callback_data="menu_reminders"),
+                InlineKeyboardButton("🏠 Main Menu", callback_data="nav_main")
+            ]
+        ]
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(welcome_message, parse_mode='Markdown', reply_markup=reply_markup)
 
     async def _help(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not self._is_authorized(update):

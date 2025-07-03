@@ -65,14 +65,17 @@ class TestTelegramBotHandler:
         mock_update = MagicMock()
         mock_update.effective_user = MagicMock()
         mock_update.effective_user.id = 123456789
+        mock_update.effective_user.first_name = "John"
         mock_update.message.reply_text = AsyncMock()
         mock_context = MagicMock()
         await handler._start(mock_update, mock_context)
-        # Check that the new welcome message was sent
+        # Check that the new welcome message was sent with buttons
         args, kwargs = mock_update.message.reply_text.call_args
-        assert "Welcome to LarryBot2" in args[0]
-        assert "Authorized User" in args[0]
-        assert "Rate Limit" in args[0]
+        assert "Welcome," in args[0]
+        assert "What I Can Do For You" in args[0]
+        assert "Task Management" in args[0]
+        assert "reply_markup" in kwargs
+        assert kwargs["reply_markup"] is not None
 
     async def test_start_command_unauthorized(self, command_registry):
         """Test /start command with unauthorized user."""
