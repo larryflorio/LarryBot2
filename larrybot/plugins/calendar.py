@@ -319,12 +319,8 @@ async def agenda_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     message += f"   📝 {MessageFormatter.escape_markdown(desc_preview)}\n"
                 message += "\n"
             
-            # Create navigation keyboard
-            keyboard = KeyboardBuilder.build_calendar_keyboard()
-            
             await update.message.reply_text(
                 message,
-                reply_markup=keyboard,
                 parse_mode='MarkdownV2'
             )
             
@@ -907,11 +903,8 @@ async def calendar_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             message = f"📅 **Calendar Overview**{account_info} \\({days} days\\)\n\n"
             message += "Calendar integration is working\\! More features coming soon\\."
             
-            keyboard = KeyboardBuilder.build_calendar_keyboard()
-            
             await update.message.reply_text(
                 message,
-                reply_markup=keyboard,
                 parse_mode='MarkdownV2'
             )
             
