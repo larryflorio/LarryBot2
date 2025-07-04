@@ -3005,9 +3005,20 @@ class TelegramBotHandler:
                     if last_completed != today:
                         habits_due.append(habit)
             
-            # Fetch events (stub: replace with real calendar integration)
-            events = []  # TODO: Integrate with calendar plugin
-            # Example: events = [("11:30 AM", "Operation Save Fishy", "1h")]
+            # Fetch calendar events
+            from larrybot.services.calendar_service import CalendarService
+            calendar_service = CalendarService()
+            calendar_events = await calendar_service.get_todays_events()
+            
+            # Format calendar events for display
+            events = []
+            for event in calendar_events:
+                formatted_event = calendar_service.format_event_for_daily_report(event)
+                events.append((
+                    formatted_event["time"],
+                    formatted_event["name"],
+                    formatted_event["duration"]
+                ))
             
             # Motivational quotes
             quotes = [
@@ -3023,12 +3034,12 @@ class TelegramBotHandler:
             lines = []
             lines.append(f"🗓️ **Daily Report – {today.strftime('%A, %b %d')}**\n")
             # Events
-            lines.append("**Today's Events:**")
+            lines.append("📅 **Today's Calendar Events:**")
             if events:
                 for time, name, duration in events:
-                    lines.append(f"- {time} — {name} (**{duration}**)")
+                    lines.append(f"- {time} — {name}{duration}")
             else:
-                lines.append("- _No events scheduled._")
+                lines.append("- _No calendar events scheduled._")
             lines.append("")
             # Overdue tasks
             lines.append("🚨 **Overdue Tasks:**")
