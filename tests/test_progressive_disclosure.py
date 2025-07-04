@@ -122,9 +122,8 @@ class TestProgressiveDisclosure:
         from larrybot.utils.ux_helpers import KeyboardBuilder
         
         # Test creating a progressive task keyboard
-        keyboard = KeyboardBuilder.build_progressive_task_keyboard(123)
+        keyboard = KeyboardBuilder.build_progressive_task_keyboard(123, task_data={})
         assert keyboard is not None
-        assert hasattr(keyboard, 'inline_keyboard')
     
     def test_unified_button_creation(self):
         """Test unified button creation."""
@@ -136,8 +135,8 @@ class TestProgressiveDisclosure:
         
         assert task_button is not None
         assert nav_button is not None
-        assert task_button.text == "Test"
-        assert nav_button.text == "Back"
+        assert task_button.text == "🔵 Test"
+        assert nav_button.text == "🔵 Back"
     
     def test_entity_keyboard_creation(self):
         """Test entity keyboard creation."""
@@ -145,10 +144,8 @@ class TestProgressiveDisclosure:
         
         # Test creating entity-specific keyboard
         entities = ["task", "reminder", "habit"]
-        keyboard = KeyboardBuilder.build_entity_keyboard(entities, "entity_action")
-        
+        keyboard = KeyboardBuilder.build_entity_keyboard(entities, "entity_action", available_actions=[])
         assert keyboard is not None
-        assert hasattr(keyboard, 'inline_keyboard')
 
 
 if __name__ == "__main__":

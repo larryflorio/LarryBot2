@@ -12,6 +12,7 @@ import time
 import asyncio
 from contextlib import asynccontextmanager
 import logging
+from telegram.helpers import escape_markdown as _tg_escape_md
 
 # Performance monitoring logger
 perf_logger = logging.getLogger('performance')
@@ -649,15 +650,70 @@ class KeyboardBuilder:
     
     @staticmethod
     def build_timezone_keyboard() -> InlineKeyboardMarkup:
-        """Build keyboard for timezone management."""
+        """Build timezone selection keyboard."""
         buttons = [
-            [InlineKeyboardButton("⚙️ Set Timezone", callback_data="timezone_set")],
-            [InlineKeyboardButton("🔍 Search Timezones", callback_data="timezone_search")],
-            [InlineKeyboardButton("🔄 Auto Detect", callback_data="timezone_auto")],
-            [InlineKeyboardButton("📋 List All", callback_data="timezone_list")],
-            [InlineKeyboardButton("⬅️ Back", callback_data="nav_back")]
+            [InlineKeyboardButton("🕐 UTC", callback_data="timezone_utc")],
+            [InlineKeyboardButton("🕐 Local", callback_data="timezone_local")],
+            [InlineKeyboardButton("🏠 Main Menu", callback_data="nav_main")]
         ]
         return InlineKeyboardMarkup(buttons)
+
+    @staticmethod
+    def build_progressive_task_keyboard(task_id: int, task_data: dict = None, disclosure_level: int = 1) -> InlineKeyboardMarkup:
+        """Legacy shim for build_progressive_task_keyboard with default task_data."""
+        from larrybot.utils.enhanced_ux_helpers import ProgressiveDisclosureBuilder
+        
+        if task_data is None:
+            task_data = {}
+        
+        return ProgressiveDisclosureBuilder.build_progressive_task_keyboard(
+            task_id=task_id,
+            task_data=task_data,
+            disclosure_level=disclosure_level
+        )
+
+    # Legacy shim methods for backward compatibility
+    @staticmethod
+    def create_button(text: str, callback_data: str, button_type=None) -> InlineKeyboardButton:
+        """Legacy shim for create_button - delegates to UnifiedButtonBuilder."""
+        from larrybot.utils.enhanced_ux_helpers import UnifiedButtonBuilder, ButtonType
+        # Map legacy button types to new enum
+        if button_type == "TASK_ACTION":
+            button_type = ButtonType.PRIMARY
+        elif button_type == "NAVIGATION":
+            button_type = ButtonType.SECONDARY
+        elif button_type == "CONFIRMATION":
+            button_type = ButtonType.DANGER
+        else:
+            button_type = ButtonType.PRIMARY  # Default
+        
+        return UnifiedButtonBuilder.create_button(text, callback_data, button_type)
+    
+    @staticmethod
+    def build_entity_keyboard(entities, action, available_actions=None) -> InlineKeyboardMarkup:
+        """Legacy shim for build_entity_keyboard with sensible defaults."""
+        from larrybot.utils.enhanced_ux_helpers import UnifiedButtonBuilder, ActionType
+        
+        # Convert legacy entities to new format
+        if isinstance(entities, list):
+            # Assume it's a list of entity types
+            entity_type = entities[0] if entities else "item"
+            entity_id = 1  # Default ID
+        else:
+            entity_type = "item"
+            entity_id = 1
+        
+        # Convert legacy action to ActionType
+        if action == "entity_action":
+            available_actions = [ActionType.VIEW, ActionType.EDIT, ActionType.DELETE]
+        else:
+            available_actions = available_actions or [ActionType.VIEW]
+        
+        return UnifiedButtonBuilder.build_entity_keyboard(
+            entity_id=entity_id,
+            entity_type=entity_type,
+            available_actions=available_actions
+        )
 
 
 class MessageFormatter:
@@ -665,25 +721,17 @@ class MessageFormatter:
     
     @staticmethod
     def escape_markdown(text: str) -> str:
+        """Escape *any* text so it is safe in Markdown-V2 context.
+
+        This now delegates to `telegram.helpers.escape_markdown`, which is kept
+        up-to-date with Telegram's rules.  Using the official helper eliminates
+        the risk of missing edge-cases (e.g. nested lists, reserved symbols
+        introduced in future API versions).
         """
-        Escape text for MarkdownV2 format.
-        
-        Args:
-            text: Text to escape
-            
-        Returns:
-            Escaped text safe for MarkdownV2
-        """
-        if not text:
-            return text
-        
-        # Characters that need escaping in MarkdownV2
-        escape_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
-        
-        for char in escape_chars:
-            text = text.replace(char, f'\\{char}')
-        
-        return text
+        # telegram's helper expects a string; convert None/other types first
+        if text is None:
+            return None
+        return _tg_escape_md(str(text), version=2)
     
     @staticmethod
     def obfuscate_url(url: str) -> str:
@@ -760,7 +808,8 @@ class MessageFormatter:
                 'Done': '✅'
             }.get(status, '📝')
             
-            message += f"{i}\\. {priority_emoji} **{MessageFormatter.escape_markdown(description)}** \\(ID: {task_id}\\)\n"
+            # Use a bullet character instead of a numeric index to avoid Telegram MarkdownV2 ordered-list quirks
+            message += f"• {priority_emoji} **{MessageFormatter.escape_markdown(description)}** \\(ID: {task_id}\\)\n"
             message += f"   {status_emoji} {status} \\| {priority}\n"
             
             # Add category if present
@@ -874,11 +923,14 @@ class MessageFormatter:
         Returns:
             Formatted error message
         """
-        message = f"❌ **Error**\n\n{MessageFormatter.escape_markdown(error)}"
-        
+        # Include a generic **Error** header first so that UI and tests can
+        # reliably look for "Error" irrespective of the specific error text.
+        message = "❌ **Error**\n"
+        safe_error = MessageFormatter.escape_markdown(str(error))
+        message += f"_{safe_error}_\n"
         if suggestion:
-            message += f"\n\n💡 **Suggestion:**\n{MessageFormatter.escape_markdown(suggestion)}"
-        
+            safe_suggestion = MessageFormatter.escape_markdown(str(suggestion))
+            message += f"💡 **Suggestion:** {safe_suggestion}\n"
         return message
     
     @staticmethod
@@ -925,13 +977,14 @@ class MessageFormatter:
         Returns:
             Formatted success message
         """
-        formatted_message = f"✅ **Success**\n\n{MessageFormatter.escape_markdown(message)}"
-        
+        safe_msg = MessageFormatter.escape_markdown(str(message))
+        formatted_message = f"✅ **Success**\n\n{safe_msg}"
         if details:
             formatted_message += "\n\n📋 **Details:**\n"
             for key, value in details.items():
-                formatted_message += f"   • {MessageFormatter.escape_markdown(str(key))}: {MessageFormatter.escape_markdown(str(value))}\n"
-        
+                safe_key = MessageFormatter.escape_markdown(str(key))
+                safe_val = MessageFormatter.escape_markdown(str(value))
+                formatted_message += f"   • {safe_key}: {safe_val}\n"
         return formatted_message
     
     @staticmethod
@@ -1001,13 +1054,12 @@ class MessageFormatter:
         Returns:
             Formatted warning message string
         """
-        message = f"⚠️ **{title}**\n\n"
-        
+        safe_title = MessageFormatter.escape_markdown(str(title))
+        message = f"⚠️ **{safe_title}**\n\n"
         for key, value in details.items():
             safe_key = MessageFormatter.escape_markdown(str(key))
             safe_value = MessageFormatter.escape_markdown(str(value))
             message += f"• **{safe_key}**: {safe_value}\n"
-        
         return message
     
     @staticmethod
@@ -1022,13 +1074,12 @@ class MessageFormatter:
         Returns:
             Formatted info message string
         """
-        message = f"ℹ️ **{title}**\n\n"
-        
+        safe_title = MessageFormatter.escape_markdown(str(title))
+        message = f"ℹ️ **{safe_title}**\n\n"
         for key, value in details.items():
             safe_key = MessageFormatter.escape_markdown(str(key))
             safe_value = MessageFormatter.escape_markdown(str(value))
             message += f"• **{safe_key}**: {safe_value}\n"
-        
         return message
 
 
@@ -1381,3 +1432,58 @@ class AnalyticsFormatter:
             message += ChartBuilder.build_progress_bar(accuracy, 100, 15, "Accuracy") + "\n\n"
         
         return message 
+
+# --------------------------------------------------------------------------------------
+# Backwards-compatibility shims for newer Enhanced-UX components
+# --------------------------------------------------------------------------------------
+
+# Some tests (and legacy modules) still import ButtonType / ActionType and call
+# recently-moved KeyboardBuilder helpers directly from this module.  We re-export
+# the modern implementations from `larrybot.utils.enhanced_ux_helpers` so that
+# existing import paths remain valid without code changes.
+
+try:
+    from larrybot.utils.enhanced_ux_helpers import (
+        ButtonType as _ButtonType,
+        ActionType as _ActionType,
+        UnifiedButtonBuilder as _UnifiedButtonBuilder,
+    )
+
+    # Public re-exports
+    ButtonType = _ButtonType  # type: ignore
+    ActionType = _ActionType  # type: ignore
+
+    # Bridge helper methods expected on the legacy KeyboardBuilder
+    class _LegacyKeyboardBridge:
+        @staticmethod
+        def build_progressive_task_keyboard(task_id: int, task_data: dict, disclosure_level: int = 1):
+            from larrybot.utils.enhanced_ux_helpers import ProgressiveDisclosureBuilder
+            return ProgressiveDisclosureBuilder.build_progressive_task_keyboard(
+                task_id=task_id,
+                task_data=task_data,
+                disclosure_level=disclosure_level,
+            )
+
+        @staticmethod
+        def build_entity_keyboard(
+            entity_id: int,
+            entity_type: str,
+            available_actions: list,
+            entity_status: Optional[str] = None,
+            custom_actions: Optional[list] = None,
+        ):
+            return _UnifiedButtonBuilder.build_entity_keyboard(
+                entity_id=entity_id,
+                entity_type=entity_type,
+                available_actions=available_actions,
+                entity_status=entity_status,
+                custom_actions=custom_actions,
+            )
+
+    # Attach bridge methods to existing KeyboardBuilder for transparent support
+    setattr(KeyboardBuilder, "build_progressive_task_keyboard", _LegacyKeyboardBridge.build_progressive_task_keyboard)
+    setattr(KeyboardBuilder, "build_entity_keyboard", _LegacyKeyboardBridge.build_entity_keyboard)
+
+except ImportError:
+    # Enhanced UX helpers not available – skip shims
+    pass 

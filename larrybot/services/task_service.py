@@ -4,9 +4,11 @@ from larrybot.services.base_service import BaseService
 from larrybot.storage.task_repository import TaskRepository
 from larrybot.models.task import Task
 from larrybot.models.task_comment import TaskComment
+from larrybot.storage.client_repository import ClientRepository
+from larrybot.storage.db import get_session
 import json
 import re
-from larrybot.utils.datetime_utils import get_utc_now
+from larrybot.utils.datetime_utils import get_utc_now, ensure_timezone_aware
 
 class TaskService(BaseService):
     """
@@ -30,7 +32,8 @@ class TaskService(BaseService):
         category: Optional[str] = None,
         estimated_hours: Optional[float] = None,
         tags: Optional[List[str]] = None,
-        parent_id: Optional[int] = None
+        parent_id: Optional[int] = None,
+        client_id: Optional[int] = None
     ) -> Dict[str, Any]:
         """Create task with advanced metadata."""
         try:
@@ -39,7 +42,7 @@ class TaskService(BaseService):
                 return self._handle_error(ValueError(f"Invalid priority: {priority}"))
             
             # Validate due date
-            if due_date and due_date < get_utc_now():
+            if due_date and ensure_timezone_aware(due_date) < get_utc_now():
                 return self._handle_error(ValueError("Due date cannot be in the past"))
             
             # Validate parent task exists
@@ -48,6 +51,14 @@ class TaskService(BaseService):
                 if not parent:
                     return self._handle_error(ValueError(f"Parent task {parent_id} not found"))
             
+            # Validate client exists if provided
+            if client_id:
+                with next(get_session()) as session:
+                    client_repo = ClientRepository(session)
+                    client = client_repo.get_client_by_id(client_id)
+                    if not client:
+                        return self._handle_error(ValueError(f"Client {client_id} not found"))
+            
             task = self.task_repository.add_task_with_metadata(
                 description=description,
                 priority=priority,
@@ -55,7 +66,8 @@ class TaskService(BaseService):
                 category=category,
                 estimated_hours=estimated_hours,
                 tags=tags,
-                parent_id=parent_id
+                parent_id=parent_id,
+                client_id=client_id
             )
             
             return self._create_success_response(
@@ -121,7 +133,7 @@ class TaskService(BaseService):
     async def update_task_due_date(self, task_id: int, due_date: datetime) -> Dict[str, Any]:
         """Update task due date."""
         try:
-            if due_date < get_utc_now():
+            if ensure_timezone_aware(due_date) < get_utc_now():
                 return self._handle_error(ValueError("Due date cannot be in the past"))
             
             task = self.task_repository.update_due_date(task_id, due_date)

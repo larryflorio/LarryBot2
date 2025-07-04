@@ -1480,7 +1480,7 @@ async def time_summary_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         
         if result['success']:
             summary = result['data']
-            msg = f"⏱️ Time Summary for Task #{task_id}\n\n"
+            msg = f"⏱️ Time Summary for Task \\#{task_id}\n\n"
             msg += f"📋 Task: {summary['task_description']}\n\n"
             msg += f"⏰ Estimated Hours: {summary['estimated_hours']:.2f}\n"
             msg += f"⏰ Actual Hours: {summary['actual_hours']:.2f}\n"

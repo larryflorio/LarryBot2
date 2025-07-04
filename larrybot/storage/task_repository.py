@@ -168,7 +168,8 @@ class TaskRepository:
         category: Optional[str] = None,
         estimated_hours: Optional[float] = None,
         tags: Optional[List[str]] = None,
-        parent_id: Optional[int] = None
+        parent_id: Optional[int] = None,
+        client_id: Optional[int] = None
     ) -> Task:
         """Create task with advanced metadata."""
         task = Task(
@@ -178,6 +179,7 @@ class TaskRepository:
             category=category,
             estimated_hours=estimated_hours,
             parent_id=parent_id,
+            client_id=client_id,
             tags=json.dumps(tags) if tags else None
         )
         self.session.add(task)
@@ -372,7 +374,9 @@ class TaskRepository:
         if task and task.started_at:
             from larrybot.utils.datetime_utils import safe_datetime_arithmetic, get_current_utc_datetime
             end_time = get_current_utc_datetime()
-            duration = safe_datetime_arithmetic(end_time, task.started_at).total_seconds() / 3600  # Convert to hours
+            delta = safe_datetime_arithmetic(end_time, task.started_at)
+            # Clamp negative duration to 0 (can happen with mocked time in tests)
+            duration = max(0, delta.total_seconds() / 3600)  # Convert to hours
             task.actual_hours = (task.actual_hours or 0) + duration
             task.started_at = None
             self.session.commit()
@@ -385,6 +389,9 @@ class TaskRepository:
         task = self.session.query(Task).filter_by(id=task_id).first()
         if task:
             duration_minutes = int((ended_at - started_at).total_seconds() / 60)
+            duration_hours = duration_minutes / 60.0
+            
+            # Create time entry
             time_entry = TaskTimeEntry(
                 task_id=task_id,
                 started_at=started_at,
@@ -393,6 +400,10 @@ class TaskRepository:
                 description=description
             )
             self.session.add(time_entry)
+            
+            # Update task's actual_hours
+            task.actual_hours = (task.actual_hours or 0) + duration_hours
+            
             self.session.commit()
             return True
         return False

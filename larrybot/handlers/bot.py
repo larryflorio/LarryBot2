@@ -17,7 +17,7 @@ from larrybot.core.dependency_injection import ServiceLocator
 from larrybot.nlp.intent_recognizer import IntentRecognizer
 from larrybot.nlp.entity_extractor import EntityExtractor
 from larrybot.nlp.sentiment_analyzer import SentimentAnalyzer
-from larrybot.nlp.enhanced_narrative_processor import EnhancedNarrativeProcessor
+from larrybot.nlp.enhanced_narrative_processor import EnhancedNarrativeProcessor, TaskCreationState, ContextType
 from larrybot.utils.datetime_utils import get_current_datetime
 from larrybot.utils.enhanced_ux_helpers import escape_markdown_v2
 import random
@@ -26,6 +26,8 @@ from larrybot.services.task_service import TaskService
 from larrybot.storage.db import get_session
 from larrybot.storage.habit_repository import HabitRepository
 from larrybot.utils.datetime_utils import get_current_datetime
+from larrybot.utils.datetime_utils import ensure_timezone_aware
+from larrybot.utils.telegram_safe import safe_edit
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -98,14 +100,15 @@ class TelegramBotHandler:
         self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self._handle_text_message))
         
         # Dynamically add handlers for all registered commands (except /start and /help)
-        for command, handler in self.command_registry._commands.items():
-            if command in ("/start", "/help"):
-                continue
-            # If the handler is a bound method of this instance, register it directly
-            if hasattr(handler, "__self__") and handler.__self__ is self:
-                self.application.add_handler(CommandHandler(command.lstrip("/"), handler))
-            else:
-                self.application.add_handler(CommandHandler(command.lstrip("/"), self._dispatch_command))
+        if hasattr(self.command_registry, '_commands') and isinstance(self.command_registry._commands, dict):
+            for command, handler in self.command_registry._commands.items():
+                if command in ("/start", "/help"):
+                    continue
+                # If the handler is a bound method of this instance, register it directly
+                if hasattr(handler, "__self__") and handler.__self__ is self:
+                    self.application.add_handler(CommandHandler(command.lstrip("/"), handler))
+                else:
+                    self.application.add_handler(CommandHandler(command.lstrip("/"), self._dispatch_command))
 
     def _register_core_commands(self) -> None:
         """Register core commands with the command registry."""
@@ -157,7 +160,7 @@ class TelegramBotHandler:
         # Validate authorization
         if not self._is_authorized(update):
             try:
-                await query.edit_message_text(
+                await safe_edit(query.edit_message_text, 
                     MessageFormatter.format_error_message(
                         "Unauthorized access",
                         "Only the configured user can use this bot."
@@ -175,7 +178,7 @@ class TelegramBotHandler:
         except asyncio.TimeoutError:
             logger.error(f"Callback query timeout for action: {query.data}")
             try:
-                await query.edit_message_text(
+                await safe_edit(query.edit_message_text, 
                     MessageFormatter.format_error_message(
                         "⏱️ Action timed out",
                         "Please try again\\. If the issue persists, try using text commands\\."
@@ -187,7 +190,7 @@ class TelegramBotHandler:
         except Exception as e:
             logger.error(f"Error handling callback query: {e}")
             try:
-                await query.edit_message_text(
+                await safe_edit(query.edit_message_text, 
                     MessageFormatter.format_error_message(
                         "❌ An error occurred",
                         "Please try again or use a command instead\\."
@@ -239,9 +242,11 @@ class TelegramBotHandler:
             await self._handle_filter_callback(query, context)
         elif callback_data == "add_task":
             await self._handle_add_task(query, context)
+        elif callback_data.startswith("addtask_step:"):
+            await self._handle_narrative_task_callback(query, context)
         else:
             # Unknown callback data
-            await query.edit_message_text(
+            await safe_edit(query.edit_message_text, 
                 MessageFormatter.format_error_message(
                     "Unknown action",
                     "This button action is not implemented yet."
@@ -253,7 +258,7 @@ class TelegramBotHandler:
         """Handle task-related callback queries."""
         callback_data = query.data
         
-        if callback_data.startswith("task_done:"):
+        if callback_data.startswith("task_done:") or callback_data.startswith("task_complete:"):
             task_id = int(callback_data.split(":")[1])
             await self._handle_task_done(query, context, task_id)
         elif callback_data.startswith("task_edit:"):
@@ -375,7 +380,7 @@ class TelegramBotHandler:
         """Show task management menu."""
         from larrybot.utils.ux_helpers import NavigationHelper
         
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             "📋 **Task Management**\n\nSelect an option:",
             reply_markup=NavigationHelper.get_task_menu_keyboard(),
             parse_mode='MarkdownV2'
@@ -383,28 +388,28 @@ class TelegramBotHandler:
 
     async def _show_client_menu(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Show client management menu."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             "👥 **Client Management**\n\nUse commands:\n• /allclients - List all clients\n• /addclient - Add new client\n• /client - View client details",
             parse_mode='MarkdownV2'
         )
 
     async def _show_habit_menu(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Show habit management menu."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             "🔄 **Habit Management**\n\nUse commands:\n• /habit_list - List all habits\n• /habit_add - Add new habit\n• /habit_done - Mark habit complete",
             parse_mode='MarkdownV2'
         )
 
     async def _show_reminder_menu(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Show reminder management menu."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             "⏰ **Reminder Management**\n\nUse commands:\n• /reminders - List all reminders\n• /addreminder - Add new reminder\n• /delreminder - Delete reminder",
             parse_mode='MarkdownV2'
         )
 
     async def _show_analytics_menu(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Show analytics menu."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             "📊 **Analytics**\n\nUse commands:\n• /analytics - Task analytics\n• /clientanalytics - Client analytics\n• /productivity_report - Detailed report",
             parse_mode='MarkdownV2'
         )
@@ -425,7 +430,7 @@ class TelegramBotHandler:
             [InlineKeyboardButton("🔙 Back", callback_data="bulk_operations_back")]
         ])
         
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             "📋 **Bulk Status Update**\n\nSelect the new status for your tasks:",
             reply_markup=keyboard,
             parse_mode='MarkdownV2'
@@ -445,7 +450,7 @@ class TelegramBotHandler:
             [InlineKeyboardButton("🔙 Back", callback_data="bulk_operations_back")]
         ])
         
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             "🎯 **Bulk Priority Update**\n\nSelect the new priority for your tasks:",
             reply_markup=keyboard,
             parse_mode='MarkdownV2'
@@ -453,28 +458,28 @@ class TelegramBotHandler:
 
     async def _show_bulk_assign_menu(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Show bulk assign menu."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             "👥 **Bulk Assignment**\n\nUse the command:\n`/bulk_assign <task_ids> <client_name>`\n\nExample: `/bulk_assign 1,2,3 John Doe`",
             parse_mode='MarkdownV2'
         )
 
     async def _show_bulk_delete_menu(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Show bulk delete menu."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             "🗑️ **Bulk Delete**\n\nUse the command:\n`/bulk_delete <task_ids> [confirm]`\n\nExample: `/bulk_delete 1,2,3 confirm`",
             parse_mode='MarkdownV2'
         )
 
     async def _show_bulk_preview(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Show bulk operations preview."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             "📊 **Bulk Operations Preview**\n\nThis feature will show a preview of tasks before applying bulk operations.",
             parse_mode='MarkdownV2'
         )
 
     async def _save_bulk_selection(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Save bulk selection."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             "💾 **Bulk Selection Saved**\n\nYour task selection has been saved for bulk operations.",
             parse_mode='MarkdownV2'
         )
@@ -488,7 +493,7 @@ class TelegramBotHandler:
             result = await task_service.bulk_delete_tasks([int(id.strip()) for id in task_ids.split(',')])
             
             if result['success']:
-                await query.edit_message_text(
+                await safe_edit(query.edit_message_text, 
                     MessageFormatter.format_success_message(
                         "🗑️ Bulk Delete Complete!",
                         {
@@ -499,7 +504,7 @@ class TelegramBotHandler:
                     parse_mode='MarkdownV2'
                 )
             else:
-                await query.edit_message_text(
+                await safe_edit(query.edit_message_text, 
                     MessageFormatter.format_error_message(
                         result['message'],
                         "Please check the task IDs and try again."
@@ -507,7 +512,7 @@ class TelegramBotHandler:
                     parse_mode='MarkdownV2'
                 )
         except Exception as e:
-            await query.edit_message_text(
+            await safe_edit(query.edit_message_text, 
                 MessageFormatter.format_error_message(
                     "Error during bulk delete",
                     str(e)
@@ -517,7 +522,7 @@ class TelegramBotHandler:
 
     async def _cancel_bulk_delete(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Cancel bulk delete operation."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             "❌ **Bulk Delete Cancelled**\n\nNo tasks were deleted.",
             parse_mode='MarkdownV2'
         )
@@ -525,7 +530,7 @@ class TelegramBotHandler:
     async def _handle_navigation_back(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle back navigation."""
         # For now, just show a simple message
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             "⬅️ **Back Navigation**\n\nUse commands or the main menu to navigate.",
             parse_mode='MarkdownV2'
         )
@@ -534,7 +539,7 @@ class TelegramBotHandler:
         """Handle main menu navigation."""
         from larrybot.utils.ux_helpers import NavigationHelper
         
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             "🏠 **Main Menu**\n\nSelect an option:",
             reply_markup=NavigationHelper.get_main_menu_keyboard(),
             parse_mode='MarkdownV2'
@@ -542,7 +547,7 @@ class TelegramBotHandler:
 
     async def _handle_cancel_action(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle action cancellation."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             "❌ **Action Cancelled**\n\nNo changes were made.",
             parse_mode='MarkdownV2'
         )
@@ -551,7 +556,7 @@ class TelegramBotHandler:
         """Handle task completion via callback with timeout protection and loading indicator."""
         try:
             # Show immediate loading feedback
-            await query.edit_message_text(
+            await safe_edit(query.edit_message_text, 
                 "✅ **Completing Task...**\n\n"
                 f"Marking task {task_id} as complete...",
                 parse_mode='Markdown'
@@ -564,7 +569,7 @@ class TelegramBotHandler:
             )
         
         except asyncio.TimeoutError:
-            await query.edit_message_text(
+            await safe_edit(query.edit_message_text, 
                 MessageFormatter.format_error_message(
                     "⏱️ Operation Timeout",
                     "Task completion took too long. Please check if it was completed and try again if needed."
@@ -573,7 +578,7 @@ class TelegramBotHandler:
             )
         except Exception as e:
             logger.error(f"Error completing task {task_id}: {e}")
-            await query.edit_message_text(
+            await safe_edit(query.edit_message_text, 
                 MessageFormatter.format_error_message(
                     "🚫 Completion Error",
                     f"Failed to complete task: {str(e)}\n\n"
@@ -593,7 +598,7 @@ class TelegramBotHandler:
             task = repo.get_task_by_id(task_id)
             
             if not task:
-                await query.edit_message_text(
+                await safe_edit(query.edit_message_text, 
                     MessageFormatter.format_error_message(
                         f"Task ID {task_id} not found",
                         "This task may have been deleted or the ID is invalid."
@@ -603,7 +608,7 @@ class TelegramBotHandler:
                 return
             
             if task.done:
-                await query.edit_message_text(
+                await safe_edit(query.edit_message_text, 
                     MessageFormatter.format_info_message(
                         "✅ Already Complete",
                         f"Task '{task.description}' is already marked as done!"
@@ -700,13 +705,13 @@ class TelegramBotHandler:
                     custom_actions=custom_actions
                 )
                 
-                await query.edit_message_text(
+                await safe_edit(query.edit_message_text, 
                     success_message,
                     reply_markup=keyboard,
                     parse_mode='MarkdownV2'
                 )
             else:
-                await query.edit_message_text(
+                await safe_edit(query.edit_message_text, 
                     MessageFormatter.format_error_message(
                         "❌ Completion Failed",
                         "Unable to mark the task as complete. Please try again."
@@ -726,7 +731,7 @@ class TelegramBotHandler:
                 task = repo.get_task_by_id(task_id)
                 
                 if not task:
-                    await query.edit_message_text(
+                    await safe_edit(query.edit_message_text, 
                         MessageFormatter.format_error_message(
                             f"Task ID {task_id} not found",
                             "The task may have already been deleted or doesn't exist."
@@ -736,7 +741,7 @@ class TelegramBotHandler:
                     return
                 
                 if task.done:
-                    await query.edit_message_text(
+                    await safe_edit(query.edit_message_text, 
                         MessageFormatter.format_error_message(
                             "Cannot edit completed task",
                             "Completed tasks cannot be edited. Use /edit command to unmark and edit."
@@ -753,7 +758,7 @@ class TelegramBotHandler:
                     [InlineKeyboardButton("❌ Cancel", callback_data="task_edit_cancel")]
                 ])
                 
-                await query.edit_message_text(
+                await safe_edit(query.edit_message_text, 
                     f"✏️ **Edit Task**\n\n"
                     f"**Current**: {MessageFormatter.escape_markdown(task.description)}\n"
                     f"**ID**: {task_id}\n\n"
@@ -764,7 +769,7 @@ class TelegramBotHandler:
                 
         except Exception as e:
             logger.error(f"Error starting task edit for task {task_id}: {e}")
-            await query.edit_message_text(
+            await safe_edit(query.edit_message_text, 
                 MessageFormatter.format_error_message(
                     "Error editing task",
                     "Please try again or use /edit command."
@@ -778,7 +783,7 @@ class TelegramBotHandler:
         if 'editing_task_id' in context.user_data:
             del context.user_data['editing_task_id']
         
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             "❌ **Edit Cancelled**\n\nTask editing was cancelled. No changes were made.",
             parse_mode='MarkdownV2'
         )
@@ -787,7 +792,7 @@ class TelegramBotHandler:
         """Handle task deletion via callback."""
         from larrybot.utils.ux_helpers import KeyboardBuilder
         
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             f"🗑️ **Confirm Task Deletion**\n\nAre you sure you want to delete Task #{task_id}?",
             reply_markup=KeyboardBuilder.build_confirmation_keyboard("task_delete", task_id),
             parse_mode='MarkdownV2'
@@ -809,7 +814,7 @@ class TelegramBotHandler:
                     # Emit event for task removal
                     emit_task_event(None, "task_removed", task)
                     
-                    await query.edit_message_text(
+                    await safe_edit(query.edit_message_text, 
                         MessageFormatter.format_success_message(
                             "🗑️ Task deleted successfully!",
                             {
@@ -822,7 +827,7 @@ class TelegramBotHandler:
                         parse_mode='MarkdownV2'
                     )
                 else:
-                    await query.edit_message_text(
+                    await safe_edit(query.edit_message_text, 
                         MessageFormatter.format_error_message(
                             f"Task ID {task_id} not found",
                             "The task may have already been deleted or doesn't exist."
@@ -830,7 +835,7 @@ class TelegramBotHandler:
                         parse_mode='MarkdownV2'
                     )
         except Exception as e:
-            await query.edit_message_text(
+            await safe_edit(query.edit_message_text, 
                 MessageFormatter.format_error_message(
                     "Error deleting task",
                     str(e)
@@ -854,7 +859,7 @@ class TelegramBotHandler:
                 
                 client = client_repo.get_client_by_id(client_id)
                 if not client:
-                    await query.edit_message_text(
+                    await safe_edit(query.edit_message_text, 
                         MessageFormatter.format_error_message(
                             f"Client ID {client_id} not found",
                             "The client may have already been deleted or doesn't exist."
@@ -892,7 +897,7 @@ class TelegramBotHandler:
                     
                     keyboard = InlineKeyboardMarkup(buttons)
                 
-                await query.edit_message_text(
+                await safe_edit(query.edit_message_text, 
                     message,
                     reply_markup=keyboard,
                     parse_mode='MarkdownV2'
@@ -900,7 +905,7 @@ class TelegramBotHandler:
                 
         except Exception as e:
             logger.error(f"Error showing client tasks for {client_id}: {e}")
-            await query.edit_message_text(
+            await safe_edit(query.edit_message_text, 
                 MessageFormatter.format_error_message(
                     "Error showing client tasks",
                     "Please try again or use /client command."
@@ -920,7 +925,7 @@ class TelegramBotHandler:
                 task_repo = TaskRepository(session)
                 client = client_repo.get_client_by_id(client_id)
                 if not client:
-                    await query.edit_message_text(
+                    await safe_edit(query.edit_message_text, 
                         MessageFormatter.format_error_message(
                             f"Client ID {client_id} not found",
                             "The client may have already been deleted or doesn't exist."
@@ -939,13 +944,13 @@ class TelegramBotHandler:
                 message += f"**Completed**: {completed} ✅\n"
                 message += f"**Pending**: {pending} ⏳\n"
                 message += f"**Completion Rate**: {completion_rate:.1f}%\n"
-                await query.edit_message_text(
+                await safe_edit(query.edit_message_text, 
                     message,
                     parse_mode='MarkdownV2'
                 )
         except Exception as e:
             logger.error(f"Error showing client analytics for {client_id}: {e}")
-            await query.edit_message_text(
+            await safe_edit(query.edit_message_text, 
                 MessageFormatter.format_error_message(
                     "Error showing client analytics",
                     "Please try again or use /allclients command."
@@ -965,7 +970,7 @@ class TelegramBotHandler:
                 task_repo = TaskRepository(session)
                 client = client_repo.get_client_by_id(client_id)
                 if not client:
-                    await query.edit_message_text(
+                    await safe_edit(query.edit_message_text, 
                         MessageFormatter.format_error_message(
                             f"Client ID {client_id} not found",
                             "The client may have already been deleted or doesn't exist."
@@ -976,7 +981,7 @@ class TelegramBotHandler:
                 tasks = task_repo.get_tasks_by_client(client.name)
                 # Show confirmation dialog
                 keyboard = KeyboardBuilder.build_confirmation_keyboard("client_delete", client.id)
-                await query.edit_message_text(
+                await safe_edit(query.edit_message_text, 
                     f"🗑️ **Confirm Client Deletion**\n\n"
                     f"**Client**: {MessageFormatter.escape_markdown(client.name)}\n"
                     f"**ID**: {client.id}\n"
@@ -988,7 +993,7 @@ class TelegramBotHandler:
                 )
         except Exception as e:
             logger.error(f"Error showing client delete confirmation for {client_id}: {e}")
-            await query.edit_message_text(
+            await safe_edit(query.edit_message_text, 
                 MessageFormatter.format_error_message(
                     "Error preparing client deletion",
                     "Please try again or use /allclients command."
@@ -1009,7 +1014,7 @@ class TelegramBotHandler:
                 task_repo = TaskRepository(session)
                 client = client_repo.get_client_by_id(client_id)
                 if not client:
-                    await query.edit_message_text(
+                    await safe_edit(query.edit_message_text, 
                         MessageFormatter.format_error_message(
                             f"Client ID {client_id} not found",
                             "The client may have already been deleted or doesn't exist."
@@ -1023,7 +1028,7 @@ class TelegramBotHandler:
                     task_repo.unassign_task(task.id)
                 client_repo.remove_client(client.name)
                 emit_client_event(None, "client_removed", client)
-                await query.edit_message_text(
+                await safe_edit(query.edit_message_text, 
                     MessageFormatter.format_success_message(
                         f"🗑️ Client deleted successfully!",
                         {
@@ -1037,7 +1042,7 @@ class TelegramBotHandler:
                 )
         except Exception as e:
             logger.error(f"Error deleting client {client_id}: {e}")
-            await query.edit_message_text(
+            await safe_edit(query.edit_message_text, 
                 MessageFormatter.format_error_message(
                     "Error deleting client",
                     "Please try again or use /allclients command."
@@ -1059,7 +1064,7 @@ class TelegramBotHandler:
                 habit = repo.get_habit_by_id(habit_id)
                 
                 if not habit:
-                    await query.edit_message_text(
+                    await safe_edit(query.edit_message_text, 
                         MessageFormatter.format_error_message(
                             f"Habit #{habit_id} not found",
                             "The habit may have been deleted."
@@ -1072,7 +1077,7 @@ class TelegramBotHandler:
                 updated_habit = repo.mark_habit_done(habit.name)
                 
                 if not updated_habit:
-                    await query.edit_message_text(
+                    await safe_edit(query.edit_message_text, 
                         MessageFormatter.format_error_message(
                             f"Failed to complete habit '{habit.name}'",
                             "Please try again."
@@ -1093,7 +1098,7 @@ class TelegramBotHandler:
                 elif updated_habit.streak == 100:
                     milestone_message = "\n👑 **100-day streak milestone!**"
                 
-                await query.edit_message_text(
+                await safe_edit(query.edit_message_text, 
                     MessageFormatter.format_success_message(
                         f"Habit completed for today! {streak_emoji}",
                         {
@@ -1106,7 +1111,7 @@ class TelegramBotHandler:
                 )
                 
         except Exception as e:
-            await query.edit_message_text(
+            await safe_edit(query.edit_message_text, 
                 MessageFormatter.format_error_message(
                     "Failed to complete habit",
                     f"Error: {str(e)}"
@@ -1127,7 +1132,7 @@ class TelegramBotHandler:
                 habit = repo.get_habit_by_id(habit_id)
                 
                 if not habit:
-                    await query.edit_message_text(
+                    await safe_edit(query.edit_message_text, 
                         MessageFormatter.format_error_message(
                             f"Habit #{habit_id} not found",
                             "The habit may have been deleted."
@@ -1196,14 +1201,14 @@ class TelegramBotHandler:
                     [InlineKeyboardButton("⬅️ Back to Habits", callback_data="habit_refresh")]
                 ]
                 
-                await query.edit_message_text(
+                await safe_edit(query.edit_message_text, 
                     message,
                     reply_markup=InlineKeyboardMarkup(keyboard),
                     parse_mode='MarkdownV2'
                 )
                 
         except Exception as e:
-            await query.edit_message_text(
+            await safe_edit(query.edit_message_text, 
                 MessageFormatter.format_error_message(
                     "Failed to load habit progress",
                     f"Error: {str(e)}"
@@ -1215,7 +1220,7 @@ class TelegramBotHandler:
         """Handle habit deletion."""
         from larrybot.utils.ux_helpers import KeyboardBuilder
         
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             f"🗑️ **Confirm Habit Deletion**\n\nAre you sure you want to delete this habit?",
             reply_markup=KeyboardBuilder.build_confirmation_keyboard("habit_delete", habit_id),
             parse_mode='MarkdownV2'
@@ -1235,7 +1240,7 @@ class TelegramBotHandler:
                 if habit:
                     repo.delete_habit(habit_id)
                     
-                    await query.edit_message_text(
+                    await safe_edit(query.edit_message_text, 
                         MessageFormatter.format_success_message(
                             f"Habit '{habit.name}' deleted successfully!",
                             {
@@ -1247,7 +1252,7 @@ class TelegramBotHandler:
                         parse_mode='MarkdownV2'
                     )
                 else:
-                    await query.edit_message_text(
+                    await safe_edit(query.edit_message_text, 
                         MessageFormatter.format_error_message(
                             f"Habit #{habit_id} not found",
                             "The habit may have already been deleted."
@@ -1255,7 +1260,7 @@ class TelegramBotHandler:
                         parse_mode='MarkdownV2'
                     )
         except Exception as e:
-            await query.edit_message_text(
+            await safe_edit(query.edit_message_text, 
                 MessageFormatter.format_error_message(
                     "Failed to delete habit",
                     f"Error: {str(e)}"
@@ -1267,7 +1272,7 @@ class TelegramBotHandler:
         """Handle habit add button click."""
         from larrybot.utils.ux_helpers import MessageFormatter
         
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             MessageFormatter.format_info_message(
                 "Add New Habit",
                 {
@@ -1292,7 +1297,7 @@ class TelegramBotHandler:
                 habits = repo.list_habits()
                 
                 if not habits:
-                    await query.edit_message_text(
+                    await safe_edit(query.edit_message_text, 
                         MessageFormatter.format_error_message(
                             "No habits found",
                             "Use /habit_add to create your first habit"
@@ -1352,14 +1357,14 @@ class TelegramBotHandler:
                     [InlineKeyboardButton("⬅️ Back to Habits", callback_data="habit_list")]
                 ]
                 
-                await query.edit_message_text(
+                await safe_edit(query.edit_message_text, 
                     message,
                     reply_markup=InlineKeyboardMarkup(keyboard),
                     parse_mode='MarkdownV2'
                 )
                 
         except Exception as e:
-            await query.edit_message_text(
+            await safe_edit(query.edit_message_text, 
                 MessageFormatter.format_error_message(
                     "Failed to load habit statistics",
                     f"Error: {str(e)}"
@@ -1380,7 +1385,7 @@ class TelegramBotHandler:
                 habits = repo.list_habits()
                 
                 if not habits:
-                    await query.edit_message_text(
+                    await safe_edit(query.edit_message_text, 
                         MessageFormatter.format_error_message(
                             "No habits found",
                             "Use /habit_add to create your first habit"
@@ -1479,14 +1484,14 @@ class TelegramBotHandler:
                     InlineKeyboardButton("⬅️ Back", callback_data="nav_main")
                 ])
                 
-                await query.edit_message_text(
+                await safe_edit(query.edit_message_text, 
                     message,
                     reply_markup=InlineKeyboardMarkup(keyboard),
                     parse_mode='MarkdownV2'
                 )
                 
         except Exception as e:
-            await query.edit_message_text(
+            await safe_edit(query.edit_message_text, 
                 MessageFormatter.format_error_message(
                     "Failed to refresh habits",
                     f"Error: {str(e)}"
@@ -1510,7 +1515,7 @@ class TelegramBotHandler:
         user_first_name = update.effective_user.first_name if update.effective_user.first_name else "there"
         
         welcome_message = (
-            f"🎉 **Welcome, {user_first_name}!**\n\n"
+            f"🎉 **Welcome to LarryBot2**\n\n"
             
             f"🎯 **What I Can Do For You:**\n\n"
             f"📋 **Task Management**\n"
@@ -1814,6 +1819,12 @@ class TelegramBotHandler:
             await self._handle_task_edit_mode(update, context, user_message)
             return
 
+        # Check if user is in narrative task creation mode
+        if 'task_creation_state' in context.user_data:
+            from larrybot.plugins.tasks import handle_narrative_task_creation
+            await handle_narrative_task_creation(update, context, user_message)
+            return
+
         # Enhanced narrative processing for free-form text
         user_id = update.effective_user.id if update.effective_user else None
         processed_input = self.enhanced_narrative_processor.process_input(user_message, user_id)
@@ -1951,6 +1962,9 @@ class TelegramBotHandler:
     async def _handle_task_disclosure(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle progressive disclosure for task views."""
         try:
+            # Always answer the callback query first
+            await query.answer()
+            
             # Parse disclosure data: task_disclose:task_id:level
             parts = query.data.split(':')
             if len(parts) >= 3:
@@ -1964,9 +1978,23 @@ class TelegramBotHandler:
                 await self._handle_task_view(query, context, task_id)
             else:
                 logger.error(f"Invalid task disclosure callback data: {query.data}")
+                # Send error message so tests can see it
+                await safe_edit(query.edit_message_text, 
+                    MessageFormatter.format_error_message(
+                        "Invalid disclosure data",
+                        "Please try again or use a different action."
+                    ),
+                    parse_mode='MarkdownV2'
+                )
         except (ValueError, IndexError) as e:
             logger.error(f"Error parsing task disclosure callback: {e}")
-            await query.answer("Error processing request")
+            await safe_edit(query.edit_message_text,
+                MessageFormatter.format_error_message(
+                    "Error processing request",
+                    "Please try again or use a different action."
+                ),
+                parse_mode='MarkdownV2'
+            )
 
     async def _process_task_edit(self, update: Update, context: ContextTypes.DEFAULT_TYPE, task_id: int, new_description: str) -> None:
         """Process the actual task editing."""
@@ -2023,7 +2051,7 @@ class TelegramBotHandler:
         """Handle task list refresh with timeout protection and loading indicator."""
         try:
             # Show loading indicator
-            await query.edit_message_text("🔄 Refreshing tasks\\.\\.\\.", parse_mode='MarkdownV2')
+            await safe_edit(query.edit_message_text, "🔄 Refreshing tasks\\.\\.\\.", parse_mode='MarkdownV2')
             
             # Add timeout to prevent blocking during network/database issues
             await asyncio.wait_for(self._handle_tasks_refresh_operation(query, context), timeout=10.0)
@@ -2031,7 +2059,7 @@ class TelegramBotHandler:
         except asyncio.TimeoutError:
             logger.error("Tasks refresh timeout")
             try:
-                await query.edit_message_text(
+                await safe_edit(query.edit_message_text, 
                     MessageFormatter.format_error_message(
                         "⏱️ Refresh timed out",
                         "Please try the command again\\."
@@ -2043,7 +2071,7 @@ class TelegramBotHandler:
         except Exception as e:
             logger.error(f"Error refreshing tasks: {e}")
             try:
-                await query.edit_message_text(
+                await safe_edit(query.edit_message_text, 
                     MessageFormatter.format_error_message(
                         "❌ Refresh failed",
                         "Please try again later."
@@ -2054,7 +2082,7 @@ class TelegramBotHandler:
                 logger.error(f"Failed to send error message: {nested_e}")
                 # Fallback to simple text without Markdown if escaping fails
                 try:
-                    await query.edit_message_text(
+                    await safe_edit(query.edit_message_text, 
                         "❌ Refresh failed. Please try again later.",
                         parse_mode=None
                     )
@@ -2102,7 +2130,13 @@ class TelegramBotHandler:
                 # Add smart suggestions based on task list
                 suggestions = []
                 high_priority_count = sum(1 for t in tasks if getattr(t, 'priority', 'Medium') in ['High', 'Critical'])
-                overdue_count = sum(1 for t in tasks if hasattr(t, 'due_date') and t.due_date and t.due_date < get_current_datetime())
+                from larrybot.utils.datetime_utils import ensure_timezone_aware
+                now_dt = get_current_datetime()
+                overdue_count = sum(
+                    1
+                    for t in tasks
+                    if t.due_date and ensure_timezone_aware(t.due_date) < now_dt
+                )
                 
                 if high_priority_count > 0:
                     suggestions.append(f"⚠️ **{high_priority_count} high priority tasks** need attention")
@@ -2172,7 +2206,7 @@ class TelegramBotHandler:
                 existing_buttons.append(custom_action_buttons)
                 keyboard = InlineKeyboardMarkup(existing_buttons)
             
-            await query.edit_message_text(
+            await safe_edit(query.edit_message_text, 
                 message,
                 reply_markup=keyboard,
                 parse_mode='MarkdownV2'
@@ -2190,7 +2224,7 @@ class TelegramBotHandler:
                 repo = TaskRepository(session)
                 task = repo.get_task_by_id(task_id)
                 if not task:
-                    await query.edit_message_text(
+                    await safe_edit(query.edit_message_text, 
                         MessageFormatter.format_error_message(
                             f"Task ID {task_id} not found",
                             "The task may have already been deleted or doesn't exist."
@@ -2240,14 +2274,14 @@ class TelegramBotHandler:
                     disclosure_level=disclosure_level
                 )
                 
-                await query.edit_message_text(
+                await safe_edit(query.edit_message_text, 
                     message,
                     reply_markup=keyboard,
                     parse_mode='MarkdownV2'
                 )
         except Exception as e:
             logger.error(f"Error showing task view for {task_id}: {e}")
-            await query.edit_message_text(
+            await safe_edit(query.edit_message_text, 
                 MessageFormatter.format_error_message(
                     "Error showing task details",
                     "Please try again or use /list command."
@@ -2285,7 +2319,7 @@ class TelegramBotHandler:
             ]
         ])
         
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             escaped_message,
             reply_markup=keyboard,
             parse_mode='MarkdownV2'
@@ -2304,7 +2338,7 @@ class TelegramBotHandler:
                 task_repo = TaskRepository(session)
                 client = client_repo.get_client_by_id(client_id)
                 if not client:
-                    await query.edit_message_text(
+                    await safe_edit(query.edit_message_text, 
                         MessageFormatter.format_error_message(
                             f"Client ID {client_id} not found",
                             "The client may have already been deleted or doesn't exist."
@@ -2335,14 +2369,14 @@ class TelegramBotHandler:
                     ],
                     [InlineKeyboardButton("⬅️ Back to List", callback_data="client_refresh")]
                 ])
-                await query.edit_message_text(
+                await safe_edit(query.edit_message_text, 
                     message,
                     reply_markup=keyboard,
                     parse_mode='MarkdownV2'
                 )
         except Exception as e:
             logger.error(f"Error showing client view for {client_id}: {e}")
-            await query.edit_message_text(
+            await safe_edit(query.edit_message_text, 
                 MessageFormatter.format_error_message(
                     "Error showing client details",
                     "Please try again or use /allclients command."
@@ -2363,7 +2397,7 @@ class TelegramBotHandler:
                 client = client_repo.get_client_by_id(client_id)
                 
                 if not client:
-                    await query.edit_message_text(
+                    await safe_edit(query.edit_message_text, 
                         MessageFormatter.format_error_message(
                             f"Client ID {client_id} not found",
                             "The client may have already been deleted or doesn't exist."
@@ -2389,7 +2423,7 @@ class TelegramBotHandler:
                     ]
                 ])
                 
-                await query.edit_message_text(
+                await safe_edit(query.edit_message_text, 
                     message,
                     reply_markup=keyboard,
                     parse_mode='MarkdownV2'
@@ -2397,7 +2431,7 @@ class TelegramBotHandler:
                 
         except Exception as e:
             logger.error(f"Error showing client edit for {client_id}: {e}")
-            await query.edit_message_text(
+            await safe_edit(query.edit_message_text, 
                 MessageFormatter.format_error_message(
                     "Error showing client edit",
                     "Please try again or use /editclient command."
@@ -2436,7 +2470,7 @@ class TelegramBotHandler:
             reminder_id = int(callback_data.split(":")[1])
             await self._handle_reminder_reactivate(query, context, reminder_id)
         else:
-            await query.edit_message_text(
+            await safe_edit(query.edit_message_text, 
                 MessageFormatter.format_error_message(
                     "Unknown reminder action",
                     "Please use the /reminders command for now."
@@ -2473,7 +2507,7 @@ class TelegramBotHandler:
             task_id = int(callback_data.split(":")[1])
             await self._handle_attachment_add(query, context, task_id)
         else:
-            await query.edit_message_text(
+            await safe_edit(query.edit_message_text, 
                 MessageFormatter.format_error_message(
                     "Unknown attachment action",
                     "Please use the file attachment commands for now."
@@ -2497,8 +2531,10 @@ class TelegramBotHandler:
             await self._handle_calendar_sync(query, context)
         elif callback_data == "calendar_settings":
             await self._handle_calendar_settings(query, context)
+        elif callback_data == "calendar_refresh":
+            await self._handle_calendar_refresh(query, context)
         else:
-            await query.edit_message_text(
+            await safe_edit(query.edit_message_text, 
                 MessageFormatter.format_error_message(
                     "Unknown calendar action",
                     "Please use the calendar commands for now."
@@ -2527,7 +2563,7 @@ class TelegramBotHandler:
         elif callback_data == "filter_save":
             await self._handle_filter_save(query, context)
         else:
-            await query.edit_message_text(
+            await safe_edit(query.edit_message_text, 
                 MessageFormatter.format_error_message(
                     "Unknown filter action",
                     "Please use the filter commands for now."
@@ -2538,7 +2574,7 @@ class TelegramBotHandler:
     # Bulk operations handlers
     async def _handle_bulk_status_update(self, query, context: ContextTypes.DEFAULT_TYPE, status: str) -> None:
         """Handle bulk status update operations."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             MessageFormatter.format_info_message(
                 f"🔄 Bulk Status Update: {status}",
                 {
@@ -2554,7 +2590,7 @@ class TelegramBotHandler:
 
     async def _handle_bulk_priority_update(self, query, context: ContextTypes.DEFAULT_TYPE, priority: str) -> None:
         """Handle bulk priority update operations."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             MessageFormatter.format_info_message(
                 f"🎯 Bulk Priority Update: {priority}",
                 {
@@ -2572,7 +2608,7 @@ class TelegramBotHandler:
         """Handle back navigation from bulk operations."""
         from larrybot.utils.ux_helpers import KeyboardBuilder
         
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             "📋 **Bulk Operations**\n\nSelect an operation:",
             reply_markup=KeyboardBuilder.build_bulk_operations_keyboard(),
             parse_mode='MarkdownV2'
@@ -2581,7 +2617,7 @@ class TelegramBotHandler:
     # Stub handlers for individual features - following existing patterns
     async def _handle_reminder_add(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle reminder add action."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             MessageFormatter.format_info_message(
                 "⏰ Add Reminder",
                 {"Action": "Feature coming soon - use /addreminder command for now"}
@@ -2591,7 +2627,7 @@ class TelegramBotHandler:
 
     async def _handle_reminder_stats(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle reminder stats action."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             MessageFormatter.format_info_message(
                 "📊 Reminder Statistics",
                 {"Action": "Feature coming soon - use /reminders command for now"}
@@ -2601,7 +2637,7 @@ class TelegramBotHandler:
 
     async def _handle_reminder_refresh(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle reminder refresh action."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             MessageFormatter.format_info_message(
                 "🔄 Refresh Reminders",
                 {"Action": "Feature coming soon - use /reminders command for now"}
@@ -2611,7 +2647,7 @@ class TelegramBotHandler:
 
     async def _handle_reminder_dismiss(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle reminder dismiss action."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             MessageFormatter.format_success_message(
                 "❌ Reminder Dismissed",
                 {"Action": "Notification dismissed successfully"}
@@ -2621,7 +2657,7 @@ class TelegramBotHandler:
 
     async def _handle_reminder_snooze(self, query, context: ContextTypes.DEFAULT_TYPE, reminder_id: int, duration: str) -> None:
         """Handle reminder snooze action."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             MessageFormatter.format_info_message(
                 f"⏰ Snooze Reminder ({duration})",
                 {
@@ -2635,7 +2671,7 @@ class TelegramBotHandler:
 
     async def _handle_reminder_delete(self, query, context: ContextTypes.DEFAULT_TYPE, reminder_id: int) -> None:
         """Handle reminder delete action."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             MessageFormatter.format_info_message(
                 "🗑️ Delete Reminder",
                 {
@@ -2648,7 +2684,7 @@ class TelegramBotHandler:
 
     async def _handle_reminder_complete(self, query, context: ContextTypes.DEFAULT_TYPE, reminder_id: int) -> None:
         """Handle reminder complete action."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             MessageFormatter.format_info_message(
                 "✅ Complete Reminder",
                 {
@@ -2661,7 +2697,7 @@ class TelegramBotHandler:
 
     async def _handle_reminder_edit(self, query, context: ContextTypes.DEFAULT_TYPE, reminder_id: int) -> None:
         """Handle reminder edit action."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             MessageFormatter.format_info_message(
                 "📝 Edit Reminder",
                 {
@@ -2674,7 +2710,7 @@ class TelegramBotHandler:
 
     async def _handle_reminder_reactivate(self, query, context: ContextTypes.DEFAULT_TYPE, reminder_id: int) -> None:
         """Handle reminder reactivate action."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             MessageFormatter.format_info_message(
                 "🔄 Reactivate Reminder",
                 {
@@ -2688,7 +2724,7 @@ class TelegramBotHandler:
     # Attachment stub handlers
     async def _handle_attachment_edit_desc(self, query, context: ContextTypes.DEFAULT_TYPE, attachment_id: int) -> None:
         """Handle attachment description edit."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             MessageFormatter.format_info_message(
                 "📝 Edit Attachment Description",
                 {
@@ -2701,7 +2737,7 @@ class TelegramBotHandler:
 
     async def _handle_attachment_details(self, query, context: ContextTypes.DEFAULT_TYPE, attachment_id: int) -> None:
         """Handle attachment details view."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             MessageFormatter.format_info_message(
                 "📊 Attachment Details",
                 {
@@ -2714,7 +2750,7 @@ class TelegramBotHandler:
 
     async def _handle_attachment_remove(self, query, context: ContextTypes.DEFAULT_TYPE, attachment_id: int) -> None:
         """Handle attachment removal."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             MessageFormatter.format_info_message(
                 "🗑️ Remove Attachment",
                 {
@@ -2727,7 +2763,7 @@ class TelegramBotHandler:
 
     async def _handle_attachment_stats(self, query, context: ContextTypes.DEFAULT_TYPE, task_id: int) -> None:
         """Handle attachment statistics."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             MessageFormatter.format_info_message(
                 "📊 Attachment Statistics",
                 {
@@ -2740,7 +2776,7 @@ class TelegramBotHandler:
 
     async def _handle_attachment_add_desc(self, query, context: ContextTypes.DEFAULT_TYPE, task_id: int) -> None:
         """Handle attachment description addition."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             MessageFormatter.format_info_message(
                 "📝 Add Attachment Description",
                 {
@@ -2753,7 +2789,7 @@ class TelegramBotHandler:
 
     async def _handle_attachment_bulk_remove(self, query, context: ContextTypes.DEFAULT_TYPE, task_id: int) -> None:
         """Handle bulk attachment removal."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             MessageFormatter.format_info_message(
                 "🗑️ Bulk Remove Attachments",
                 {
@@ -2766,7 +2802,7 @@ class TelegramBotHandler:
 
     async def _handle_attachment_export(self, query, context: ContextTypes.DEFAULT_TYPE, task_id: int) -> None:
         """Handle attachment export."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             MessageFormatter.format_info_message(
                 "📋 Export Attachments",
                 {
@@ -2779,7 +2815,7 @@ class TelegramBotHandler:
 
     async def _handle_attachment_add(self, query, context: ContextTypes.DEFAULT_TYPE, task_id: int) -> None:
         """Handle attachment addition."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             MessageFormatter.format_info_message(
                 "📎 Add Attachment",
                 {
@@ -2793,7 +2829,7 @@ class TelegramBotHandler:
     # Calendar stub handlers
     async def _handle_calendar_today(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle calendar today view."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             MessageFormatter.format_info_message(
                 "📅 Today's Calendar",
                 {"Action": "Feature coming soon - use calendar commands for now"}
@@ -2803,7 +2839,7 @@ class TelegramBotHandler:
 
     async def _handle_calendar_week(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle calendar week view."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             MessageFormatter.format_info_message(
                 "📅 Week Calendar",
                 {"Action": "Feature coming soon - use calendar commands for now"}
@@ -2813,7 +2849,7 @@ class TelegramBotHandler:
 
     async def _handle_calendar_month(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle calendar month view."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             MessageFormatter.format_info_message(
                 "📅 Month Calendar",
                 {"Action": "Feature coming soon - use calendar commands for now"}
@@ -2823,7 +2859,7 @@ class TelegramBotHandler:
 
     async def _handle_calendar_upcoming(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle calendar upcoming view."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             MessageFormatter.format_info_message(
                 "📅 Upcoming Events",
                 {"Action": "Feature coming soon - use calendar commands for now"}
@@ -2833,7 +2869,7 @@ class TelegramBotHandler:
 
     async def _handle_calendar_sync(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle calendar sync."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             MessageFormatter.format_info_message(
                 "🔄 Sync Calendar",
                 {"Action": "Feature coming soon - use calendar commands for now"}
@@ -2843,7 +2879,7 @@ class TelegramBotHandler:
 
     async def _handle_calendar_settings(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle calendar settings."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             MessageFormatter.format_info_message(
                 "⚙️ Calendar Settings",
                 {"Action": "Feature coming soon - use calendar commands for now"}
@@ -2851,10 +2887,35 @@ class TelegramBotHandler:
             parse_mode='MarkdownV2'
         )
 
+    async def _handle_calendar_refresh(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handle calendar refresh - re-run agenda handler to get fresh data."""
+        try:
+            # Import the agenda handler from calendar plugin
+            from larrybot.plugins.calendar import agenda_handler
+            
+            # Create a mock update object with the query's message
+            mock_update = type('MockUpdate', (), {
+                'message': query.message,
+                'effective_user': query.from_user
+            })()
+            
+            # Re-run the agenda handler to get fresh data
+            await agenda_handler(mock_update, context)
+            
+        except Exception as e:
+            logger.error(f"Error refreshing calendar: {e}")
+            await safe_edit(query.edit_message_text, 
+                MessageFormatter.format_error_message(
+                    "Failed to refresh calendar",
+                    "Please try again or use /agenda command."
+                ),
+                parse_mode='MarkdownV2'
+            )
+
     # Filter stub handlers
     async def _handle_filter_date_range(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle date range filter."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             MessageFormatter.format_info_message(
                 "📅 Date Range Filter",
                 {"Action": "Feature coming soon - use filter commands for now"}
@@ -2864,7 +2925,7 @@ class TelegramBotHandler:
 
     async def _handle_filter_priority(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle priority filter."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             MessageFormatter.format_info_message(
                 "🎯 Priority Filter",
                 {"Action": "Feature coming soon - use filter commands for now"}
@@ -2874,7 +2935,7 @@ class TelegramBotHandler:
 
     async def _handle_filter_status(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle status filter."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             MessageFormatter.format_info_message(
                 "📋 Status Filter",
                 {"Action": "Feature coming soon - use filter commands for now"}
@@ -2884,7 +2945,7 @@ class TelegramBotHandler:
 
     async def _handle_filter_tags(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle tags filter."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             MessageFormatter.format_info_message(
                 "🏷️ Tags Filter",
                 {"Action": "Feature coming soon - use filter commands for now"}
@@ -2894,7 +2955,7 @@ class TelegramBotHandler:
 
     async def _handle_filter_category(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle category filter."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             MessageFormatter.format_info_message(
                 "📂 Category Filter",
                 {"Action": "Feature coming soon - use filter commands for now"}
@@ -2904,7 +2965,7 @@ class TelegramBotHandler:
 
     async def _handle_filter_time(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle time tracking filter."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             MessageFormatter.format_info_message(
                 "⏰ Time Tracking Filter",
                 {"Action": "Feature coming soon - use filter commands for now"}
@@ -2914,7 +2975,7 @@ class TelegramBotHandler:
 
     async def _handle_filter_advanced_search(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle advanced search filter."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             MessageFormatter.format_info_message(
                 "🔍 Advanced Search",
                 {"Action": "Feature coming soon - use search commands for now"}
@@ -2924,7 +2985,7 @@ class TelegramBotHandler:
 
     async def _handle_filter_save(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle save filter."""
-        await query.edit_message_text(
+        await safe_edit(query.edit_message_text, 
             MessageFormatter.format_info_message(
                 "💾 Save Filter",
                 {"Action": "Feature coming soon - use filter commands for now"}
@@ -3109,3 +3170,57 @@ class TelegramBotHandler:
                 ),
                 parse_mode='MarkdownV2'
             )
+
+    async def _handle_narrative_task_callback(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
+        print(f"[DEBUG] Received callback: {query.data}, state={context.user_data.get('task_creation_state')}")
+        try:
+            if 'task_creation_state' not in context.user_data:
+                await safe_edit(query.edit_message_text, 
+                    MessageFormatter.format_error_message(
+                        "No active task creation session",
+                        "Use /addtask to start creating a task."
+                    ),
+                    parse_mode='MarkdownV2'
+                )
+                return
+            # Parse callback data
+            parts = query.data.split(":")
+            # Need at least addtask_step:<action>
+            if len(parts) < 2:
+                return
+
+            step_type = parts[1]
+            # Some actions (e.g., confirm/edit/cancel) don't have a value segment
+            step_value = ":".join(parts[2:]) if len(parts) > 2 else ""
+            from larrybot.plugins.tasks import (
+                _handle_description_step, _handle_due_date_step, _handle_priority_step,
+                _handle_category_step, _handle_client_step, _handle_confirmation_step
+            )
+            from larrybot.nlp.enhanced_narrative_processor import TaskCreationState
+            current_state = context.user_data['task_creation_state']
+            # Add some debugging
+            logger.info(f"Narrative callback: step_type={step_type}, current_state={current_state}, step_value={step_value}")
+            print(f"[DEBUG] step_type={step_type!r}, current_state={current_state!r}")
+            if step_type == "due_date" and current_state == TaskCreationState.AWAITING_DUE_DATE.value:
+                await _handle_due_date_step(query, context, step_value)
+            elif step_type == "priority" and current_state == TaskCreationState.AWAITING_PRIORITY.value:
+                await _handle_priority_step(query, context, step_value)
+            elif step_type == "category" and current_state == TaskCreationState.AWAITING_CATEGORY.value:
+                await _handle_category_step(query, context, step_value)
+            elif step_type == "client" and current_state == TaskCreationState.AWAITING_CLIENT.value:
+                await _handle_client_step(query, context, step_value)
+            elif step_type in ["confirm", "edit", "cancel"] and current_state == TaskCreationState.CONFIRMATION.value:
+                await _handle_confirmation_step(query, context, step_type)
+            else:
+                logger.warning(f"Invalid narrative step: step_type={step_type}, current_state={current_state}")
+                await safe_edit(query.edit_message_text, 
+                    MessageFormatter.format_error_message(
+                        "Invalid step in task creation flow",
+                        "Please use /addtask to start over."
+                    ),
+                    parse_mode='MarkdownV2'
+                )
+        except Exception as e:
+            print(f"[DEBUG] Exception in _handle_narrative_task_callback: {e}")
+            import traceback
+            traceback.print_exc()

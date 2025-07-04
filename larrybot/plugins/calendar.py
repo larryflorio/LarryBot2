@@ -238,7 +238,7 @@ async def agenda_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             
             # Build rich agenda message
             today = datetime.now(timezone.utc).date()
-            message = f"📅 *Today's Agenda* \({MessageFormatter.escape_markdown(today.strftime('%B %d, %Y'))}\)\n\n"
+            message = f"📅 **Today's Agenda** \({MessageFormatter.escape_markdown(today.strftime('%B %d, %Y'))}\)\n\n"
             message += f"📋 *{len(all_events)} Events Scheduled*\n\n"
             
             # Find the next upcoming event (first event that hasn't started yet)
@@ -321,7 +321,13 @@ async def agenda_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             
             await update.message.reply_text(
                 message,
-                parse_mode='MarkdownV2'
+                parse_mode='MarkdownV2',
+                reply_markup=InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("🔄 Refresh", callback_data="calendar_refresh"),
+                        InlineKeyboardButton("🏠 Main Menu", callback_data="nav_main")
+                    ]
+                ])
             )
             
     except Exception as e:

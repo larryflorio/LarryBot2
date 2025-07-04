@@ -7,8 +7,13 @@ from larrybot.storage.task_repository import TaskRepository
 from larrybot.core.event_utils import emit_task_event
 from larrybot.utils.ux_helpers import MessageFormatter, KeyboardBuilder
 from larrybot.services.task_service import TaskService
+from larrybot.utils.decorators import command_handler
 from typing import Optional
 from larrybot.utils.datetime_utils import get_current_datetime
+from larrybot.nlp.enhanced_narrative_processor import TaskCreationState, ContextType
+from larrybot.storage.client_repository import ClientRepository
+from datetime import datetime, timedelta, timezone
+import json
 
 # Global reference to event bus for task events
 _task_event_bus = None
@@ -25,6 +30,7 @@ def register(event_bus: EventBus, command_registry: CommandRegistry) -> None:
     command_registry.register("/done", done_task_handler)
     command_registry.register("/edit", edit_task_handler)
     command_registry.register("/remove", remove_task_handler)
+    command_registry.register("/addtask", narrative_add_task_handler)
 
 def _get_task_service() -> TaskService:
     """Get task service instance."""
@@ -71,7 +77,7 @@ async def add_task_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         if priority not in valid_priorities:
             await update.message.reply_text(
                 MessageFormatter.format_error_message(
-                    f"Invalid priority: {priority}",
+                    f"Invalid priority: {MessageFormatter.escape_markdown(priority)}",
                     f"Valid priorities: {', '.join(valid_priorities)}"
                 ),
                 parse_mode='MarkdownV2'
@@ -85,7 +91,7 @@ async def add_task_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             await update.message.reply_text(
                 MessageFormatter.format_error_message(
                     "Invalid date format",
-                    "Use YYYY-MM-DD format (e.g., 2025-07-15)"
+                    MessageFormatter.escape_markdown("Please use YYYY-MM-DD format or select from the buttons.")
                 ),
                 parse_mode='MarkdownV2'
             )
@@ -126,7 +132,7 @@ async def add_task_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             else:
                 await update.message.reply_text(
                     MessageFormatter.format_error_message(
-                        f"❌ Error: {result['message']}",
+                        f"❌ Error: {MessageFormatter.escape_markdown(result['message'])}",
                         "Check your input format and try again."
                     ),
                     parse_mode='MarkdownV2'
@@ -474,4 +480,551 @@ async def remove_task_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             f"Are you sure you want to delete this task?",
             reply_markup=keyboard,
             parse_mode='MarkdownV2'
-        ) 
+        )
+
+@command_handler("/addtask", "Create task with narrative flow", "Usage: /addtask", "tasks")
+async def narrative_add_task_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Start the narrative task creation flow."""
+    user_id = update.effective_user.id if update.effective_user else None
+    
+    # Initialize task creation state
+    context.user_data['task_creation_state'] = TaskCreationState.AWAITING_DESCRIPTION.value
+    context.user_data['partial_task'] = {
+        'description': None,
+        'due_date': None,
+        'priority': 'Medium',
+        'category': None,
+        'client_id': None,
+        'estimated_hours': None
+    }
+    context.user_data['step_history'] = []
+    context.user_data['started_at'] = datetime.now().isoformat()
+    
+    # Ask for task description
+    await update.message.reply_text(
+        MessageFormatter.format_info_message(
+            "📝 Let's create a new task!",
+            {"Action": "Please describe what you'd like to add."}
+        ),
+        parse_mode='MarkdownV2'
+    )
+
+async def handle_narrative_task_creation(update: Update, context: ContextTypes.DEFAULT_TYPE, user_input: str) -> None:
+    """Handle the narrative task creation flow."""
+    if 'task_creation_state' not in context.user_data:
+        return
+    
+    current_state = context.user_data['task_creation_state']
+    partial_task = context.user_data['partial_task']
+    
+    # Handle custom category input
+    if current_state == TaskCreationState.AWAITING_CATEGORY.value and context.user_data.get('awaiting_custom_category'):
+        del context.user_data['awaiting_custom_category']
+        await _handle_category_step(update, context, user_input.strip())
+        return
+    
+    # Handle new client input
+    if current_state == TaskCreationState.AWAITING_CLIENT.value and context.user_data.get('awaiting_new_client'):
+        del context.user_data['awaiting_new_client']
+        # Create new client
+        with next(get_session()) as session:
+            client_repo = ClientRepository(session)
+            new_client = client_repo.add_client(user_input.strip())
+            await _handle_client_step(update, context, str(new_client.id))
+        return
+    
+    if current_state == TaskCreationState.AWAITING_DESCRIPTION.value:
+        await _handle_description_step(update, context, user_input)
+    elif current_state == TaskCreationState.AWAITING_DUE_DATE.value:
+        await _handle_due_date_step(update, context, user_input)
+    elif current_state == TaskCreationState.AWAITING_PRIORITY.value:
+        await _handle_priority_step(update, context, user_input)
+    elif current_state == TaskCreationState.AWAITING_CATEGORY.value:
+        await _handle_category_step(update, context, user_input)
+    elif current_state == TaskCreationState.AWAITING_CLIENT.value:
+        await _handle_client_step(update, context, user_input)
+    elif current_state == TaskCreationState.CONFIRMATION.value:
+        await _handle_confirmation_step(update, context, user_input)
+
+async def _handle_description_step(update: Update, context: ContextTypes.DEFAULT_TYPE, description: str) -> None:
+    if hasattr(update, 'answer'):
+        await update.answer()
+    if not description.strip():
+        await update.message.reply_text(
+            MessageFormatter.format_error_message(
+                "Description cannot be empty",
+                "Please provide a task description."
+            ),
+            parse_mode='MarkdownV2'
+        )
+        return
+    
+    # Store description and move to next step
+    context.user_data['partial_task']['description'] = description.strip()
+    context.user_data['task_creation_state'] = TaskCreationState.AWAITING_DUE_DATE.value
+    context.user_data['step_history'].append({
+        'step': 'description',
+        'value': description.strip(),
+        'timestamp': datetime.now().isoformat()
+    })
+    
+    # Ask for due date with action buttons
+    keyboard_buttons = [
+        [
+            InlineKeyboardButton("📅 Today", callback_data="addtask_step:due_date:today"),
+            InlineKeyboardButton("📅 Tomorrow", callback_data="addtask_step:due_date:tomorrow")
+        ],
+        [
+            InlineKeyboardButton("📅 This Week", callback_data="addtask_step:due_date:week"),
+            InlineKeyboardButton("📅 Next Week", callback_data="addtask_step:due_date:next_week")
+        ],
+        [
+            InlineKeyboardButton("⏭️ Skip", callback_data="addtask_step:due_date:skip"),
+            InlineKeyboardButton("❌ Cancel", callback_data="addtask_step:cancel")
+        ]
+    ]
+    keyboard = InlineKeyboardMarkup(keyboard_buttons)
+    
+    await update.message.reply_text(
+        MessageFormatter.format_info_message(
+            f"📝 Task: {MessageFormatter.escape_markdown(description.strip())}",
+            {"Question": "When is this due?"}
+        ),
+        reply_markup=keyboard,
+        parse_mode='MarkdownV2'
+    )
+
+async def _handle_due_date_step(update_or_query, context: ContextTypes.DEFAULT_TYPE, due_date_input: str) -> None:
+    if hasattr(update_or_query, 'answer'):
+        await update_or_query.answer()
+    due_date = None
+    
+    if due_date_input == "skip":
+        due_date = None
+    elif due_date_input == "today":
+        due_date = datetime.now().date()
+    elif due_date_input == "tomorrow":
+        due_date = (datetime.now() + timedelta(days=1)).date()
+    elif due_date_input == "week":
+        # End of this week (Sunday)
+        today = datetime.now().date()
+        days_until_sunday = (6 - today.weekday()) % 7
+        due_date = today + timedelta(days=days_until_sunday)
+    elif due_date_input == "next_week":
+        # End of next week (Sunday)
+        today = datetime.now().date()
+        days_until_next_sunday = (6 - today.weekday()) % 7 + 7
+        due_date = today + timedelta(days=days_until_next_sunday)
+    else:
+        # Try to parse custom date
+        try:
+            due_date_obj = datetime.strptime(due_date_input, "%Y-%m-%d")
+            # Make timezone-aware (UTC) to avoid naive/aware comparison issues
+            due_date = due_date_obj.replace(tzinfo=timezone.utc)
+        except ValueError:
+            message = MessageFormatter.format_error_message(
+                "Invalid date format",
+                MessageFormatter.escape_markdown("Please use YYYY-MM-DD format or select from the buttons.")
+            )
+            if hasattr(update_or_query, 'edit_message_text'):
+                await update_or_query.edit_message_text(message, parse_mode='MarkdownV2')
+            else:
+                await update_or_query.message.reply_text(message, parse_mode='MarkdownV2')
+            return
+    
+    # Store due date and move to next step
+    context.user_data['partial_task']['due_date'] = due_date.isoformat() if due_date else None
+    context.user_data['task_creation_state'] = TaskCreationState.AWAITING_PRIORITY.value
+    context.user_data['step_history'].append({
+        'step': 'due_date',
+        'value': due_date.isoformat() if due_date else None,
+        'timestamp': datetime.now().isoformat()
+    })
+    
+    # Ask for priority with action buttons
+    keyboard_buttons = [
+        [
+            InlineKeyboardButton("🟢 Low", callback_data="addtask_step:priority:Low"),
+            InlineKeyboardButton("🟡 Medium", callback_data="addtask_step:priority:Medium")
+        ],
+        [
+            InlineKeyboardButton("🟠 High", callback_data="addtask_step:priority:High"),
+            InlineKeyboardButton("🔴 Critical", callback_data="addtask_step:priority:Critical")
+        ],
+        [
+            InlineKeyboardButton("⏭️ Skip", callback_data="addtask_step:priority:skip"),
+            InlineKeyboardButton("❌ Cancel", callback_data="addtask_step:cancel")
+        ]
+    ]
+    keyboard = InlineKeyboardMarkup(keyboard_buttons)
+    
+    due_date_text = due_date.strftime("%Y-%m-%d") if due_date else "No due date"
+    message = MessageFormatter.format_info_message(
+        f"📅 Due: {due_date_text}",
+        {"Question": "How urgent is this task?"}
+    )
+
+    print("[DEBUG] Due date message to Telegram:")
+    print(repr(message))
+    
+    if hasattr(update_or_query, 'edit_message_text'):
+        await update_or_query.edit_message_text(message, reply_markup=keyboard, parse_mode='MarkdownV2')
+    else:
+        await update_or_query.message.reply_text(message, reply_markup=keyboard, parse_mode='MarkdownV2')
+
+async def _handle_priority_step(update_or_query, context: ContextTypes.DEFAULT_TYPE, priority_input: str) -> None:
+    if hasattr(update_or_query, 'answer'):
+        await update_or_query.answer()
+    if priority_input == "skip":
+        priority = "Medium"
+    else:
+        priority = priority_input
+    
+    # Store priority and move to next step
+    context.user_data['partial_task']['priority'] = priority
+    context.user_data['task_creation_state'] = TaskCreationState.AWAITING_CATEGORY.value
+    context.user_data['step_history'].append({
+        'step': 'priority',
+        'value': priority,
+        'timestamp': datetime.now().isoformat()
+    })
+    
+    # Get available categories
+    with next(get_session()) as session:
+        task_repo = TaskRepository(session)
+        available_categories = task_repo.get_all_categories()
+    
+    # Add common categories if not present
+    common_categories = ["Work", "Personal", "Health", "Learning", "Finance", "Home"]
+    for cat in common_categories:
+        if cat not in available_categories:
+            available_categories.append(cat)
+    
+    # Create category buttons (limit to 8 for UI performance)
+    category_buttons = []
+    for i in range(0, min(len(available_categories), 8), 2):
+        row = []
+        for j in range(2):
+            if i + j < len(available_categories):
+                cat = available_categories[i + j]
+                row.append(InlineKeyboardButton(
+                    f"📂 {cat}", 
+                    callback_data=f"addtask_step:category:{cat}"
+                ))
+        category_buttons.append(row)
+    
+    # Add action buttons
+    category_buttons.append([
+        InlineKeyboardButton("➕ Custom", callback_data="addtask_step:category:custom"),
+        InlineKeyboardButton("⏭️ Skip", callback_data="addtask_step:category:skip")
+    ])
+    category_buttons.append([
+        InlineKeyboardButton("❌ Cancel", callback_data="addtask_step:cancel")
+    ])
+    
+    keyboard = InlineKeyboardMarkup(category_buttons)
+    
+    priority_emoji = {"Low": "🟢", "Medium": "🟡", "High": "🟠", "Critical": "🔴"}.get(priority, "⚪")
+    message = MessageFormatter.format_info_message(
+        f"{priority_emoji} Priority: {MessageFormatter.escape_markdown(priority)}",
+        {"Question": "What category is this?"}
+    )
+    
+    if hasattr(update_or_query, 'edit_message_text'):
+        await update_or_query.edit_message_text(message, reply_markup=keyboard, parse_mode='MarkdownV2')
+    else:
+        await update_or_query.message.reply_text(message, reply_markup=keyboard, parse_mode='MarkdownV2')
+
+async def _handle_category_step(update_or_query, context: ContextTypes.DEFAULT_TYPE, category_input: str) -> None:
+    if hasattr(update_or_query, 'answer'):
+        await update_or_query.answer()
+    if category_input == "skip":
+        category = None
+        next_state = TaskCreationState.CONFIRMATION.value
+    elif category_input == "custom":
+        # Ask for custom category
+        context.user_data['task_creation_state'] = TaskCreationState.AWAITING_CATEGORY.value
+        context.user_data['awaiting_custom_category'] = True
+        message = MessageFormatter.format_info_message(
+            "📂 Custom Category",
+            {"Action": "Please enter the category name:"}
+        )
+        if hasattr(update_or_query, 'edit_message_text'):
+            await update_or_query.edit_message_text(message, parse_mode='MarkdownV2')
+        else:
+            await update_or_query.message.reply_text(message, parse_mode='MarkdownV2')
+        return
+    else:
+        category = category_input
+        # If category is Work, ask for client
+        if category.lower() == "work":
+            next_state = TaskCreationState.AWAITING_CLIENT.value
+        else:
+            next_state = TaskCreationState.CONFIRMATION.value
+    
+    # Store category
+    context.user_data['partial_task']['category'] = category
+    context.user_data['step_history'].append({
+        'step': 'category',
+        'value': category,
+        'timestamp': datetime.now().isoformat()
+    })
+    
+    if next_state == TaskCreationState.AWAITING_CLIENT.value:
+        context.user_data['task_creation_state'] = TaskCreationState.AWAITING_CLIENT.value
+        await _handle_client_step(update_or_query, context, None)
+    else:
+        context.user_data['task_creation_state'] = TaskCreationState.CONFIRMATION.value
+        await _show_confirmation(update_or_query, context)
+
+async def _handle_client_step(update_or_query, context: ContextTypes.DEFAULT_TYPE, client_input: str) -> None:
+    if hasattr(update_or_query, 'answer'):
+        await update_or_query.answer()
+    if client_input == "skip":
+        client_id = None
+        next_state = TaskCreationState.CONFIRMATION.value
+    elif client_input is None:
+        # Show client selection buttons
+        with next(get_session()) as session:
+            client_repo = ClientRepository(session)
+            clients = client_repo.list_clients()
+        
+        if not clients:
+            # No clients available, skip to confirmation
+            client_id = None
+            next_state = TaskCreationState.CONFIRMATION.value
+        else:
+            # Show client selection buttons
+            client_buttons = []
+            for i in range(0, min(len(clients), 6), 2):  # Limit to 6 clients for UI
+                row = []
+                for j in range(2):
+                    if i + j < len(clients):
+                        client = clients[i + j]
+                        # Get task count for this client
+                        task_count = len(client.tasks) if hasattr(client, 'tasks') else 0
+                        row.append(InlineKeyboardButton(
+                            f"👤 {MessageFormatter.escape_markdown(client.name)} ({task_count})", 
+                            callback_data=f"addtask_step:client:{client.id}"
+                        ))
+                client_buttons.append(row)
+            
+            # Add action buttons
+            client_buttons.append([
+                InlineKeyboardButton("➕ New Client", callback_data="addtask_step:client:new"),
+                InlineKeyboardButton("⏭️ Skip", callback_data="addtask_step:client:skip")
+            ])
+            client_buttons.append([
+                InlineKeyboardButton("❌ Cancel", callback_data="addtask_step:cancel")
+            ])
+            
+            keyboard = InlineKeyboardMarkup(client_buttons)
+            
+            message = MessageFormatter.format_info_message(
+                "💼 Category: Work",
+                {"Question": "Which client is this for?"}
+            )
+            
+            if hasattr(update_or_query, 'edit_message_text'):
+                await update_or_query.edit_message_text(message, reply_markup=keyboard, parse_mode='MarkdownV2')
+            else:
+                await update_or_query.message.reply_text(message, reply_markup=keyboard, parse_mode='MarkdownV2')
+            return
+    else:
+        # Parse client ID from input
+        try:
+            client_id = int(client_input)
+            next_state = TaskCreationState.CONFIRMATION.value
+        except (ValueError, TypeError):
+            if client_input == "new":
+                # Handle new client creation
+                context.user_data['task_creation_state'] = TaskCreationState.AWAITING_CLIENT.value
+                context.user_data['awaiting_new_client'] = True
+                message = MessageFormatter.format_info_message(
+                    "➕ New Client",
+                    {"Action": "Please enter the client name:"}
+                )
+                if hasattr(update_or_query, 'edit_message_text'):
+                    await update_or_query.edit_message_text(message, parse_mode='MarkdownV2')
+                else:
+                    await update_or_query.message.reply_text(message, parse_mode='MarkdownV2')
+                return
+            else:
+                client_id = None
+                next_state = TaskCreationState.CONFIRMATION.value
+    
+    # Store client and move to confirmation
+    context.user_data['partial_task']['client_id'] = client_id
+    context.user_data['task_creation_state'] = TaskCreationState.CONFIRMATION.value
+    context.user_data['step_history'].append({
+        'step': 'client',
+        'value': client_id,
+        'timestamp': datetime.now().isoformat()
+    })
+    
+    await _show_confirmation(update_or_query, context)
+
+async def _show_confirmation(update_or_query, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if hasattr(update_or_query, 'answer'):
+        await update_or_query.answer()
+    partial_task = context.user_data['partial_task']
+    
+    # Build summary message
+    summary_lines = [
+        f"📝 **{partial_task['description']}**"
+    ]
+    
+    if partial_task['due_date']:
+        summary_lines.append(f"📅 Due: {partial_task['due_date']}")
+    
+    priority_emoji = {"Low": "🟢", "Medium": "🟡", "High": "🟠", "Critical": "🔴"}.get(partial_task['priority'], "⚪")
+    summary_lines.append(f"{priority_emoji} Priority: {partial_task['priority']}")
+    
+    if partial_task['category']:
+        summary_lines.append(f"📂 Category: {partial_task['category']}")
+    
+    if partial_task['client_id']:
+        # Get client name
+        with next(get_session()) as session:
+            client_repo = ClientRepository(session)
+            client = client_repo.get_client_by_id(partial_task['client_id'])
+            if client:
+                summary_lines.append(f"👤 Client: {client.name}")
+    
+    summary_text = "\n".join(summary_lines)
+    
+    # Create confirmation buttons
+    keyboard_buttons = [
+        [
+            InlineKeyboardButton("✅ Create Task", callback_data="addtask_step:confirm"),
+            InlineKeyboardButton("✏️ Edit", callback_data="addtask_step:edit")
+        ],
+        [
+            InlineKeyboardButton("❌ Cancel", callback_data="addtask_step:cancel")
+        ]
+    ]
+    keyboard = InlineKeyboardMarkup(keyboard_buttons)
+    
+    message = MessageFormatter.format_success_message(
+        "✅ Task Summary",
+        {"Summary": summary_text}
+    )
+    
+    if hasattr(update_or_query, 'edit_message_text'):
+        await update_or_query.edit_message_text(message, reply_markup=keyboard, parse_mode='MarkdownV2')
+    else:
+        await update_or_query.message.reply_text(message, reply_markup=keyboard, parse_mode='MarkdownV2')
+
+async def _handle_confirmation_step(update_or_query, context: ContextTypes.DEFAULT_TYPE, action: str) -> None:
+    print(f"[DEBUG] Entered _handle_confirmation_step with action={action}")
+    if hasattr(update_or_query, 'answer'):
+        await update_or_query.answer()
+    if action == "confirm":
+        await _create_final_task(update_or_query, context)
+    elif action == "edit":
+        await _show_edit_options(update_or_query, context)
+    elif action == "cancel":
+        await _cancel_task_creation(update_or_query, context)
+
+async def _create_final_task(update_or_query, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Create the final task with all collected data."""
+    partial_task = context.user_data['partial_task']
+    
+    # Convert due_date string back to datetime if present
+    due_date = None
+    if partial_task['due_date']:
+        try:
+            due_date_obj = datetime.strptime(partial_task['due_date'], "%Y-%m-%d")
+            # Make timezone-aware (UTC) to avoid naive/aware comparison issues
+            due_date = due_date_obj.replace(tzinfo=timezone.utc)
+        except ValueError:
+            due_date = None
+    
+    # Create task using existing service
+    task_service = _get_task_service()
+    result = await task_service.create_task_with_metadata(
+        description=partial_task['description'],
+        priority=partial_task['priority'],
+        due_date=due_date,
+        category=partial_task['category'],
+        estimated_hours=partial_task['estimated_hours'],
+        client_id=partial_task['client_id']
+    )
+    
+    if result['success']:
+        task_data = result['data']
+        
+        # Emit event
+        emit_task_event(_task_event_bus, "task_created", task_data)
+        
+        message = MessageFormatter.format_success_message(
+            "✅ Task created successfully!",
+            {
+                "ID": task_data['id'],
+                "Description": task_data['description'],
+                "Priority": task_data['priority'],
+                "Due Date": task_data['due_date'] or 'None',
+                "Category": task_data['category'] or 'None'
+            }
+        )
+        print("[DEBUG] outgoing success message:\n", message)
+        
+        if hasattr(update_or_query, 'edit_message_text'):
+            await update_or_query.edit_message_text(message, parse_mode='MarkdownV2')
+        else:
+            await update_or_query.message.reply_text(message, parse_mode='MarkdownV2')
+        
+        # Clear task creation state
+        _clear_task_creation_state(context)
+    else:
+        message = MessageFormatter.format_error_message(
+            f"❌ Error creating task: {MessageFormatter.escape_markdown(result['message'])}",
+            "Please try again or use /add for basic task creation."
+        )
+        if hasattr(update_or_query, 'edit_message_text'):
+            await update_or_query.edit_message_text(message, parse_mode='MarkdownV2')
+        else:
+            await update_or_query.message.reply_text(message, parse_mode='MarkdownV2')
+
+async def _cancel_task_creation(update_or_query, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if hasattr(update_or_query, 'answer'):
+        await update_or_query.answer()
+    _clear_task_creation_state(context)
+    
+    message = MessageFormatter.format_info_message(
+        "❌ Task creation cancelled",
+        {"Action": "Use /addtask to start over or /add for basic task creation."}
+    )
+    
+    if hasattr(update_or_query, 'edit_message_text'):
+        await update_or_query.edit_message_text(message, parse_mode='MarkdownV2')
+    else:
+        await update_or_query.message.reply_text(message, parse_mode='MarkdownV2')
+
+async def _show_edit_options(update_or_query, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if hasattr(update_or_query, 'answer'):
+        await update_or_query.answer()
+    message = MessageFormatter.format_info_message(
+        "✏️ Edit Options",
+        {"Status": "Edit functionality coming soon. Please cancel and start over to make changes."}
+    )
+    
+    keyboard_buttons = [
+        [InlineKeyboardButton("❌ Cancel", callback_data="addtask_step:cancel")]
+    ]
+    keyboard = InlineKeyboardMarkup(keyboard_buttons)
+    
+    if hasattr(update_or_query, 'edit_message_text'):
+        await update_or_query.edit_message_text(message, reply_markup=keyboard, parse_mode='MarkdownV2')
+    else:
+        await update_or_query.message.reply_text(message, reply_markup=keyboard, parse_mode='MarkdownV2')
+
+def _clear_task_creation_state(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Clear task creation state from context."""
+    keys_to_remove = [
+        'task_creation_state', 'partial_task', 'step_history', 
+        'started_at', 'awaiting_custom_category', 'awaiting_new_client'
+    ]
+    for key in keys_to_remove:
+        if key in context.user_data:
+            del context.user_data[key] 

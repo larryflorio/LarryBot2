@@ -71,7 +71,7 @@ class TestTelegramBotHandler:
         await handler._start(mock_update, mock_context)
         # Check that the new welcome message was sent with buttons
         args, kwargs = mock_update.message.reply_text.call_args
-        assert "Welcome," in args[0]
+        assert "Welcome to LarryBot2" in args[0]
         assert "What I Can Do For You" in args[0]
         assert "Task Management" in args[0]
         assert "reply_markup" in kwargs

@@ -25,6 +25,10 @@ class ButtonType(Enum):
     DANGER = "danger"
     WARNING = "warning"
     INFO = "info"
+    # Legacy aliases for backward compatibility
+    TASK_ACTION = "primary"  # Alias for PRIMARY
+    NAVIGATION = "secondary"  # Alias for SECONDARY
+    CONFIRMATION = "danger"  # Alias for DANGER
 
 
 class ActionType(Enum):
@@ -611,7 +615,11 @@ class UnifiedButtonBuilder:
         ButtonType.SUCCESS: {"emoji": "✅", "style": "success"},
         ButtonType.DANGER: {"emoji": "🗑️", "style": "danger"},
         ButtonType.WARNING: {"emoji": "⚠️", "style": "warning"},
-        ButtonType.INFO: {"emoji": "ℹ️", "style": "info"}
+        ButtonType.INFO: {"emoji": "ℹ️", "style": "info"},
+        # Legacy aliases
+        "TASK_ACTION": {"emoji": "🔵", "style": "primary"},
+        "NAVIGATION": {"emoji": "⚪", "style": "secondary"},
+        "CONFIRMATION": {"emoji": "🗑️", "style": "danger"}
     }
     
     # Action templates for common operations
@@ -682,7 +690,11 @@ class UnifiedButtonBuilder:
         style = template["style"]
         emoji = template["emoji"]
         
-        callback_data = f"{entity_type}_{action_type.value}:{entity_id}"
+        # Use generic action pattern for all entities
+        if entity_type == "task" and action_type == ActionType.COMPLETE:
+            callback_data = f"task_complete:{entity_id}"
+        else:
+            callback_data = f"{entity_type}_{action_type.value}:{entity_id}"
         
         return UnifiedButtonBuilder.create_button(
             text=text,

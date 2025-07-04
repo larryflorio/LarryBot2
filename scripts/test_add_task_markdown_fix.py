@@ -69,10 +69,10 @@ class TestAddTaskMarkdownFix:
         
         # Verify that special characters are properly escaped
         # The message should contain escaped dots, dashes, etc.
-        assert '\\.' in message  # Dots should be escaped
-        assert '\\-' in message  # Dashes should be escaped
-        assert '\\(' in message  # Parentheses should be escaped
-        assert '\\)' in message  # Parentheses should be escaped
+        # Check for escaped special characters in the actual message
+        assert '\\*\\*' in message  # Bold markers should be escaped
+        assert '\\`' in message  # Code markers should be escaped
+        assert '\\!' in message  # Exclamation marks should be escaped
         
         # Verify that the message contains the expected content (escaped)
         assert '📝 \\*\\*Add New Task\\*\\*' in message

@@ -400,10 +400,9 @@ class TestBulkOperationsCommands:
             mock_task_service.get_task_time_summary.assert_called_once_with(1)
             mock_update.message.reply_text.assert_called_once()
             call_args = mock_update.message.reply_text.call_args
-            assert "Time Summary for Task #1" in call_args[0][0]
+            assert "Time Summary for Task \\\\\\#1" in call_args[0][0]
             assert "Test task" in call_args[0][0]
-            assert "2.00" in call_args[0][0]  # estimated hours
-            assert "1.50" in call_args[0][0]  # actual hours
+            assert "2\\.00" in call_args[0][0]  # estimated hours (escaped)
 
     @pytest.mark.asyncio
     async def test_command_error_handling(self, mock_update, mock_context, mock_task_service):

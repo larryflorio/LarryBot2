@@ -17,7 +17,7 @@ import json
 from larrybot.models import Base
 from larrybot.models.enums import TaskStatus, TaskPriority, validate_enum_value
 from larrybot.utils.basic_datetime import get_utc_now, get_current_datetime
-from larrybot.utils.datetime_utils import is_overdue, days_until_due, hours_elapsed_since
+from larrybot.utils.datetime_utils import is_overdue, days_until_due, hours_elapsed_since, ensure_timezone_aware
 
 
 class Task(Base):
@@ -338,7 +338,9 @@ class Task(Base):
         if self.created_at is None:
             return sla_hours
         
-        delta = get_current_datetime() - self.created_at
+        # Normalize created_at to UTC before subtraction
+        normalized_created_at = ensure_timezone_aware(self.created_at)
+        delta = get_current_datetime() - normalized_created_at
         hours_elapsed = delta.total_seconds() / 3600
         return max(0, sla_hours - hours_elapsed)
     

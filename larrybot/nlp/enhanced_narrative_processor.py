@@ -35,8 +35,18 @@ class IntentType(Enum):
     UNKNOWN = "unknown"
 
 
+class TaskCreationState(Enum):
+    """States for the narrative task creation flow."""
+    AWAITING_DESCRIPTION = "awaiting_description"
+    AWAITING_DUE_DATE = "awaiting_due_date"
+    AWAITING_PRIORITY = "awaiting_priority"
+    AWAITING_CATEGORY = "awaiting_category"
+    AWAITING_CLIENT = "awaiting_client"
+    CONFIRMATION = "confirmation"
+
+
 class ContextType(Enum):
-    """Context types for conversation flow management."""
+    """Context types for narrative processing."""
     TASK_CREATION = "task_creation"
     TASK_EDITING = "task_editing"
     TASK_SELECTION = "task_selection"
