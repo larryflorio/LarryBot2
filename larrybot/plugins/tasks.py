@@ -25,7 +25,7 @@ def register(event_bus: EventBus, command_registry: CommandRegistry) -> None:
     global _task_event_bus
     _task_event_bus = event_bus
     
-    command_registry.register("/add", add_task_handler)
+    # NOTE: /add is now deprecated in favor of /addtask (handled by advanced_tasks plugin)
     command_registry.register("/list", list_tasks_handler)
     command_registry.register("/done", done_task_handler)
     command_registry.register("/edit", edit_task_handler)

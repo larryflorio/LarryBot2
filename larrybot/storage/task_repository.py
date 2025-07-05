@@ -8,6 +8,9 @@ from datetime import datetime, timedelta
 import json
 from sqlalchemy import or_, and_, func, text, desc, asc
 from larrybot.utils.caching import cached, cache_invalidate, cache_clear
+from larrybot.utils.cache_automation import (
+    auto_invalidate_cache, OperationType, invalidate_caches_for
+)
 from larrybot.utils.background_processing import background_task, submit_background_job
 from larrybot.utils.datetime_utils import get_current_datetime, get_current_utc_datetime, get_today_date, get_start_of_day, get_end_of_day, get_utc_now
 import logging
@@ -22,14 +25,19 @@ class TaskRepository:
     def __init__(self, session: Session):
         self.session = session
 
+    @auto_invalidate_cache(OperationType.TASK_CREATE)
     def add_task(self, description: str) -> Task:
         task = Task(description=description, done=False)
         self.session.add(task)
         self.session.commit()
         
-        # Invalidate task list caches
-        cache_invalidate('list_incomplete_tasks')
-        cache_invalidate('task_statistics')
+        # Automated cache invalidation handles:
+        # - list_incomplete_tasks
+        # - task_statistics
+        # - analytics
+        # - get_tasks_by_priority
+        # - get_tasks_by_category
+        # - get_all_categories
         
         return task
 
@@ -58,6 +66,7 @@ class TaskRepository:
                 .filter_by(id=task_id)
                 .first())
 
+    @auto_invalidate_cache(OperationType.TASK_STATUS_CHANGE)
     def mark_task_done(self, task_id: int) -> Optional[Task]:
         # Query directly to ensure we have a session-attached object
         task = self.session.query(Task).filter_by(id=task_id).first()
@@ -67,15 +76,17 @@ class TaskRepository:
             task.status = TaskStatus.DONE.value
             self.session.commit()
             
-            # Invalidate related caches
-            cache_invalidate('list_incomplete_tasks')
-            cache_invalidate('task_statistics')
-            cache_invalidate('analytics')  # Invalidate analytics caches
-            cache_invalidate(f'get_task_by_id')
+            # Automated cache invalidation handles:
+            # - get_task_by_id
+            # - get_tasks_by_status
+            # - list_incomplete_tasks
+            # - task_statistics
+            # - analytics
             
             return task
         return None
 
+    @auto_invalidate_cache(OperationType.TASK_UPDATE)
     def edit_task(self, task_id: int, new_description: str) -> Optional[Task]:
         # Query directly to ensure we have a session-attached object
         task = self.session.query(Task).filter_by(id=task_id).first()
@@ -83,13 +94,14 @@ class TaskRepository:
             task.description = new_description
             self.session.commit()
             
-            # Invalidate caches
-            cache_invalidate(f'get_task_by_id')
-            cache_invalidate('list_incomplete_tasks')
+            # Automated cache invalidation handles:
+            # - get_task_by_id
+            # - list_incomplete_tasks
             
             return task
         return None
 
+    @auto_invalidate_cache(OperationType.TASK_DELETE)
     def remove_task(self, task_id: int) -> Optional[Task]:
         # Query directly to ensure we have a session-attached object
         task = self.session.query(Task).filter_by(id=task_id).first()
@@ -97,15 +109,20 @@ class TaskRepository:
             self.session.delete(task)
             self.session.commit()
             
-            # Invalidate all related caches
-            cache_invalidate('list_incomplete_tasks')
-            cache_invalidate('task_statistics')
-            cache_invalidate('analytics')  # Invalidate analytics caches
-            cache_invalidate('get_task_by_id')  # Pattern match for all get_task_by_id calls
+            # Automated cache invalidation handles comprehensive invalidation:
+            # - list_incomplete_tasks
+            # - task_statistics
+            # - analytics
+            # - get_task_by_id
+            # - get_tasks_by_priority
+            # - get_tasks_by_category
+            # - get_tasks_by_status
+            # - get_tasks_by_client
             
             return task
         return None
 
+    @auto_invalidate_cache(OperationType.TASK_CLIENT_CHANGE)
     def assign_task_to_client(self, task_id: int, client_name: str) -> Optional[Task]:
         from larrybot.models.client import Client
         
@@ -128,12 +145,13 @@ class TaskRepository:
         task.client_id = client.id
         self.session.commit()
         
-        # Invalidate caches
-        cache_invalidate(f'get_task_by_id')
-        cache_invalidate('get_tasks_by_client')
+        # Automated cache invalidation handles:
+        # - get_task_by_id
+        # - get_tasks_by_client
         
         return task
 
+    @auto_invalidate_cache(OperationType.TASK_CLIENT_CHANGE)
     def unassign_task(self, task_id: int) -> Optional[Task]:
         # Query directly to ensure we have a session-attached object
         task = self.session.query(Task).filter_by(id=task_id).first()
@@ -142,9 +160,9 @@ class TaskRepository:
         task.client_id = None
         self.session.commit()
         
-        # Invalidate caches
-        cache_invalidate(f'get_task_by_id')
-        cache_invalidate('get_tasks_by_client')
+        # Automated cache invalidation handles:
+        # - get_task_by_id
+        # - get_tasks_by_client
         
         return task
 
@@ -160,6 +178,7 @@ class TaskRepository:
                 .order_by(Task.created_at.desc())
                 .all())
 
+    @auto_invalidate_cache(OperationType.TASK_CREATE)
     def add_task_with_metadata(
         self, 
         description: str, 
@@ -185,12 +204,13 @@ class TaskRepository:
         self.session.add(task)
         self.session.commit()
         
-        # Invalidate caches
-        cache_invalidate('list_incomplete_tasks')
-        cache_invalidate('task_statistics')
-        cache_invalidate('analytics')  # Invalidate analytics caches
-        cache_invalidate('get_tasks_by_priority')
-        cache_invalidate('get_tasks_by_category')
+        # Automated cache invalidation handles:
+        # - list_incomplete_tasks
+        # - task_statistics
+        # - analytics
+        # - get_tasks_by_priority
+        # - get_tasks_by_category
+        # - get_all_categories
         
         return task
 
@@ -218,6 +238,7 @@ class TaskRepository:
                 .order_by(Task.created_at.desc())
                 .all())
 
+    @auto_invalidate_cache(OperationType.TASK_PRIORITY_CHANGE)
     def update_priority(self, task_id: int, priority: str) -> Optional[Task]:
         """Update task priority."""
         # Query directly to ensure we have a session-attached object
@@ -226,9 +247,9 @@ class TaskRepository:
             task.priority = priority  # This will use the property setter
             self.session.commit()
             
-            # Invalidate caches
-            cache_invalidate(f'get_task_by_id')
-            cache_invalidate('get_tasks_by_priority')
+            # Automated cache invalidation handles:
+            # - get_task_by_id
+            # - get_tasks_by_priority
             
             return task
         return None
@@ -265,6 +286,7 @@ class TaskRepository:
         end_of_day = get_end_of_day()
         return self.get_tasks_due_between(start_of_day, end_of_day)
 
+    @auto_invalidate_cache(OperationType.TASK_DUE_DATE_CHANGE)
     def update_due_date(self, task_id: int, due_date: datetime) -> Optional[Task]:
         """Update task due date."""
         # Query directly to ensure we have a session-attached object
@@ -273,10 +295,10 @@ class TaskRepository:
             task.due_date = due_date
             self.session.commit()
             
-            # Invalidate caches
-            cache_invalidate(f'get_task_by_id')
-            cache_invalidate('get_overdue_tasks')
-            cache_invalidate('get_tasks_due_between')
+            # Automated cache invalidation handles:
+            # - get_task_by_id
+            # - get_overdue_tasks
+            # - get_tasks_due_between
             
             return task
         return None
@@ -298,6 +320,7 @@ class TaskRepository:
         ).distinct().all()
         return [cat[0] for cat in categories if cat[0]]
 
+    @auto_invalidate_cache(OperationType.TASK_CATEGORY_CHANGE)
     def update_category(self, task_id: int, category: str) -> Optional[Task]:
         """Update task category."""
         # Query directly to ensure we have a session-attached object
@@ -306,10 +329,10 @@ class TaskRepository:
             task.category = category
             self.session.commit()
             
-            # Invalidate caches
-            cache_invalidate(f'get_task_by_id')
-            cache_invalidate('get_tasks_by_category')
-            cache_invalidate('get_all_categories')
+            # Automated cache invalidation handles:
+            # - get_task_by_id
+            # - get_tasks_by_category
+            # - get_all_categories
             
             return task
         return None
@@ -337,6 +360,7 @@ class TaskRepository:
                 .order_by(Task.created_at.desc())
                 .all())
 
+    @auto_invalidate_cache(OperationType.TASK_STATUS_CHANGE)
     def update_status(self, task_id: int, status: str) -> Optional[Task]:
         """Update task status."""
         # Query directly to ensure we have a session-attached object
@@ -347,12 +371,12 @@ class TaskRepository:
                 task.done = True
             self.session.commit()
             
-            # Invalidate caches
-            cache_invalidate(f'get_task_by_id')
-            cache_invalidate('get_tasks_by_status')
-            cache_invalidate('list_incomplete_tasks')
-            cache_invalidate('task_statistics')
-            cache_invalidate('analytics')  # Invalidate analytics caches
+            # Automated cache invalidation handles:
+            # - get_task_by_id
+            # - get_tasks_by_status
+            # - list_incomplete_tasks
+            # - task_statistics
+            # - analytics
             
             return task
         return None
@@ -494,6 +518,7 @@ class TaskRepository:
                 .order_by(Task.created_at.asc())
                 .all())
 
+    @auto_invalidate_cache(OperationType.TASK_UPDATE)
     def add_tags(self, task_id: int, tags: List[str]) -> Optional[Task]:
         """Add tags to a task."""
         # Query directly to ensure we have a session-attached object
@@ -503,9 +528,15 @@ class TaskRepository:
             current_tags.extend(tags)
             task.tags = json.dumps(list(set(current_tags)))  # Remove duplicates
             self.session.commit()
+            
+            # Automated cache invalidation handles:
+            # - get_task_by_id
+            # - list_incomplete_tasks
+            
             return task
         return None
 
+    @auto_invalidate_cache(OperationType.TASK_UPDATE)
     def remove_tags(self, task_id: int, tags: List[str]) -> Optional[Task]:
         """Remove tags from a task."""
         # Query directly to ensure we have a session-attached object
@@ -515,6 +546,11 @@ class TaskRepository:
             current_tags = [tag for tag in current_tags if tag not in tags]
             task.tags = json.dumps(current_tags) if current_tags else None
             self.session.commit()
+            
+            # Automated cache invalidation handles:
+            # - get_task_by_id
+            # - list_incomplete_tasks
+            
             return task
         return None
 
@@ -785,6 +821,7 @@ class TaskRepository:
                 .order_by(Task.created_at.desc())
                 .all())
 
+    @auto_invalidate_cache(OperationType.BULK_OPERATION)
     def bulk_update_status(self, task_ids: List[int], status: str) -> int:
         """Bulk update task status - optimized for performance."""
         if not task_ids:
@@ -807,14 +844,18 @@ class TaskRepository:
         
         self.session.commit()
         
-        # Invalidate relevant caches
-        cache_invalidate('get_tasks_by_status')
-        cache_invalidate('list_incomplete_tasks')
-        cache_invalidate('task_statistics')
-        cache_invalidate('analytics')
+        # Automated cache invalidation handles comprehensive bulk operation cache clearing:
+        # - get_tasks_by_status
+        # - get_tasks_by_priority
+        # - get_tasks_by_category
+        # - get_tasks_by_client
+        # - list_incomplete_tasks
+        # - task_statistics
+        # - analytics
         
         return updated_count
 
+    @auto_invalidate_cache(OperationType.BULK_OPERATION)
     def bulk_update_priority(self, task_ids: List[int], priority: str) -> int:
         """Bulk update task priority - optimized for performance."""
         if not task_ids:
@@ -826,11 +867,18 @@ class TaskRepository:
         
         self.session.commit()
         
-        # Invalidate relevant caches
-        cache_invalidate('get_tasks_by_priority')
+        # Automated cache invalidation handles comprehensive bulk operation cache clearing:
+        # - get_tasks_by_status
+        # - get_tasks_by_priority
+        # - get_tasks_by_category
+        # - get_tasks_by_client
+        # - list_incomplete_tasks
+        # - task_statistics
+        # - analytics
         
         return updated_count
 
+    @auto_invalidate_cache(OperationType.BULK_OPERATION)
     def bulk_update_category(self, task_ids: List[int], category: str) -> int:
         """Bulk update task category - optimized for performance."""
         if not task_ids:
@@ -842,12 +890,18 @@ class TaskRepository:
         
         self.session.commit()
         
-        # Invalidate relevant caches
-        cache_invalidate('get_tasks_by_category')
-        cache_invalidate('get_all_categories')
+        # Automated cache invalidation handles comprehensive bulk operation cache clearing:
+        # - get_tasks_by_status
+        # - get_tasks_by_priority
+        # - get_tasks_by_category
+        # - get_tasks_by_client
+        # - list_incomplete_tasks
+        # - task_statistics
+        # - analytics
         
         return updated_count
 
+    @auto_invalidate_cache(OperationType.BULK_OPERATION)
     def bulk_assign_to_client(self, task_ids: List[int], client_name: str) -> int:
         """Bulk assign tasks to client - optimized for performance."""
         if not task_ids:
@@ -864,11 +918,18 @@ class TaskRepository:
         
         self.session.commit()
         
-        # Invalidate relevant caches
-        cache_invalidate('get_tasks_by_client')
+        # Automated cache invalidation handles comprehensive bulk operation cache clearing:
+        # - get_tasks_by_status
+        # - get_tasks_by_priority
+        # - get_tasks_by_category
+        # - get_tasks_by_client
+        # - list_incomplete_tasks
+        # - task_statistics
+        # - analytics
         
         return updated_count
 
+    @auto_invalidate_cache(OperationType.BULK_OPERATION)
     def bulk_delete_tasks(self, task_ids: List[int]) -> int:
         """Bulk delete tasks - optimized for performance."""
         if not task_ids:
@@ -908,9 +969,14 @@ class TaskRepository:
             # Force session expiry to ensure fresh data on next query
             self.session.expunge_all()
             
-            # Invalidate all relevant caches - specifically target get_task_by_id
-            from larrybot.utils.caching import cache_clear
-            cache_clear()  # Clear all caches to be safe
+            # Automated cache invalidation handles comprehensive bulk operation cache clearing:
+            # - get_tasks_by_status
+            # - get_tasks_by_priority
+            # - get_tasks_by_category
+            # - get_tasks_by_client
+            # - list_incomplete_tasks
+            # - task_statistics
+            # - analytics
             
             return deleted_count
             

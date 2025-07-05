@@ -69,18 +69,19 @@ def register(event_bus: EventBus, command_registry: CommandRegistry) -> None:
     command_registry.register("/time_summary", time_summary_handler)
     
     # Enhanced filtering and search
-    command_registry.register("/search_advanced", search_advanced_handler)
+    # NOTE: /search_advanced is deprecated in favor of /search --advanced (registered below as deprecated)
     command_registry.register("/filter_advanced", filter_advanced_handler)
     command_registry.register("/tags_multi", tags_multi_handler)
     command_registry.register("/time_range", time_range_handler)
     command_registry.register("/priority_range", priority_range_handler)
     
     # Enhanced analytics and reporting
-    command_registry.register("/analytics_advanced", analytics_advanced_handler)
+    # NOTE: /analytics_advanced is deprecated in favor of /analytics advanced (registered below as deprecated)
     command_registry.register("/productivity_report", productivity_report_handler)
     
     # DEPRECATED COMMANDS - Redirect to consolidated versions
-    command_registry.register("/addtask", deprecated_addtask_handler)
+    # NOTE: /addtask is NOT deprecated - it's the primary command registered above
+    command_registry.register("/add", deprecated_add_handler)  # /add → /addtask
     command_registry.register("/tasks", deprecated_tasks_handler)
     command_registry.register("/search_advanced", deprecated_search_advanced_handler)
     command_registry.register("/analytics_detailed", deprecated_analytics_detailed_handler)
@@ -1807,25 +1808,24 @@ async def productivity_report_handler(update: Update, context: ContextTypes.DEFA
 # These handlers provide backward compatibility and smooth transition
 # for users still using the old command names.
 
-async def deprecated_addtask_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Deprecated: Redirect /addtask to enhanced /add command."""
+async def deprecated_add_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Deprecated: Redirect /add to enhanced /addtask command."""
     await update.message.reply_text(
         MessageFormatter.format_info_message(
             "🔄 Command Consolidated",
             {
-                "Old Command": "/addtask",
-                "New Command": "/add",
-                "Migration": "The /addtask command has been merged into /add",
-                "Usage": "/add <description> [priority] [due_date] [category]",
-                "Benefits": "Same functionality with cleaner interface"
+                "Old Command": "/add",
+                "New Command": "/addtask",
+                "Migration": "The /add command has been merged into /addtask",
+                "Usage": "/addtask <description> [priority] [due_date] [category]",
+                "Benefits": "Enhanced functionality with metadata support"
             }
         ),
         parse_mode='MarkdownV2'
     )
     
-    # Redirect to the enhanced /add handler
-    from larrybot.plugins.tasks import add_task_handler
-    await add_task_handler(update, context)
+    # Redirect to the enhanced /addtask handler (this plugin's handler)
+    await add_task_with_metadata_handler(update, context)
 
 async def deprecated_tasks_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Deprecated: Redirect /tasks to enhanced /list command."""
