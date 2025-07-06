@@ -4,13 +4,12 @@ Shared utilities for the Advanced Tasks plugin.
 This module provides common functions and utilities used across
 all components of the advanced tasks plugin.
 """
-
 from larrybot.storage.db import get_session
 from larrybot.storage.task_repository import TaskRepository
 from larrybot.services.task_service import TaskService
 
 
-def get_task_service() -> TaskService:
+def get_task_service() ->TaskService:
     """
     Get task service instance with proper session management.
     
@@ -22,7 +21,7 @@ def get_task_service() -> TaskService:
     return TaskService(task_repository)
 
 
-def validate_task_id(task_id_str: str) -> tuple[bool, int, str]:
+def validate_task_id(task_id_str: str) ->tuple[bool, int, str]:
     """
     Validate and convert task ID string to integer.
     
@@ -33,16 +32,14 @@ def validate_task_id(task_id_str: str) -> tuple[bool, int, str]:
         tuple: (is_valid, task_id, error_message)
     """
     if not task_id_str.isdigit():
-        return False, 0, "Task ID must be a number"
-    
+        return False, 0, 'Task ID must be a number'
     task_id = int(task_id_str)
     if task_id <= 0:
-        return False, 0, "Task ID must be positive"
-    
-    return True, task_id, ""
+        return False, 0, 'Task ID must be positive'
+    return True, task_id, ''
 
 
-def parse_task_ids(task_ids_str: str) -> tuple[bool, list[int], str]:
+def parse_task_ids(task_ids_str: str) ->tuple[bool, list[int], str]:
     """
     Parse comma-separated task IDs string into list of integers.
     
@@ -54,21 +51,16 @@ def parse_task_ids(task_ids_str: str) -> tuple[bool, list[int], str]:
     """
     try:
         task_ids = [int(tid.strip()) for tid in task_ids_str.split(',')]
-        
-        # Validate all IDs are positive
         if any(tid <= 0 for tid in task_ids):
-            return False, [], "All task IDs must be positive numbers"
-        
-        # Remove duplicates while preserving order
+            return False, [], 'All task IDs must be positive numbers'
         unique_ids = list(dict.fromkeys(task_ids))
-        
-        return True, unique_ids, ""
-        
+        return True, unique_ids, ''
     except ValueError:
-        return False, [], "Invalid task ID format. Use comma-separated numbers (e.g., 1,2,3)"
+        return False, [
+            ], 'Invalid task ID format. Use comma-separated numbers (e.g., 1,2,3)'
 
 
-def format_task_list_message(tasks: list, title: str = "Tasks") -> str:
+def format_task_list_message(tasks: list, title: str='Tasks') ->str:
     """
     Format a list of tasks into a readable message.
     
@@ -80,12 +72,9 @@ def format_task_list_message(tasks: list, title: str = "Tasks") -> str:
         str: Formatted message string
     """
     if not tasks:
-        return f"📋 **{title}**\n\nNo tasks found."
-    
-    message = f"📋 **{title}** ({len(tasks)} tasks)\n\n"
-    
-    for i, task in enumerate(tasks[:10], 1):  # Limit to 10 tasks
-        # Handle both dict and object formats
+        return f'📋 **{title}**\n\nNo tasks found.'
+    message = f'📋 **{title}** ({len(tasks)} tasks)\n\n'
+    for i, task in enumerate(tasks[:10], 1):
         if isinstance(task, dict):
             task_id = task.get('id', 'N/A')
             description = task.get('description', 'No description')
@@ -96,21 +85,16 @@ def format_task_list_message(tasks: list, title: str = "Tasks") -> str:
             description = getattr(task, 'description', 'No description')
             status = getattr(task, 'status', 'Todo')
             priority = getattr(task, 'priority', 'Medium')
-        
-        # Truncate long descriptions
         if len(description) > 50:
-            description = description[:47] + "..."
-        
-        message += f"{i}. **#{task_id}** {description}\n"
-        message += f"   📊 {status} | 🔥 {priority}\n\n"
-    
+            description = description[:47] + '...'
+        message += f'{i}. **#{task_id}** {description}\n'
+        message += f'   📊 {status} | 🔥 {priority}\n\n'
     if len(tasks) > 10:
-        message += f"*... and {len(tasks) - 10} more tasks*\n"
-    
+        message += f'*... and {len(tasks) - 10} more tasks*\n'
     return message
 
 
-def get_priority_emoji(priority: str) -> str:
+def get_priority_emoji(priority: str) ->str:
     """
     Get emoji representation for task priority.
     
@@ -120,16 +104,11 @@ def get_priority_emoji(priority: str) -> str:
     Returns:
         str: Emoji representation
     """
-    priority_emojis = {
-        'Low': '🟢',
-        'Medium': '🟡', 
-        'High': '🟠',
-        'Critical': '🔴'
-    }
+    priority_emojis = {'Low': '🟢', 'Medium': '🟡', 'High': '🟠', 'Critical': '🔴'}
     return priority_emojis.get(priority, '⚪')
 
 
-def get_status_emoji(status: str) -> str:
+def get_status_emoji(status: str) ->str:
     """
     Get emoji representation for task status.
     
@@ -139,17 +118,12 @@ def get_status_emoji(status: str) -> str:
     Returns:
         str: Emoji representation
     """
-    status_emojis = {
-        'Todo': '⏳',
-        'In Progress': '🔄',
-        'Review': '👀', 
-        'Done': '✅',
-        'Cancelled': '❌'
-    }
+    status_emojis = {'Todo': '⏳', 'In Progress': '🔄', 'Review': '👀', 'Done':
+        '✅', 'Cancelled': '❌'}
     return status_emojis.get(status, '📋')
 
 
-def format_duration(minutes: int) -> str:
+def format_duration(minutes: int) ->str:
     """
     Format duration in minutes to human-readable string.
     
@@ -160,18 +134,16 @@ def format_duration(minutes: int) -> str:
         str: Formatted duration string
     """
     if minutes < 60:
-        return f"{minutes}m"
-    
+        return f'{minutes}m'
     hours = minutes // 60
     remaining_minutes = minutes % 60
-    
     if remaining_minutes == 0:
-        return f"{hours}h"
+        return f'{hours}h'
     else:
-        return f"{hours}h {remaining_minutes}m"
+        return f'{hours}h {remaining_minutes}m'
 
 
-def truncate_text(text: str, max_length: int = 50) -> str:
+def truncate_text(text: str, max_length: int=50) ->str:
     """
     Truncate text to specified length with ellipsis.
     
@@ -184,4 +156,4 @@ def truncate_text(text: str, max_length: int = 50) -> str:
     """
     if len(text) <= max_length:
         return text
-    return text[:max_length - 3] + "..." 
+    return text[:max_length - 3] + '...'

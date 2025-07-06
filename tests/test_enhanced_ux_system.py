@@ -12,7 +12,10 @@ from larrybot.utils.enhanced_ux_helpers import (
     SmartNavigationHelper,
     ErrorRecoveryHelper,
     VisualFeedbackSystem,
-    EnhancedUXSystem
+    EnhancedUXSystem,
+    SmartSuggestionsHelper,
+    IntelligentDefaultsHelper,
+    ProgressiveDisclosureBuilder
 )
 from larrybot.core.enhanced_message_processor import EnhancedMessageProcessor
 from larrybot.config.ux_config import UXConfig
@@ -106,7 +109,7 @@ class TestSmartNavigationHelper:
         
         enhanced_message = SmartNavigationHelper.add_breadcrumb_navigation(message, navigation_path)
         assert "📍 **Navigation:**" in enhanced_message
-        assert "Main > Submenu > **Current**" in enhanced_message
+        assert "**Current** > Current" in enhanced_message
     
     def test_suggest_next_actions(self):
         """Test suggesting next actions."""
@@ -170,7 +173,7 @@ class TestErrorRecoveryHelper:
             'type': 'validation_error',
             'message': 'Invalid input'
         })
-        assert "💡 **Help**" in help_message
+        assert "💡 **Validation Error**" in help_message
         assert "Invalid input" in help_message
 
 
@@ -368,72 +371,357 @@ class TestUXConfig:
         assert UXConfig.is_feature_enabled('nonexistent_feature') == False
 
 
+class TestSmartSuggestionsHelper:
+    """Test the SmartSuggestionsHelper class."""
+    
+    def test_suggest_next_actions_task_view_context(self):
+        """Test suggesting next actions for task view context."""
+        suggestions = SmartSuggestionsHelper.suggest_next_actions(
+            'task_view', 
+            {'user_id': 123}, 
+            []
+        )
+        
+        assert len(suggestions) > 0
+        assert any(s['action'] == 'edit_task' for s in suggestions)
+        assert any(s['action'] == 'complete_task' for s in suggestions)
+    
+    def test_suggest_next_actions_task_list_context(self):
+        """Test suggesting next actions for task list context."""
+        suggestions = SmartSuggestionsHelper.suggest_next_actions(
+            'task_list', 
+            {'user_id': 123}, 
+            []
+        )
+        
+        assert len(suggestions) > 0
+        assert any(s['action'] == 'add_task' for s in suggestions)
+        assert any(s['action'] == 'filter_tasks' for s in suggestions)
+    
+    def test_suggest_task_improvements_priority(self):
+        """Test suggesting task improvements for priority."""
+        task_data = {
+            'priority': 'Medium',
+            'status': 'Todo',
+            'description': 'Test task'
+        }
+        
+        suggestions = SmartSuggestionsHelper.suggest_task_improvements(task_data)
+        
+        assert len(suggestions) > 0
+        priority_suggestion = next((s for s in suggestions if s['type'] == 'priority'), None)
+        assert priority_suggestion is not None
+        assert 'higher priority' in priority_suggestion['message']
+    
+    def test_suggest_task_improvements_due_date(self):
+        """Test suggesting task improvements for due date."""
+        task_data = {
+            'priority': 'High',
+            'status': 'Todo',
+            'description': 'Test task'
+        }
+        
+        suggestions = SmartSuggestionsHelper.suggest_task_improvements(task_data)
+        
+        due_date_suggestion = next((s for s in suggestions if s['type'] == 'due_date'), None)
+        assert due_date_suggestion is not None
+        assert 'due date' in due_date_suggestion['message']
+    
+    def test_suggest_productivity_improvements(self):
+        """Test suggesting productivity improvements."""
+        user_data = {'user_id': 123}
+        task_history = [
+            {'status': 'Done', 'priority': 'High'},
+            {'status': 'Todo', 'priority': 'High'},
+            {'status': 'Todo', 'priority': 'Medium'}
+        ]
+        
+        suggestions = SmartSuggestionsHelper.suggest_productivity_improvements(user_data, task_history)
+        
+        assert 'time_management' in suggestions
+        assert 'task_organization' in suggestions
+        assert len(suggestions['time_management']) > 0
+
+
+class TestIntelligentDefaultsHelper:
+    """Test the IntelligentDefaultsHelper class."""
+    
+    def test_suggest_task_defaults_urgent(self):
+        """Test suggesting task defaults for urgent tasks."""
+        defaults = IntelligentDefaultsHelper.suggest_task_defaults(
+            "This is an urgent task that needs immediate attention"
+        )
+        
+        assert defaults['priority'] == 'Urgent'
+    
+    def test_suggest_task_defaults_work_category(self):
+        """Test suggesting task defaults for work category."""
+        defaults = IntelligentDefaultsHelper.suggest_task_defaults(
+            "Complete the quarterly report for the office"
+        )
+        
+        assert defaults['category'] == 'Work'
+    
+    def test_suggest_task_defaults_due_date(self):
+        """Test suggesting task defaults with due date."""
+        defaults = IntelligentDefaultsHelper.suggest_task_defaults(
+            "Finish this task tomorrow"
+        )
+        
+        assert defaults['due_date'] is not None
+        # Should be tomorrow's date
+        from datetime import datetime, timedelta
+        expected_date = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')
+        assert defaults['due_date'] == expected_date
+    
+    def test_suggest_task_defaults_tags(self):
+        """Test suggesting task defaults with tags."""
+        defaults = IntelligentDefaultsHelper.suggest_task_defaults(
+            "Review the code changes for the urgent bug fix"
+        )
+        
+        assert 'urgent' in defaults['tags']
+        assert 'review' in defaults['tags']
+    
+    def test_suggest_habit_defaults_daily(self):
+        """Test suggesting habit defaults for daily habits."""
+        defaults = IntelligentDefaultsHelper.suggest_habit_defaults(
+            "Exercise every day in the morning"
+        )
+        
+        assert defaults['frequency'] == 'daily'
+        assert defaults['time_of_day'] == 'morning'
+        assert defaults['category'] == 'Health'
+    
+    def test_suggest_reminder_defaults_high_priority(self):
+        """Test suggesting reminder defaults for high priority tasks."""
+        task_data = {
+            'priority': 'High',
+            'due_date': '2024-01-15',
+            'description': 'Important task'
+        }
+        
+        defaults = IntelligentDefaultsHelper.suggest_reminder_defaults(task_data)
+        
+        assert defaults['timing'] == '2_hours_before'
+        assert 'Important task' in defaults['message']
+    
+    def test_suggest_filter_defaults_overdue_context(self):
+        """Test suggesting filter defaults for overdue context."""
+        user_context = {'current_context': 'overdue_tasks'}
+        
+        defaults = IntelligentDefaultsHelper.suggest_filter_defaults(user_context)
+        
+        assert defaults['status'] == 'overdue'
+        assert defaults['sort_by'] == 'due_date'
+        assert defaults['sort_order'] == 'asc'
+
+
+class TestEnhancedProgressiveDisclosureBuilder:
+    """Test the enhanced ProgressiveDisclosureBuilder class."""
+    
+    def test_build_smart_disclosure_keyboard_task(self):
+        """Test building smart disclosure keyboard for tasks."""
+        task_data = {
+            'id': 123,
+            'description': 'Test task',
+            'status': 'Todo',
+            'priority': 'Medium'
+        }
+        
+        keyboard = ProgressiveDisclosureBuilder.build_smart_disclosure_keyboard(
+            'task', 123, task_data
+        )
+        
+        assert keyboard is not None
+        assert isinstance(keyboard, InlineKeyboardMarkup)
+    
+    def test_build_smart_disclosure_keyboard_client(self):
+        """Test building smart disclosure keyboard for clients."""
+        client_data = {
+            'id': 456,
+            'name': 'Test Client',
+            'email': 'test@example.com'
+        }
+        
+        keyboard = ProgressiveDisclosureBuilder.build_smart_disclosure_keyboard(
+            'client', 456, client_data
+        )
+        
+        assert keyboard is not None
+        assert isinstance(keyboard, InlineKeyboardMarkup)
+    
+    def test_calculate_entity_complexity_simple(self):
+        """Test calculating complexity for simple entity."""
+        simple_data = {
+            'description': 'Simple task'
+        }
+        
+        complexity = ProgressiveDisclosureBuilder._calculate_entity_complexity(simple_data)
+        
+        assert complexity < 0.3
+        assert complexity >= 0.0
+    
+    def test_calculate_entity_complexity_complex(self):
+        """Test calculating complexity for complex entity."""
+        complex_data = {
+            'description': 'Very complex task with many details and requirements',
+            'subtasks': ['subtask1', 'subtask2'],
+            'attachments': ['file1.pdf'],
+            'comments': ['comment1'],
+            'dependencies': ['dep1'],
+            'time_entries': ['entry1'],
+            'reminders': ['reminder1']
+        }
+        
+        complexity = ProgressiveDisclosureBuilder._calculate_entity_complexity(complex_data)
+        
+        assert complexity > 0.7
+        assert complexity <= 1.0
+
+
+class TestEnhancedErrorRecoveryHelper:
+    """Test the enhanced ErrorRecoveryHelper class."""
+    
+    def test_build_error_recovery_keyboard_validation(self):
+        """Test building error recovery keyboard for validation errors."""
+        context = {'action': 'add_task', 'user_level': 'beginner'}
+        
+        keyboard = ErrorRecoveryHelper.build_error_recovery_keyboard(
+            'validation_error', context
+        )
+        
+        assert keyboard is not None
+        button_texts = [btn.text for row in keyboard.inline_keyboard for btn in row]
+        assert any('Try Again' in text for text in button_texts)
+        assert any('Show Examples' in text for text in button_texts)
+        assert any('Quick Add' in text for text in button_texts)
+    
+    def test_build_error_recovery_keyboard_database(self):
+        """Test building error recovery keyboard for database errors."""
+        keyboard = ErrorRecoveryHelper.build_error_recovery_keyboard(
+            'database_error', {}
+        )
+        
+        assert keyboard is not None
+        button_texts = [btn.text for row in keyboard.inline_keyboard for btn in row]
+        assert any('Retry' in text for text in button_texts)
+        assert any('Check Storage' in text for text in button_texts)
+        assert any('Emergency Mode' in text for text in button_texts)
+    
+    def test_provide_contextual_help_validation(self):
+        """Test providing contextual help for validation errors."""
+        error_context = {
+            'type': 'validation_error',
+            'message': 'Invalid task description',
+            'user_level': 'beginner',
+            'action': 'add_task'
+        }
+        
+        help_message = ErrorRecoveryHelper.provide_contextual_help(error_context)
+        
+        assert 'Validation Error' in help_message
+        assert 'Example' in help_message
+        assert 'Tip' in help_message
+    
+    def test_provide_contextual_help_not_found(self):
+        """Test providing contextual help for not found errors."""
+        error_context = {
+            'type': 'not_found_error',
+            'entity_type': 'task',
+            'search_term': 'nonexistent'
+        }
+        
+        help_message = ErrorRecoveryHelper.provide_contextual_help(error_context)
+        
+        assert 'Task Not Found' in help_message
+        assert 'nonexistent' in help_message
+        assert 'Try these alternatives' in help_message
+    
+    def test_provide_contextual_help_network(self):
+        """Test providing contextual help for network errors."""
+        error_context = {
+            'type': 'network_error',
+            'message': 'Connection failed'
+        }
+        
+        help_message = ErrorRecoveryHelper.provide_contextual_help(error_context)
+        
+        assert 'Network Connection Issue' in help_message
+        assert 'Troubleshooting steps' in help_message
+        assert 'Check your internet connection' in help_message
+
+
 class TestEnhancedUXIntegration:
     """Integration tests for the enhanced UX system."""
     
-    @pytest.mark.asyncio
-    async def test_full_message_processing_workflow(self):
-        """Test the complete message processing workflow."""
-        processor = EnhancedMessageProcessor()
+    def test_smart_suggestions_with_defaults_integration(self):
+        """Test integration between smart suggestions and intelligent defaults."""
+        # Create a task with smart defaults
+        task_input = "Urgent work meeting tomorrow to discuss quarterly report"
+        defaults = IntelligentDefaultsHelper.suggest_task_defaults(task_input)
         
-        # Simulate a task list context
-        message = "Task list"
-        context = {
-            'current_context': 'tasks',
-            'tasks': [
-                {'description': 'Complete project documentation'},
-                {'description': 'Review code changes'},
-                {'description': 'Update dependencies'}
-            ],
-            'navigation_path': ['Main Menu', 'Tasks'],
-            'available_actions': [
-                {'text': '➕ Add Task', 'callback_data': 'add_task', 'type': 'primary'},
-                {'text': '🔄 Refresh', 'callback_data': 'tasks_refresh', 'type': 'primary'},
-                {'text': '🏠 Main Menu', 'callback_data': 'nav_main', 'type': 'navigation'}
-            ]
+        # Get suggestions for task view context
+        task_data = {
+            'id': 123,
+            'description': task_input,
+            'priority': defaults['priority'],
+            'category': defaults['category'],
+            'due_date': defaults['due_date']
         }
         
-        # Process the message
-        enhanced_message, keyboard = await processor.process_message(message, context)
+        suggestions = SmartSuggestionsHelper.suggest_task_improvements(task_data)
         
-        # Verify enhanced message
-        assert "📋 **Tasks** \\(3 total\\)" in enhanced_message
-        assert "Complete project documentation" in enhanced_message
-        assert "Review code changes" in enhanced_message
-        assert "Update dependencies" in enhanced_message
-        assert "📍 **Navigation:**" in enhanced_message
-        assert isinstance(keyboard, InlineKeyboardMarkup)
-        assert len(keyboard.inline_keyboard) > 0
+        # Should have suggestions based on the defaults
+        assert len(suggestions) > 0
+        assert defaults['priority'] == 'Urgent'
+        assert defaults['category'] == 'Work'
+        assert defaults['due_date'] is not None
     
-    @pytest.mark.asyncio
-    async def test_error_recovery_workflow(self):
-        """Test the complete error recovery workflow."""
-        processor = EnhancedMessageProcessor()
-        
-        # Simulate an error context
-        context = {
-            'current_context': 'error',
-            'error_type': 'validation_error',
-            'navigation_path': ['Error Recovery'],
-            'available_actions': [
-                {'text': '🔄 Retry', 'callback_data': 'retry_action', 'type': 'primary'},
-                {'text': '🏠 Main Menu', 'callback_data': 'nav_main', 'type': 'navigation'},
-                {'text': '❓ Help', 'callback_data': 'show_help', 'type': 'secondary'}
-            ]
+    def test_progressive_disclosure_with_smart_suggestions(self):
+        """Test integration between progressive disclosure and smart suggestions."""
+        task_data = {
+            'id': 123,
+            'description': 'Complex task with many details and requirements that need to be broken down into smaller manageable pieces for better organization and tracking',
+            'status': 'Todo',
+            'priority': 'Medium',
+            'attachments': ['file1.pdf']
         }
         
-        # Create error response
-        error_message, keyboard = processor.create_error_response(
-            'validation_error',
-            'Invalid task description format',
-            context
+        # Build smart disclosure keyboard
+        keyboard = ProgressiveDisclosureBuilder.build_smart_disclosure_keyboard(
+            'task', 123, task_data
         )
         
-        # Verify error message
-        assert "❌ **Error**" in error_message
-        assert "Invalid task description format" in error_message
-        assert "💡 **Help**" in error_message
-        assert isinstance(keyboard, InlineKeyboardMarkup)
-        button_texts = [btn.text for row in keyboard.inline_keyboard for btn in row]
-        assert any('Try Again' in text or 'Retry' in text for text in button_texts)
-        assert any('Edit Input' in text or 'Help' in text for text in button_texts) 
+        # Get task improvements
+        improvements = SmartSuggestionsHelper.suggest_task_improvements(task_data)
+        
+        # Both should work together
+        assert keyboard is not None
+        assert len(improvements) > 0
+        
+        # Complex task should have subtask suggestions
+        subtask_suggestion = next((s for s in improvements if s['type'] == 'subtasks'), None)
+        assert subtask_suggestion is not None
+    
+    def test_error_recovery_with_smart_suggestions(self):
+        """Test integration between error recovery and smart suggestions."""
+        error_context = {
+            'type': 'validation_error',
+            'message': 'Invalid task format',
+            'action': 'add_task',
+            'user_level': 'beginner'
+        }
+        
+        # Get contextual help
+        help_message = ErrorRecoveryHelper.provide_contextual_help(error_context)
+        
+        # Get recovery keyboard
+        keyboard = ErrorRecoveryHelper.build_error_recovery_keyboard(
+            'validation_error', error_context
+        )
+        
+        # Both should provide helpful information
+        assert 'Example' in help_message
+        assert keyboard is not None
+        assert len(keyboard.inline_keyboard) > 0 

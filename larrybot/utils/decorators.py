@@ -5,7 +5,9 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from larrybot.core.interfaces import CommandHandler
 
-def command_handler(command: str, description: str = "", usage: str = "", category: str = "general"):
+
+def command_handler(command: str, description: str='', usage: str='',
+    category: str='general'):
     """
     Decorator to register a function as a command handler with metadata.
     
@@ -14,21 +16,19 @@ def command_handler(command: str, description: str = "", usage: str = "", catego
         async def my_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # handler implementation
     """
-    def decorator(func: Callable) -> Callable:
+
+    def decorator(func: Callable) ->Callable:
+
         @functools.wraps(func)
-        async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
+        async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE
+            ) ->Any:
             return await func(update, context)
-        
-        # Store metadata on the function
-        wrapper._command_metadata = {
-            "command": command,
-            "description": description or f"Handler for {command}",
-            "usage": usage or f"{command} [args]",
-            "category": category
-        }
-        
+        wrapper._command_metadata = {'command': command, 'description': 
+            description or f'Handler for {command}', 'usage': usage or
+            f'{command} [args]', 'category': category}
         return wrapper
     return decorator
+
 
 def event_listener(event_name: str):
     """
@@ -39,18 +39,18 @@ def event_listener(event_name: str):
         def handle_task_created(task):
             # handle the event
     """
-    def decorator(func: Callable) -> Callable:
+
+    def decorator(func: Callable) ->Callable:
+
         @functools.wraps(func)
-        def wrapper(data: Any) -> Any:
+        def wrapper(data: Any) ->Any:
             return func(data)
-        
-        # Store event information on the function
         wrapper._event_name = event_name
-        
         return wrapper
     return decorator
 
-def require_args(min_args: int = 1, max_args: Optional[int] = None):
+
+def require_args(min_args: int=1, max_args: Optional[int]=None):
     """
     Decorator to validate command arguments.
     
@@ -59,25 +59,29 @@ def require_args(min_args: int = 1, max_args: Optional[int] = None):
         async def my_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # handler implementation
     """
-    def decorator(func: Callable) -> Callable:
+
+    def decorator(func: Callable) ->Callable:
+
         @functools.wraps(func)
-        async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
+        async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE
+            ) ->Any:
             args = context.args or []
-            
             if len(args) < min_args:
-                await update.message.reply_text(f"Usage: {func.__name__} requires at least {min_args} argument(s)")
+                await update.message.reply_text(
+                    f'Usage: {func.__name__} requires at least {min_args} argument(s)'
+                    )
                 return
-            
             if max_args is not None and len(args) > max_args:
-                await update.message.reply_text(f"Usage: {func.__name__} accepts at most {max_args} argument(s)")
+                await update.message.reply_text(
+                    f'Usage: {func.__name__} accepts at most {max_args} argument(s)'
+                    )
                 return
-            
             return await func(update, context)
-        
         return wrapper
     return decorator
 
-def async_retry(max_attempts: int = 3, delay: float = 1.0):
+
+def async_retry(max_attempts: int=3, delay: float=1.0):
     """
     Decorator to retry async functions on failure.
     
@@ -86,23 +90,23 @@ def async_retry(max_attempts: int = 3, delay: float = 1.0):
         async def my_async_function():
             # function implementation
     """
-    def decorator(func: Callable) -> Callable:
+
+    def decorator(func: Callable) ->Callable:
+
         @functools.wraps(func)
-        async def wrapper(*args, **kwargs) -> Any:
+        async def wrapper(*args, **kwargs) ->Any:
             last_exception = None
-            
             for attempt in range(max_attempts):
                 try:
                     return await func(*args, **kwargs)
                 except Exception as e:
                     last_exception = e
                     if attempt < max_attempts - 1:
-                        await asyncio.sleep(delay * (2 ** attempt))  # Exponential backoff
-            
+                        await asyncio.sleep(delay * 2 ** attempt)
             raise last_exception
-        
         return wrapper
     return decorator
+
 
 def validate_user_id(allowed_user_id: int):
     """
@@ -113,19 +117,23 @@ def validate_user_id(allowed_user_id: int):
         async def my_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # handler implementation
     """
-    def decorator(func: Callable) -> Callable:
+
+    def decorator(func: Callable) ->Callable:
+
         @functools.wraps(func)
-        async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
-            if update.effective_user and update.effective_user.id != allowed_user_id:
-                await update.message.reply_text("You are not authorized to use this command.")
+        async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE
+            ) ->Any:
+            if (update.effective_user and update.effective_user.id !=
+                allowed_user_id):
+                await update.message.reply_text(
+                    'You are not authorized to use this command.')
                 return
-            
             return await func(update, context)
-        
         return wrapper
     return decorator
 
-def cache_result(ttl_seconds: int = 300):
+
+def cache_result(ttl_seconds: int=300):
     """
     Decorator to cache function results.
     
@@ -134,28 +142,23 @@ def cache_result(ttl_seconds: int = 300):
         async def expensive_operation():
             # expensive operation
     """
-    def decorator(func: Callable) -> Callable:
+
+    def decorator(func: Callable) ->Callable:
         cache = {}
-        
+
         @functools.wraps(func)
-        async def wrapper(*args, **kwargs) -> Any:
+        async def wrapper(*args, **kwargs) ->Any:
             import time
             current_time = time.time()
-            
-            # Create cache key from function name and arguments
-            cache_key = f"{func.__name__}:{hash(str(args) + str(sorted(kwargs.items())))}"
-            
-            # Check cache
+            cache_key = (
+                f'{func.__name__}:{hash(str(args) + str(sorted(kwargs.items())))}'
+                )
             if cache_key in cache:
                 result, timestamp = cache[cache_key]
                 if current_time - timestamp < ttl_seconds:
                     return result
-            
-            # Execute function and cache result
             result = await func(*args, **kwargs)
-            cache[cache_key] = (result, current_time)
-            
+            cache[cache_key] = result, current_time
             return result
-        
         return wrapper
-    return decorator 
+    return decorator

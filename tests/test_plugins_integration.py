@@ -7,7 +7,14 @@ from larrybot.storage.db import get_session
 from larrybot.storage.task_repository import TaskRepository
 from larrybot.storage.habit_repository import HabitRepository
 from larrybot.storage.reminder_repository import ReminderRepository
+from unittest.mock import Mock
 
+@pytest.fixture
+def mock_context():
+    context = Mock()
+    context.args = []
+    context.user_data = {}
+    return context
 
 class TestPluginIntegration:
     """Integration tests for plugin system."""
@@ -33,7 +40,7 @@ class TestPluginIntegration:
         registered_commands = list(command_registry._commands.keys())
         
         # Task commands
-        assert "/add" in registered_commands
+        assert "/addtask" in registered_commands
         assert "/list" in registered_commands
         assert "/done" in registered_commands
         assert "/edit" in registered_commands
@@ -80,7 +87,7 @@ class TestPluginIntegration:
         mock_context.args = ["Test task"]
         
         # Test task creation
-        handler = command_registry._commands["/add"]
+        handler = command_registry._commands["/addtask"]
         await handler(mock_update, mock_context)
         
         # Check that task_created event was emitted
@@ -144,7 +151,7 @@ class TestTaskPluginIntegration:
         
         # Test adding a task
         mock_context.args = ["Integration test task"]
-        handler = command_registry._commands["/add"]
+        handler = command_registry._commands["/addtask"]
         await handler(mock_update, mock_context)
         
         # Check that the task was created and message was sent

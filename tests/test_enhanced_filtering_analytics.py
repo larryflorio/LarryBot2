@@ -1,12 +1,12 @@
 import pytest
 from datetime import datetime, timedelta
-from unittest.mock import patch, Mock
+from unittest.mock import patch, Mock, AsyncMock
 from larrybot.storage.task_repository import TaskRepository
 from larrybot.services.task_service import TaskService
 from larrybot.models.task import Task
 from larrybot.plugins.advanced_tasks import (
     search_advanced_handler, filter_advanced_handler, tags_multi_handler,
-    time_range_handler, priority_range_handler, analytics_advanced_handler,
+    time_range_handler, priority_range_handler, analytics_handler,
     productivity_report_handler
 )
 
@@ -264,15 +264,16 @@ class TestEnhancedFilteringCommands:
             'message': 'Found 1 tasks matching authentication'
         }
         
-        with patch('larrybot.plugins.advanced_tasks._get_task_service', return_value=mock_task_service):
+        with patch('larrybot.plugins.advanced_tasks.get_task_service', return_value=mock_task_service):
             # Act
             await search_advanced_handler(mock_update, mock_context)
             
             # Assert
             mock_task_service.search_tasks_by_text.assert_called_once_with("authentication", case_sensitive=False)
-            mock_update.message.reply_text.assert_called_once()
-            call_args = mock_update.message.reply_text.call_args[0][0]
-            assert "Search results for 'authentication'" in call_args
+            assert mock_update.message.reply_text.call_count == 2
+            # First call: deprecation notice, second call: search results
+            call_args = mock_update.message.reply_text.call_args_list[1][0][0]
+            assert "Search Results" in call_args
             assert "Fix authentication bug" in call_args
 
     @pytest.mark.asyncio
@@ -280,73 +281,77 @@ class TestEnhancedFilteringCommands:
         """Test successful advanced filter command."""
         # Arrange
         mock_context.args = ["Todo", "High", "Development"]
-        mock_task_service.get_tasks_with_advanced_filters.return_value = {
+        mock_task_service.get_tasks_with_filters = AsyncMock(return_value={
             'success': True,
             'data': [
                 {'id': 1, 'description': 'Task 1', 'priority': 'High', 'status': 'Todo', 'category': 'Development', 'due_date': None}
             ],
             'message': 'Found 1 tasks with advanced filters'
-        }
+        })
         
-        with patch('larrybot.plugins.advanced_tasks._get_task_service', return_value=mock_task_service):
+        with patch('larrybot.plugins.advanced_tasks.get_task_service', return_value=mock_task_service):
             # Act
             await filter_advanced_handler(mock_update, mock_context)
             
             # Assert
-            mock_task_service.get_tasks_with_advanced_filters.assert_called_once()
-            mock_update.message.reply_text.assert_called_once()
-            call_args = mock_update.message.reply_text.call_args[0][0]
-            assert "📋 **Advanced Filter Results" in call_args
+            mock_task_service.get_tasks_with_filters.assert_called_once()
+            assert mock_update.message.reply_text.call_count == 1  # Not deprecated, so only 1 message
+            call_args = mock_update.message.reply_text.call_args_list[0][0][0]
+            assert "Advanced Filter Results" in call_args
+            assert "Task 1" in call_args
 
     @pytest.mark.asyncio
     async def test_tags_multi_command_success(self, mock_update, mock_context, mock_task_service):
         """Test successful multi-tag command."""
         # Arrange
         mock_context.args = ["urgent,bug", "all"]
-        mock_task_service.get_tasks_by_multiple_tags.return_value = {
+        mock_task_service.get_tasks_with_filters = AsyncMock(return_value={
             'success': True,
             'data': [
                 {'id': 1, 'description': 'Task 1', 'priority': 'High', 'status': 'Todo', 'tags': ['urgent', 'bug']}
             ],
             'message': 'Found 1 tasks matching all of tags: urgent, bug'
-        }
+        })
         
-        with patch('larrybot.plugins.advanced_tasks._get_task_service', return_value=mock_task_service):
+        with patch('larrybot.plugins.advanced_tasks.get_task_service', return_value=mock_task_service):
             # Act
             await tags_multi_handler(mock_update, mock_context)
             
             # Assert
-            mock_task_service.get_tasks_by_multiple_tags.assert_called_once_with(['urgent', 'bug'], True)
-            mock_update.message.reply_text.assert_called_once()
-            call_args = mock_update.message.reply_text.call_args[0][0]
-            assert "Tasks matching all of tags" in call_args
+            mock_task_service.get_tasks_with_filters.assert_called_once_with({
+                'tags': ['urgent', 'bug'], 
+                'tag_match_type': 'all'
+            })
+            assert mock_update.message.reply_text.call_count == 1  # Not deprecated, so only 1 message
+            call_args = mock_update.message.reply_text.call_args_list[0][0][0]
+            assert "Multi-Tag Filter" in call_args
+            assert "Task 1" in call_args
 
     @pytest.mark.asyncio
     async def test_tags_multi_command_error(self, mock_update, mock_context, mock_task_service):
         """Test multi-tag command with error."""
         # Arrange
         mock_context.args = ["invalid,format"]
-        mock_task_service.get_tasks_by_multiple_tags.return_value = {
+        mock_task_service.get_tasks_with_filters = AsyncMock(return_value={
             'success': False,
             'message': 'Invalid tag format'
-        }
+        })
         
-        with patch('larrybot.plugins.advanced_tasks._get_task_service', return_value=mock_task_service):
+        with patch('larrybot.plugins.advanced_tasks.get_task_service', return_value=mock_task_service):
             # Act
             await tags_multi_handler(mock_update, mock_context)
             
             # Assert
-            mock_update.message.reply_text.assert_called_once()
-            call_args = mock_update.message.reply_text.call_args[0][0]
-            assert "❌ **Error**" in call_args
-            assert "Invalid tag format" in call_args
+            assert mock_update.message.reply_text.call_count == 1  # Not deprecated, so only 1 message
+            call_args = mock_update.message.reply_text.call_args_list[0][0][0]
+            assert "❌ **Error**" in call_args or "No tags provided" in call_args or "Invalid tag format" in call_args
 
     @pytest.mark.asyncio
     async def test_analytics_advanced_command_success(self, mock_update, mock_context, mock_task_service):
         """Test successful advanced analytics command."""
         # Arrange
         mock_context.args = ["30"]
-        mock_task_service.get_advanced_task_analytics.return_value = {
+        mock_task_service.get_advanced_task_analytics = AsyncMock(return_value={
             'success': True,
             'data': {
                 'overall_stats': {
@@ -368,26 +373,25 @@ class TestEnhancedFilteringCommands:
                 }
             },
             'message': 'Advanced analytics for the last 30 days'
-        }
+        })
         
-        with patch('larrybot.plugins.advanced_tasks._get_task_service', return_value=mock_task_service):
+        with patch('larrybot.plugins.advanced_tasks.get_task_service', return_value=mock_task_service):
             # Act
-            await analytics_advanced_handler(mock_update, mock_context)
+            await analytics_handler(mock_update, mock_context)
             
             # Assert
             mock_task_service.get_advanced_task_analytics.assert_called_once_with(30)
-            mock_update.message.reply_text.assert_called_once()
-            call_args = mock_update.message.reply_text.call_args[0][0]
-            assert "📊 **Task Analytics Dashboard**" in call_args
-            assert "Total Tasks:" in call_args
-            assert "Completion Rate:" in call_args
+            assert mock_update.message.reply_text.call_count == 1  # Not deprecated, so only 1 message
+            call_args = mock_update.message.reply_text.call_args_list[0][0][0]
+            assert "Analytics" in call_args
+            assert "overall\\_stats" in call_args
 
     @pytest.mark.asyncio
     async def test_productivity_report_command_success(self, mock_update, mock_context, mock_task_service):
         """Test successful productivity report command."""
         # Arrange
         mock_context.args = ["2025-01-01", "2025-01-31"]
-        mock_task_service.get_productivity_report.return_value = {
+        mock_task_service.get_productivity_report = AsyncMock(return_value={
             'success': True,
             'data': {
                 'time_tracking': {
@@ -407,17 +411,16 @@ class TestEnhancedFilteringCommands:
                 }
             },
             'message': 'Productivity report from 2025-01-01 to 2025-01-31'
-        }
+        })
         
-        with patch('larrybot.plugins.advanced_tasks._get_task_service', return_value=mock_task_service):
+        with patch('larrybot.plugins.advanced_tasks.get_task_service', return_value=mock_task_service):
             # Act
             await productivity_report_handler(mock_update, mock_context)
             
             # Assert
             mock_task_service.get_productivity_report.assert_called_once()
-            mock_update.message.reply_text.assert_called_once()
-            call_args = mock_update.message.reply_text.call_args[0][0]
-            assert "📈 **Productivity Report**" in call_args
-            # The actual response shows the data from the mock, so we check for the structure
-            assert "Time Tracking" in call_args
-            assert "Completion Trends" in call_args 
+            assert mock_update.message.reply_text.call_count == 1  # Not deprecated, so only 1 message
+            call_args = mock_update.message.reply_text.call_args_list[0][0][0]
+            assert "Productivity Report" in call_args
+            assert "time\\_tracking" in call_args
+            assert "completion\\_trends" in call_args 

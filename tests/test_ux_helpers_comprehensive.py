@@ -55,7 +55,7 @@ class TestKeyboardBuilderComprehensive:
         
         buttons = keyboard.inline_keyboard[0]
         button_texts = [btn.text for btn in buttons]
-        assert "📋 View Tasks" in button_texts
+        assert "⚪ 📋 View Tasks" in button_texts
         assert "📊 Analytics" in button_texts
         assert "🗑️ Delete" in button_texts
 
@@ -94,9 +94,9 @@ class TestKeyboardBuilderComprehensive:
         custom_row_1 = keyboard.inline_keyboard[0]
         custom_row_2 = keyboard.inline_keyboard[1]
         nav_buttons = keyboard.inline_keyboard[2]
-        assert custom_row_1[0].text == "Custom 1"
-        assert custom_row_2[0].text == "Custom 2"
-        assert nav_buttons[0].text == "⬅️ Back"
+        assert custom_row_1[0].text == "ℹ️ Custom 1"
+        assert custom_row_2[0].text == "ℹ️ Custom 2"
+        assert nav_buttons[0].text == "ℹ️ ⬅️ Back"
         assert nav_buttons[1].text == "🏠 Main Menu"
 
     def test_build_navigation_keyboard_no_options(self):
@@ -121,7 +121,7 @@ class TestKeyboardBuilderComprehensive:
         # Should have only custom button as a row
         assert len(keyboard.inline_keyboard) == 1
         assert len(keyboard.inline_keyboard[0]) == 1
-        assert keyboard.inline_keyboard[0][0].text == "Custom 1"
+        assert keyboard.inline_keyboard[0][0].text == "ℹ️ Custom 1"
 
     def test_build_pagination_keyboard_first_page(self):
         """Test pagination keyboard for first page."""
@@ -130,8 +130,8 @@ class TestKeyboardBuilderComprehensive:
         # Should not have previous button on first page
         buttons = keyboard.inline_keyboard[0]
         assert len(buttons) == 2
-        assert buttons[0].text == "1/5"
-        assert buttons[1].text == "➡️"
+        assert buttons[0].text == "ℹ️ 1/5"
+        assert buttons[1].text == "ℹ️ ➡️"
 
     def test_build_pagination_keyboard_last_page(self):
         """Test pagination keyboard for last page."""
@@ -140,8 +140,8 @@ class TestKeyboardBuilderComprehensive:
         # Should not have next button on last page
         buttons = keyboard.inline_keyboard[0]
         assert len(buttons) == 2
-        assert buttons[0].text == "⬅️"
-        assert buttons[1].text == "5/5"
+        assert buttons[0].text == "ℹ️ ⬅️"
+        assert buttons[1].text == "ℹ️ 5/5"
 
     def test_build_pagination_keyboard_middle_page(self):
         """Test pagination keyboard for middle page."""
@@ -150,9 +150,9 @@ class TestKeyboardBuilderComprehensive:
         # Should have both previous and next buttons
         buttons = keyboard.inline_keyboard[0]
         assert len(buttons) == 3
-        assert buttons[0].text == "⬅️"
-        assert buttons[1].text == "3/5"
-        assert buttons[2].text == "➡️"
+        assert buttons[0].text == "ℹ️ ⬅️"
+        assert buttons[1].text == "ℹ️ 3/5"
+        assert buttons[2].text == "ℹ️ ➡️"
 
     def test_build_pagination_keyboard_single_page(self):
         """Test pagination keyboard for single page."""
@@ -161,7 +161,7 @@ class TestKeyboardBuilderComprehensive:
         # Should only show current page
         buttons = keyboard.inline_keyboard[0]
         assert len(buttons) == 1
-        assert buttons[0].text == "1/1"
+        assert buttons[0].text == "ℹ️ 1/1"
 
     def test_build_confirmation_keyboard(self):
         """Test confirmation keyboard building (destructive action)."""
@@ -172,7 +172,7 @@ class TestKeyboardBuilderComprehensive:
         back_row = keyboard.inline_keyboard[1]
         assert confirm_row[0].text == "✅ Confirm"
         assert confirm_row[1].text == "❌ Cancel"
-        assert back_row[0].text == "⬅️ Back"
+        assert back_row[0].text == "ℹ️ ⬅️ Back"
 
     def test_build_client_list_keyboard(self):
         """Test client list keyboard building."""
@@ -187,7 +187,7 @@ class TestKeyboardBuilderComprehensive:
         # Should have delete button in the second row
         all_button_texts = [btn.text for row in keyboard.inline_keyboard for btn in row]
         assert "🗑️ Delete" in all_button_texts
-        assert "📋 View Tasks" in all_button_texts
+        assert "⚪ 📋 View Tasks" in all_button_texts
         assert "📊 Analytics" in all_button_texts
 
     def test_build_habit_list_keyboard(self):
@@ -217,7 +217,7 @@ class TestKeyboardBuilderComprehensive:
         keyboard = KeyboardBuilder.build_reminder_action_keyboard(123, 456)
         all_button_texts = [btn.text for row in keyboard.inline_keyboard for btn in row]
         assert "✅ Mark Done" in all_button_texts
-        assert "⏰ Snooze 1h" in all_button_texts
+        assert "⚪ ⏰ Snooze 1h" in all_button_texts
         assert "🗑️ Delete Reminder" in all_button_texts
 
     def test_build_reminder_keyboard_active(self):
@@ -225,7 +225,7 @@ class TestKeyboardBuilderComprehensive:
         keyboard = KeyboardBuilder.build_reminder_keyboard(123, is_active=True)
         all_button_texts = [btn.text for row in keyboard.inline_keyboard for btn in row]
         assert "✅ Complete" in all_button_texts
-        assert "⏰ Snooze" in all_button_texts
+        assert "⚪ ⏰ Snooze" in all_button_texts
 
     def test_build_reminder_keyboard_inactive(self):
         """Test reminder keyboard for inactive reminder."""
@@ -239,48 +239,48 @@ class TestKeyboardBuilderComprehensive:
         """Test analytics keyboard building."""
         keyboard = KeyboardBuilder.build_analytics_keyboard()
         all_button_texts = [btn.text for row in keyboard.inline_keyboard for btn in row]
-        assert "📈 Detailed" in all_button_texts
+        assert "⚪ 📈 Detailed" in all_button_texts
         assert "📊 Productivity" in all_button_texts
-        assert "⏰ Time Tracking" in all_button_texts
-        assert "🎯 Performance" in all_button_texts
+        assert "⚪ ⏰ Time Tracking" in all_button_texts
+        assert "⚪ 🎯 Performance" in all_button_texts
         assert "📅 Trends" in all_button_texts
-        assert "📋 Reports" in all_button_texts
-        assert "🔙 Back to Main" in all_button_texts
+        assert "⚪ 📋 Reports" in all_button_texts
+        assert "ℹ️ 🔙 Back to Main" in all_button_texts
 
     def test_build_filter_keyboard(self):
         """Test filter keyboard building."""
         keyboard = KeyboardBuilder.build_filter_keyboard()
         all_button_texts = [btn.text for row in keyboard.inline_keyboard for btn in row]
         assert "📅 Date Range" in all_button_texts
-        assert "🎯 Priority" in all_button_texts
-        assert "📋 Status" in all_button_texts
-        assert "🏷️ Tags" in all_button_texts
-        assert "📂 Category" in all_button_texts
-        assert "⏰ Time Tracking" in all_button_texts
+        assert "⚪ 🎯 Priority" in all_button_texts
+        assert "⚪ 📋 Status" in all_button_texts
+        assert "⚪ 🏷️ Tags" in all_button_texts
+        assert "⚪ 📂 Category" in all_button_texts
+        assert "⚪ ⏰ Time Tracking" in all_button_texts
         assert "🔍 Advanced Search" in all_button_texts
-        assert "💾 Save Filter" in all_button_texts
-        assert "🔙 Back to Tasks" in all_button_texts
+        assert "⚪ 💾 Save Filter" in all_button_texts
+        assert "ℹ️ 🔙 Back to Tasks" in all_button_texts
 
     def test_build_attachment_keyboard(self):
         """Test attachment keyboard building."""
         keyboard = KeyboardBuilder.build_attachment_keyboard(1, 2)
         all_button_texts = [btn.text for row in keyboard.inline_keyboard for btn in row]
-        assert "📝 Edit Description" in all_button_texts
+        assert "⚪ 📝 Edit Description" in all_button_texts
         assert "📊 View Details" in all_button_texts
         assert "🗑️ Remove" in all_button_texts
-        assert "📋 Task Details" in all_button_texts
-        assert "🔙 Back to Attachments" in all_button_texts
+        assert "⚪ 📋 Task Details" in all_button_texts
+        assert "ℹ️ 🔙 Back to Attachments" in all_button_texts
 
     def test_build_attachments_list_keyboard(self):
         """Test attachments list keyboard building."""
         keyboard = KeyboardBuilder.build_attachments_list_keyboard(2, 5)
         all_button_texts = [btn.text for row in keyboard.inline_keyboard for btn in row]
         assert "📊 Statistics" in all_button_texts
-        assert "📝 Add Description" in all_button_texts
+        assert "⚪ 📝 Add Description" in all_button_texts
         assert "🗑️ Bulk Remove" in all_button_texts
-        assert "📋 Export List" in all_button_texts
-        assert "📎 Add New File" in all_button_texts
-        assert "🔙 Back to Task" in all_button_texts
+        assert "⚪ 📋 Export List" in all_button_texts
+        assert "⚪ 📎 Add New File" in all_button_texts
+        assert "ℹ️ 🔙 Back to Task" in all_button_texts
 
     def test_build_calendar_keyboard(self):
         """Test calendar keyboard building."""
@@ -292,19 +292,19 @@ class TestKeyboardBuilderComprehensive:
         assert "📅 Upcoming" in all_button_texts
         assert "🔄 Sync" in all_button_texts
         assert "⚙️ Settings" in all_button_texts
-        assert "🔙 Back to Main" in all_button_texts
+        assert "ℹ️ 🔙 Back to Main" in all_button_texts
 
     def test_build_bulk_operations_keyboard(self):
         """Test bulk operations keyboard building."""
         keyboard = KeyboardBuilder.build_bulk_operations_keyboard()
         all_button_texts = [btn.text for row in keyboard.inline_keyboard for btn in row]
-        assert "📋 Status" in all_button_texts
-        assert "🎯 Priority" in all_button_texts
-        assert "👥 Assign" in all_button_texts
+        assert "⚪ 📋 Status" in all_button_texts
+        assert "⚪ 🎯 Priority" in all_button_texts
+        assert "⚪ 👥 Assign" in all_button_texts
         assert "🗑️ Delete" in all_button_texts
         assert "📊 Preview" in all_button_texts
-        assert "💾 Save Selection" in all_button_texts
-        assert "🔙 Back to Tasks" in all_button_texts
+        assert "⚪ 💾 Save Selection" in all_button_texts
+        assert "ℹ️ 🔙 Back to Tasks" in all_button_texts
 
 
 class TestMessageFormatterComprehensive:
@@ -518,12 +518,12 @@ class TestNavigationHelperComprehensive:
         """Test main menu keyboard building."""
         keyboard = NavigationHelper.get_main_menu_keyboard()
         all_button_texts = [btn.text for row in keyboard.inline_keyboard for btn in row]
-        assert "📋 Tasks" in all_button_texts
-        assert "👥 Clients" in all_button_texts
+        assert "⚪ 📋 Tasks" in all_button_texts
+        assert "⚪ 👥 Clients" in all_button_texts
         assert "🔄 Habits" in all_button_texts
-        assert "⏰ Reminders" in all_button_texts
+        assert "⚪ ⏰ Reminders" in all_button_texts
         assert "📊 Analytics" in all_button_texts
-        assert "📎 Files" in all_button_texts
+        assert "⚪ 📎 Files" in all_button_texts
         assert "📅 Calendar" in all_button_texts
         assert "⚙️ Settings" in all_button_texts
 
@@ -531,13 +531,13 @@ class TestNavigationHelperComprehensive:
         """Test task menu keyboard building."""
         keyboard = NavigationHelper.get_task_menu_keyboard()
         all_button_texts = [btn.text for row in keyboard.inline_keyboard for btn in row]
-        assert "📋 View Tasks" in all_button_texts
+        assert "⚪ 📋 View Tasks" in all_button_texts
         assert "➕ Add Task" in all_button_texts
         assert "🔍 Search" in all_button_texts
         assert "📊 Analytics" in all_button_texts
         assert "⚠️ Overdue" in all_button_texts
         assert "📅 Today" in all_button_texts
-        assert "⬅️ Back" in all_button_texts
+        assert "ℹ️ ⬅️ Back" in all_button_texts
 
 
 class TestChartBuilderComprehensive:

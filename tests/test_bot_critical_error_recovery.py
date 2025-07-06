@@ -173,7 +173,7 @@ class TestBotCriticalErrorRecovery:
     async def test_task_view_database_failure(self, bot_handler, mock_callback_query, mock_context):
         """Test task view recovers from database connection failures."""
         # Mock database session failure
-        with patch('larrybot.storage.db.get_session', side_effect=ConnectionError("Database unavailable")):
+        with patch('larrybot.storage.db.get_optimized_session', side_effect=ConnectionError("Database unavailable")):
             await bot_handler._handle_task_view(mock_callback_query, mock_context, task_id=123)
             
             # Should send user-friendly error message

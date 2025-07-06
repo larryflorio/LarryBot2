@@ -18,7 +18,7 @@ def test_register_commands(command_registry, event_bus):
     register(event_bus, command_registry)
     
     registered_commands = list(command_registry._commands.keys())
-    assert "/add" in registered_commands
+    assert "/addtask" in registered_commands  # Changed from /add to /addtask
     assert "/list" in registered_commands
     assert "/done" in registered_commands
     assert "/edit" in registered_commands
