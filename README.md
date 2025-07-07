@@ -92,6 +92,7 @@ Want to contribute, customize, or self-host? See the [Developer Guide](docs/deve
 - **[Installation Guide](docs/getting-started/installation.md)**
 - **[User Guide](docs/user-guide/README.md)**
 - **[Troubleshooting](docs/troubleshooting/README.md)**
+- **[Changelog](CHANGELOG.md)** - Recent changes and improvements
 
 ---
 

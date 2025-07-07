@@ -199,7 +199,7 @@ GOOGLE_CLIENT_SECRET=your_client_secret
 python -m pytest --cov=larrybot --cov-report=term-missing -v
 
 # Expected results:
-# - 491 tests passing
+# - 492 tests passing
 # - 85% coverage (3,238 statements)
 # - 0 failures, 5 warnings (non-critical)
 ```
@@ -213,13 +213,13 @@ python -m pytest --cov=larrybot.services.health_service tests/test_services_heal
 
 #### Test Command Registration
 ```bash
-# Verify all 62 commands are registered
+# Verify all 91 commands are registered
 python test_commands.py
 
 # Expected output:
 # ✅ Found 62 registered commands
 # ✅ All Core Commands Present
-# ✅ Loaded 9 plugins
+# ✅ Loaded 12 plugins
 ```
 
 ### Step 8: Start the Bot
@@ -342,8 +342,8 @@ Before proceeding, ensure you have:
 - [ ] All dependencies installed successfully
 - [ ] Database initialized with `alembic upgrade head`
 - [ ] `.env` file created with valid configuration
-- [ ] Test suite passes (491 tests)
-- [ ] Command registration verified (62 commands)
+- [ ] Test suite passes (492 tests)
+- [ ] Command registration verified (91 commands)
 - [ ] Bot starts without errors
 
 ## 🔧 Next Steps

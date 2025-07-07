@@ -304,4 +304,15 @@ build/
 .Spotlight-V100
 .Trashes
 ehthumbs.db
-Thumbs.db 
+Thumbs.db
+
+# Development artifacts (phase summaries, reports, etc.)
+*SUMMARY*.md
+*REPORT*.md
+*PLAN*.md
+*PHASE*.md
+*AUDIT*.md
+*CHECKLIST*.md
+backup_*/
+debug_*.py
+*.example.backup 

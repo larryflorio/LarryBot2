@@ -416,7 +416,7 @@ if [ -f larrybot.log ]; then
         echo "$warnings" | sed 's/^/   /'
     fi
 else
-    echo "   ℹ️  No log file found"
+    echo "     No log file found"
 fi
 
 echo "=== Performance Check Complete ==="
@@ -568,7 +568,7 @@ Command not found: /unknown_command
 3. **Check command registration:**
    ```bash
    python test_commands.py
-   # Should show all 62 commands
+   # Should show all 91 commands
    ```
 
 #### Problem: "Task not found"

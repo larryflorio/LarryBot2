@@ -89,7 +89,7 @@ class MessageLayoutBuilder:
         Returns:
             Formatted info card
         """
-        style_configs = {'default': {'icon': 'ℹ️', 'separator': '│'},
+        style_configs = {'default': {'icon': '', 'separator': '│'},
             'success': {'icon': '✅', 'separator': '│'}, 'warning': {'icon':
             '⚠️', 'separator': '│'}, 'error': {'icon': '❌', 'separator': '│'}}
         config = style_configs.get(style, style_configs['default'])
@@ -679,7 +679,7 @@ class VisualFeedbackSystem:
         Returns:
             Tuple of (message, keyboard)
         """
-        risk_indicators = {'low': {'icon': 'ℹ️', 'color': 'blue'}, 'medium':
+        risk_indicators = {'low': {'icon': '', 'color': 'blue'}, 'medium':
             {'icon': '⚠️', 'color': 'yellow'}, 'high': {'icon': '🚨',
             'color': 'red'}}
         indicator = risk_indicators.get(risk_level, risk_indicators['low'])
@@ -713,7 +713,7 @@ class UnifiedButtonBuilder:
         ButtonType.SECONDARY: {'emoji': '⚪', 'style': 'secondary'},
         ButtonType.SUCCESS: {'emoji': '✅', 'style': 'success'}, ButtonType.
         DANGER: {'emoji': '🗑️', 'style': 'danger'}, ButtonType.WARNING: {
-        'emoji': '⚠️', 'style': 'warning'}, ButtonType.INFO: {'emoji': 'ℹ️',
+        'emoji': '⚠️', 'style': 'warning'}, ButtonType.INFO: {'emoji': '📋',
         'style': 'info'}, 'TASK_ACTION': {'emoji': '🔵', 'style': 'primary'},
         'NAVIGATION': {'emoji': '⚪', 'style': 'secondary'}, 'CONFIRMATION':
         {'emoji': '🗑️', 'style': 'danger'}}

@@ -930,7 +930,7 @@ class MessageFormatter:
             Formatted info message string
         """
         safe_title = MessageFormatter.escape_markdown(str(title))
-        message = f'ℹ️ **{safe_title}**\n\n'
+        message = f'**{safe_title}**\n\n'
         for key, value in details.items():
             safe_key = MessageFormatter.escape_markdown(str(key))
             safe_value = MessageFormatter.escape_markdown(str(value))

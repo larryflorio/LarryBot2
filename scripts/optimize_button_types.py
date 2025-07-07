@@ -2,7 +2,7 @@
 """
 Button Type Optimization Script
 
-This script removes inappropriate ℹ️ prefixes from buttons by updating
+This script removes inappropriate  prefixes from buttons by updating
 ButtonType assignments to be semantically correct without redundant icons.
 """
 
@@ -17,7 +17,7 @@ BUTTON_TYPE_RULES = {
     "⬅️ Back": "ButtonType.INFO",
     "🏠 Main Menu": "ButtonType.INFO", 
     "🔙 Back to": "ButtonType.INFO",
-    "ℹ️ Info": "ButtonType.INFO",
+    " Info": "ButtonType.INFO",
     
     # Action buttons (no prefix, clear styling)
     "📋 View": "ButtonType.SECONDARY",
@@ -196,7 +196,7 @@ def main():
     print(f"  Files modified: {files_modified}")
     print(f"  Total button changes: {total_changes}")
     print(f"\n✅ Button type optimization complete!")
-    print(f"   All inappropriate ℹ️ prefixes have been removed.")
+    print(f"   All inappropriate  prefixes have been removed.")
     print(f"   Buttons now use semantic styling without redundant icons.")
 
 if __name__ == "__main__":

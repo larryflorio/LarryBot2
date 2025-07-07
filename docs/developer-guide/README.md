@@ -1,7 +1,7 @@
 ---
 title: Developer Guide
 description: Complete developer guide for LarryBot2 architecture and development
-last_updated: 2025-07-02
+last_updated: 2025-07-07
 ---
 
 # Developer Guide 🛠️
@@ -78,7 +78,7 @@ Welcome to the LarryBot2 Developer Guide. This section covers architecture, deve
 ## 🎯 Development Best Practices
 
 ### Code Quality Standards
-- **Maintain 75%+ test coverage** for all new code (current: 75%)
+- **Maintain 75%+ test coverage** for all new code (current: 41%)
 - **Follow SOLID principles** and clean code practices
 - **Use type hints** and modern Python features
 - **Document all public APIs** with examples
@@ -260,4 +260,4 @@ created_at = get_utc_now()
 - **Phase 1 & 2**: Database optimizations, error handling, and performance monitoring
 - **Enhanced UX System**: Progressive disclosure and action buttons
 - **Plugin Architecture**: Modular, extensible plugin system
-- **Comprehensive Testing**: 958+ tests with 100% pass rate 
+- **Comprehensive Testing**: 492 tests with 100% pass rate 
