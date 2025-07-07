@@ -340,47 +340,186 @@ def mock_plugin_manager():
 @pytest.fixture
 def mock_task_service():
     """Create a mock task service for testing."""
-    service = Mock()
+    service = AsyncMock()
     
-    # Mock all the bulk operation methods
-    service.bulk_update_status = AsyncMock()
-    service.bulk_update_priority = AsyncMock()
-    service.bulk_assign_to_client = AsyncMock()
-    service.bulk_delete_tasks = AsyncMock()
+    # Mock all the bulk operation methods with proper return values
+    service.bulk_update_status = AsyncMock(return_value={
+        'success': True,
+        'data': {'updated_count': 3, 'new_status': 'In Progress'},
+        'message': 'Bulk status update successful'
+    })
+    service.bulk_update_priority = AsyncMock(return_value={
+        'success': True,
+        'data': {'updated_count': 3, 'new_priority': 'High'},
+        'message': 'Bulk priority update successful'
+    })
+    service.bulk_assign_to_client = AsyncMock(return_value={
+        'success': True,
+        'data': {'updated_count': 3, 'client_name': 'TestClient'},
+        'message': 'Bulk assign successful'
+    })
+    service.bulk_delete_tasks = AsyncMock(return_value={
+        'success': True,
+        'data': {'deleted_count': 3},
+        'message': 'Bulk delete successful'
+    })
     
     # Mock time entry methods
-    service.add_manual_time_entry = AsyncMock()
-    service.get_task_time_summary = AsyncMock()
+    service.add_manual_time_entry = AsyncMock(return_value={
+        'success': True,
+        'data': {'task_id': 1, 'duration_minutes': 120},
+        'message': 'Time entry added successfully'
+    })
+    service.get_task_time_summary = AsyncMock(return_value={
+        'success': True,
+        'data': {'total_minutes': 180, 'entry_count': 2},
+        'message': 'Time summary retrieved successfully'
+    })
     
     # Mock enhanced filtering methods
-    service.search_tasks_by_text = AsyncMock()
-    service.get_tasks_with_advanced_filters = AsyncMock()
-    service.get_tasks_by_multiple_tags = AsyncMock()
-    service.get_tasks_by_time_range = AsyncMock()
-    service.get_tasks_by_priority_range = AsyncMock()
+    service.search_tasks_by_text = AsyncMock(return_value={
+        'success': True,
+        'data': [{'id': 1, 'description': 'Test task'}],
+        'message': 'Search completed successfully'
+    })
+    service.get_tasks_with_advanced_filters = AsyncMock(return_value={
+        'success': True,
+        'data': [{'id': 1, 'description': 'Test task'}],
+        'message': 'Filtered tasks retrieved successfully'
+    })
+    service.get_tasks_by_multiple_tags = AsyncMock(return_value={
+        'success': True,
+        'data': [{'id': 1, 'description': 'Test task'}],
+        'message': 'Tasks by tags retrieved successfully'
+    })
+    service.get_tasks_by_time_range = AsyncMock(return_value={
+        'success': True,
+        'data': [{'id': 1, 'description': 'Test task'}],
+        'message': 'Tasks by time range retrieved successfully'
+    })
+    service.get_tasks_by_priority_range = AsyncMock(return_value={
+        'success': True,
+        'data': [{'id': 1, 'description': 'Test task'}],
+        'message': 'Tasks by priority range retrieved successfully'
+    })
     
     # Mock enhanced analytics methods
-    service.get_advanced_task_analytics = AsyncMock()
-    service.get_productivity_report = AsyncMock()
+    service.get_advanced_task_analytics = AsyncMock(return_value={
+        'success': True,
+        'data': {
+            'total_tasks': 10,
+            'completed_tasks': 7,
+            'completion_rate': 70.0,
+            'avg_completion_time_hours': 3.5
+        },
+        'message': 'Analytics generated successfully'
+    })
+    service.get_productivity_report = AsyncMock(return_value={
+        'success': True,
+        'data': {
+            'total_tasks': 25,
+            'completed_tasks': 18,
+            'completion_rate': 72.0,
+            'avg_completion_time': 4.5
+        },
+        'message': 'Productivity report generated successfully'
+    })
     
     # Mock other task methods
-    service.create_task_with_metadata = AsyncMock()
-    service.update_task_priority = AsyncMock()
-    service.update_task_due_date = AsyncMock()
-    service.update_task_category = AsyncMock()
-    service.update_task_status = AsyncMock()
-    service.start_time_tracking = AsyncMock()
-    service.stop_time_tracking = AsyncMock()
-    service.add_subtask = AsyncMock()
-    service.get_subtasks = AsyncMock()
-    service.add_task_dependency = AsyncMock()
-    service.get_task_dependencies = AsyncMock()
-    service.add_tags = AsyncMock()
-    service.get_tasks_by_tag = AsyncMock()
-    service.add_comment = AsyncMock()
-    service.get_comments = AsyncMock()
-    service.get_task_analytics = AsyncMock()
-    service.suggest_priority = AsyncMock()
+    service.create_task_with_metadata = AsyncMock(return_value={
+        'success': True,
+        'data': {'id': 1, 'description': 'Test task', 'done': False},
+        'message': 'Task created successfully'
+    })
+    service.update_task_priority = AsyncMock(return_value={
+        'success': True,
+        'data': {'id': 1, 'priority': 'High'},
+        'message': 'Priority updated successfully'
+    })
+    service.update_task_due_date = AsyncMock(return_value={
+        'success': True,
+        'data': {'id': 1, 'due_date': '2025-01-01T10:00:00Z'},
+        'message': 'Due date updated successfully'
+    })
+    service.update_task_category = AsyncMock(return_value={
+        'success': True,
+        'data': {'id': 1, 'category': 'Work'},
+        'message': 'Category updated successfully'
+    })
+    service.update_task_status = AsyncMock(return_value={
+        'success': True,
+        'data': {'id': 1, 'status': 'In Progress'},
+        'message': 'Status updated successfully'
+    })
+    service.start_time_tracking = AsyncMock(return_value={
+        'success': True,
+        'data': {'task_id': 1, 'started_at': '2025-01-01T10:00:00Z'},
+        'message': 'Time tracking started'
+    })
+    service.stop_time_tracking = AsyncMock(return_value={
+        'success': True,
+        'data': {'task_id': 1, 'duration_hours': 2.5},
+        'message': 'Time tracking stopped'
+    })
+    service.add_subtask = AsyncMock(return_value={
+        'success': True,
+        'data': {'id': 2, 'description': 'Subtask', 'parent_id': 1},
+        'message': 'Subtask created successfully'
+    })
+    service.get_subtasks = AsyncMock(return_value={
+        'success': True,
+        'data': [{'id': 2, 'description': 'Subtask'}],
+        'message': 'Subtasks retrieved successfully'
+    })
+    service.add_task_dependency = AsyncMock(return_value={
+        'success': True,
+        'data': {'task_id': 1, 'dependency_id': 2},
+        'message': 'Dependency added successfully'
+    })
+    service.get_task_dependencies = AsyncMock(return_value={
+        'success': True,
+        'data': [{'id': 2, 'description': 'Dependency task'}],
+        'message': 'Dependencies retrieved successfully'
+    })
+    service.add_tags = AsyncMock(return_value={
+        'success': True,
+        'data': {'task_id': 1, 'tags': ['urgent', 'work']},
+        'message': 'Tags added successfully'
+    })
+    service.get_tasks_by_tag = AsyncMock(return_value={
+        'success': True,
+        'data': [{'id': 1, 'description': 'Test task'}],
+        'message': 'Tasks by tag retrieved successfully'
+    })
+    service.add_comment = AsyncMock(return_value={
+        'success': True,
+        'data': {'task_id': 1, 'comment': 'Test comment'},
+        'message': 'Comment added successfully'
+    })
+    service.get_comments = AsyncMock(return_value={
+        'success': True,
+        'data': [{'id': 1, 'comment': 'Test comment'}],
+        'message': 'Comments retrieved successfully'
+    })
+    service.get_task_analytics = AsyncMock(return_value={
+        'success': True,
+        'data': {
+            'total_tasks': 10,
+            'completed_tasks': 7,
+            'completion_rate': 70.0,
+            'avg_completion_time_hours': 3.5
+        },
+        'message': 'Analytics generated successfully'
+    })
+    service.suggest_priority = AsyncMock(return_value={
+        'success': True,
+        'data': {
+            'priority': 'High',
+            'confidence': 85,
+            'reasoning': 'Contains urgent keywords'
+        },
+        'message': 'Priority suggested successfully'
+    })
     
     return service
 

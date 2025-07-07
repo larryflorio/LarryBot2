@@ -180,4 +180,324 @@ class TestTelegramBotHandler:
         mock_update.message.text = None
         mock_context = MagicMock()
         # Should not raise
-        await handler._dispatch_command(mock_update, mock_context) 
+        await handler._dispatch_command(mock_update, mock_context)
+
+    # Enhanced tests for better coverage
+
+    async def test_callback_query_unauthorized(self, command_registry):
+        """Test callback query with unauthorized user."""
+        mock_config = MagicMock(spec=Config)
+        mock_config.TELEGRAM_BOT_TOKEN = "test_token"
+        mock_config.ALLOWED_TELEGRAM_USER_ID = 123456789
+        handler = TelegramBotHandler(mock_config, command_registry)
+        
+        mock_update = MagicMock()
+        mock_update.effective_user = MagicMock()
+        mock_update.effective_user.id = 999999999
+        mock_update.callback_query = MagicMock()
+        mock_update.callback_query.answer = AsyncMock()
+        mock_update.callback_query.edit_message_text = AsyncMock()
+        
+        await handler._handle_callback_query(mock_update, MagicMock())
+        
+        # Should answer callback and send unauthorized message
+        mock_update.callback_query.answer.assert_called_once()
+        mock_update.callback_query.edit_message_text.assert_called_once()
+
+    async def test_callback_query_timeout(self, command_registry):
+        """Test callback query timeout handling."""
+        mock_config = MagicMock(spec=Config)
+        mock_config.TELEGRAM_BOT_TOKEN = "test_token"
+        mock_config.ALLOWED_TELEGRAM_USER_ID = 123456789
+        handler = TelegramBotHandler(mock_config, command_registry)
+        
+        mock_update = MagicMock()
+        mock_update.effective_user = MagicMock()
+        mock_update.effective_user.id = 123456789
+        mock_update.callback_query = MagicMock()
+        mock_update.callback_query.answer = AsyncMock(side_effect=asyncio.TimeoutError())
+        mock_update.callback_query.data = "test_action"
+        
+        await handler._handle_callback_query(mock_update, MagicMock())
+        
+        # Should handle timeout gracefully
+        mock_update.callback_query.answer.assert_called_once()
+
+    async def test_callback_query_operations_timeout(self, command_registry):
+        """Test callback operations timeout."""
+        mock_config = MagicMock(spec=Config)
+        mock_config.TELEGRAM_BOT_TOKEN = "test_token"
+        mock_config.ALLOWED_TELEGRAM_USER_ID = 123456789
+        handler = TelegramBotHandler(mock_config, command_registry)
+        
+        mock_update = MagicMock()
+        mock_update.effective_user = MagicMock()
+        mock_update.effective_user.id = 123456789
+        mock_update.callback_query = MagicMock()
+        mock_update.callback_query.answer = AsyncMock()
+        mock_update.callback_query.edit_message_text = AsyncMock()
+        mock_update.callback_query.data = "task_done:123"
+        
+        # Mock the callback operations to timeout
+        with patch.object(handler, '_handle_callback_operations', side_effect=asyncio.TimeoutError()):
+            await handler._handle_callback_query(mock_update, MagicMock())
+        
+        # Should send timeout message
+        mock_update.callback_query.edit_message_text.assert_called()
+
+    async def test_callback_query_operations_exception(self, command_registry):
+        """Test callback operations exception handling."""
+        mock_config = MagicMock(spec=Config)
+        mock_config.TELEGRAM_BOT_TOKEN = "test_token"
+        mock_config.ALLOWED_TELEGRAM_USER_ID = 123456789
+        handler = TelegramBotHandler(mock_config, command_registry)
+        
+        mock_update = MagicMock()
+        mock_update.effective_user = MagicMock()
+        mock_update.effective_user.id = 123456789
+        mock_update.callback_query = MagicMock()
+        mock_update.callback_query.answer = AsyncMock()
+        mock_update.callback_query.edit_message_text = AsyncMock()
+        mock_update.callback_query.data = "task_done:123"
+        
+        # Mock the callback operations to raise exception
+        with patch.object(handler, '_handle_callback_operations', side_effect=Exception("Test error")):
+            await handler._handle_callback_query(mock_update, MagicMock())
+        
+        # Should send error message
+        mock_update.callback_query.edit_message_text.assert_called()
+
+    async def test_handle_text_message_authorized(self, command_registry):
+        """Test text message handling with authorized user."""
+        mock_config = MagicMock(spec=Config)
+        mock_config.TELEGRAM_BOT_TOKEN = "test_token"
+        mock_config.ALLOWED_TELEGRAM_USER_ID = 123456789
+        handler = TelegramBotHandler(mock_config, command_registry)
+        
+        mock_update = MagicMock()
+        mock_update.effective_user = MagicMock()
+        mock_update.effective_user.id = 123456789
+        mock_update.message = MagicMock()
+        mock_update.message.text = "Hello bot"
+        mock_update.message.reply_text = AsyncMock()
+        
+        mock_context = MagicMock()
+        mock_context.user_data = {}
+        
+        # Mock the narrative processor
+        with patch.object(handler.enhanced_narrative_processor, 'process_input') as mock_process:
+            mock_process.return_value = MagicMock(
+                intent=MagicMock(value='GREETING'),
+                entities={},
+                context=MagicMock(sentiment='positive'),
+                confidence=0.8,
+                response_message="Hello! How can I help you?",
+                suggested_command=None
+            )
+            
+            await handler._handle_text_message(mock_update, mock_context)
+            
+            # Should process the message and send response
+            mock_process.assert_called_once_with("Hello bot", 123456789)
+            mock_update.message.reply_text.assert_called_once()
+
+    async def test_handle_text_message_task_edit_mode(self, command_registry):
+        """Test text message handling in task edit mode."""
+        mock_config = MagicMock(spec=Config)
+        mock_config.TELEGRAM_BOT_TOKEN = "test_token"
+        mock_config.ALLOWED_TELEGRAM_USER_ID = 123456789
+        handler = TelegramBotHandler(mock_config, command_registry)
+        
+        mock_update = MagicMock()
+        mock_update.effective_user = MagicMock()
+        mock_update.effective_user.id = 123456789
+        mock_update.message = MagicMock()
+        mock_update.message.text = "Updated task description"
+        mock_update.message.reply_text = AsyncMock()
+        
+        mock_context = MagicMock()
+        mock_context.user_data = {'editing_task_id': 123}
+        
+        with patch.object(handler, '_handle_task_edit_mode') as mock_edit:
+            await handler._handle_text_message(mock_update, mock_context)
+            
+            # Should call task edit handler
+            mock_edit.assert_called_once_with(mock_update, mock_context, "Updated task description")
+
+    async def test_handle_text_message_task_creation_state(self, command_registry):
+        """Test text message handling in task creation state."""
+        mock_config = MagicMock(spec=Config)
+        mock_config.TELEGRAM_BOT_TOKEN = "test_token"
+        mock_config.ALLOWED_TELEGRAM_USER_ID = 123456789
+        handler = TelegramBotHandler(mock_config, command_registry)
+        
+        mock_update = MagicMock()
+        mock_update.effective_user = MagicMock()
+        mock_update.effective_user.id = 123456789
+        mock_update.message = MagicMock()
+        mock_update.message.text = "Create a new task"
+        mock_update.message.reply_text = AsyncMock()
+        
+        mock_context = MagicMock()
+        mock_context.user_data = {'task_creation_state': 'description'}
+        
+        with patch('larrybot.plugins.tasks.handle_narrative_task_creation') as mock_create:
+            await handler._handle_text_message(mock_update, mock_context)
+            
+            # Should call narrative task creation
+            mock_create.assert_called_once_with(mock_update, mock_context, "Create a new task")
+
+    async def test_handle_text_message_low_confidence(self, command_registry):
+        """Test text message handling with low confidence."""
+        mock_config = MagicMock(spec=Config)
+        mock_config.TELEGRAM_BOT_TOKEN = "test_token"
+        mock_config.ALLOWED_TELEGRAM_USER_ID = 123456789
+        handler = TelegramBotHandler(mock_config, command_registry)
+        
+        mock_update = MagicMock()
+        mock_update.effective_user = MagicMock()
+        mock_update.effective_user.id = 123456789
+        mock_update.message = MagicMock()
+        mock_update.message.text = "Unclear message"
+        mock_update.message.reply_text = AsyncMock()
+        
+        mock_context = MagicMock()
+        mock_context.user_data = {}
+        
+        # Mock the narrative processor to return low confidence
+        with patch.object(handler.enhanced_narrative_processor, 'process_input') as mock_process:
+            mock_process.return_value = MagicMock(
+                intent=MagicMock(value='UNKNOWN'),
+                entities={},
+                context=MagicMock(sentiment='neutral'),
+                confidence=0.3,
+                response_message="I'm not sure what you mean",
+                suggested_command=None
+            )
+            
+            with patch.object(handler, '_handle_low_confidence_input') as mock_low:
+                await handler._handle_text_message(mock_update, mock_context)
+                
+                # Should call low confidence handler
+                mock_low.assert_called_once()
+
+    async def test_global_error_handler(self, command_registry):
+        """Test global error handler."""
+        mock_config = MagicMock(spec=Config)
+        mock_config.TELEGRAM_BOT_TOKEN = "test_token"
+        mock_config.ALLOWED_TELEGRAM_USER_ID = 123456789
+        handler = TelegramBotHandler(mock_config, command_registry)
+        
+        mock_update = MagicMock()
+        mock_update.effective_user = MagicMock()
+        mock_update.effective_user.id = 123456789
+        mock_update.effective_message = MagicMock()
+        mock_update.effective_message.reply_text = AsyncMock()
+        
+        mock_context = MagicMock()
+        mock_context.error = Exception("Test error")
+        
+        # Mock the enhanced message processor to avoid complex dependencies
+        with patch.object(handler, 'enhanced_message_processor') as mock_processor:
+            mock_processor.create_error_response.return_value = ("Error message", None)
+            
+            await handler._global_error_handler(mock_update, mock_context)
+            
+            # Should send error message
+            mock_update.effective_message.reply_text.assert_called_once()
+
+    async def test_register_core_commands(self, command_registry):
+        """Test core command registration."""
+        mock_config = MagicMock(spec=Config)
+        mock_config.TELEGRAM_BOT_TOKEN = "test_token"
+        mock_config.ALLOWED_TELEGRAM_USER_ID = 123456789
+        handler = TelegramBotHandler(mock_config, command_registry)
+        
+        # Check that core commands are registered
+        assert '/help' in command_registry._commands
+        assert '/start' in command_registry._commands
+        assert '/daily' in command_registry._commands
+
+    async def test_register_core_handlers(self, command_registry):
+        """Test core handler registration."""
+        mock_config = MagicMock(spec=Config)
+        mock_config.TELEGRAM_BOT_TOKEN = "test_token"
+        mock_config.ALLOWED_TELEGRAM_USER_ID = 123456789
+        handler = TelegramBotHandler(mock_config, command_registry)
+        
+        # Mock the application to check handlers are added
+        with patch.object(handler.application, 'add_handler') as mock_add:
+            handler._register_core_handlers()
+            
+            # Should add multiple handlers
+            assert mock_add.call_count >= 4  # start, help, callback, message handlers
+
+    async def test_callback_operations_routing(self, command_registry):
+        """Test callback operations routing to correct handlers."""
+        mock_config = MagicMock(spec=Config)
+        mock_config.TELEGRAM_BOT_TOKEN = "test_token"
+        mock_config.ALLOWED_TELEGRAM_USER_ID = 123456789
+        handler = TelegramBotHandler(mock_config, command_registry)
+        
+        mock_query = MagicMock()
+        mock_context = MagicMock()
+        
+        # Test different callback data routing
+        test_cases = [
+            ('no_action', None),
+            ('nav_back', '_handle_navigation_back'),
+            ('nav_main', '_handle_navigation_main'),
+            ('cancel_action', '_handle_cancel_action'),
+            ('task_done:123', '_handle_task_callback'),
+            ('client_view:456', '_handle_client_callback'),
+            ('habit_done:789', '_handle_habit_callback'),
+            ('confirm_delete:123', '_handle_confirmation_callback'),
+            ('menu_tasks', '_handle_menu_callback'),
+            ('bulk_status:done', '_handle_bulk_operations_callback'),
+            ('task_disclose:123:1', '_handle_task_disclosure'),
+            ('task_edit_cancel', '_handle_task_edit_cancel'),
+            ('tasks_refresh', '_handle_tasks_refresh'),
+            ('reminder_add', '_handle_reminder_callback'),
+            ('attachment_view:123', '_handle_attachment_callback'),
+            ('calendar_today', '_handle_calendar_callback'),
+            ('filter_date', '_handle_filter_callback'),
+            ('add_task', '_handle_add_task'),
+            ('addtask_step:description', '_handle_narrative_task_callback'),
+        ]
+        
+        for callback_data, expected_handler in test_cases:
+            mock_query.data = callback_data
+            if expected_handler:
+                # Patch as AsyncMock for async methods
+                with patch.object(handler, expected_handler, new_callable=AsyncMock) as mock_handler:
+                    await handler._handle_callback_operations(mock_query, mock_context)
+                    assert mock_handler.await_count == 1
+                    mock_handler.assert_awaited_once_with(mock_query, mock_context)
+            else:
+                # Should not call any handler for no_action
+                await handler._handle_callback_operations(mock_query, mock_context)
+
+    async def test_authorization_edge_cases(self, command_registry):
+        """Test authorization edge cases."""
+        mock_config = MagicMock(spec=Config)
+        mock_config.TELEGRAM_BOT_TOKEN = "test_token"
+        mock_config.ALLOWED_TELEGRAM_USER_ID = 123456789
+        handler = TelegramBotHandler(mock_config, command_registry)
+        
+        # Test with no config
+        mock_update = MagicMock()
+        mock_update.effective_user = MagicMock()
+        mock_update.effective_user.id = 123456789
+        
+        handler.config = None
+        assert not handler._is_authorized(mock_update)
+        
+        # Test with invalid config
+        handler.config = MagicMock()
+        handler.config.ALLOWED_TELEGRAM_USER_ID = "invalid"
+        assert not handler._is_authorized(mock_update)
+        
+        # Test with no effective_user attribute
+        mock_update = MagicMock()
+        del mock_update.effective_user
+        assert not handler._is_authorized(mock_update) 

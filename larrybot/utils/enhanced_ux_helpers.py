@@ -521,6 +521,73 @@ class ErrorRecoveryHelper:
         help_text += '**Solutions:**\n'
         help_text += '• Try again with a smaller dataset\n'
         help_text += '• Break the operation into smaller parts\n'
+        return help_text
+
+    @staticmethod
+    def suggest_recovery_actions(error_type: str, context: dict) -> List[str]:
+        """
+        Suggest recovery actions based on error type and context.
+        
+        Args:
+            error_type: Type of error that occurred
+            context: Error context information
+            
+        Returns:
+            List of suggested recovery actions
+        """
+        recovery_suggestions = {
+            'validation_error': [
+                'Check input format and try again',
+                'Use the provided examples as a template',
+                'Ensure all required fields are filled'
+            ],
+            'not_found_error': [
+                'Verify the item ID or name is correct',
+                'Use search to find similar items',
+                'Create a new item if it doesn\'t exist'
+            ],
+            'permission_error': [
+                'Contact your administrator for access',
+                'Check your user role and permissions',
+                'Try a different approach or action'
+            ],
+            'network_error': [
+                'Check your internet connection',
+                'Try again in a few moments',
+                'Contact support if the issue persists'
+            ],
+            'database_error': [
+                'Try the operation again',
+                'Check if your data is still available',
+                'Contact support if the issue persists'
+            ],
+            'timeout_error': [
+                'Try again with a smaller dataset',
+                'Break the operation into smaller parts',
+                'Check system performance and try later'
+            ],
+            'system_error': [
+                'Try the operation again',
+                'Check system status',
+                'Contact support if the issue persists'
+            ]
+        }
+        
+        suggestions = recovery_suggestions.get(error_type, [
+            'Try the operation again',
+            'Check your input and try again',
+            'Contact support if the issue persists'
+        ])
+        
+        # Add context-specific suggestions
+        if context.get('action') == 'add_task':
+            suggestions.append('Use /add command with a clear description')
+        elif context.get('action') == 'edit_task':
+            suggestions.append('Use /edit command with the correct task ID')
+        elif context.get('user_level') == 'beginner':
+            suggestions.append('Use /help for command examples')
+        
+        return suggestions
         help_text += '• Check your connection speed\n'
         help_text += '• Try again during off-peak hours\n'
         return help_text

@@ -160,6 +160,8 @@ class TelegramBotHandler:
             await self._handle_navigation_main(query, context)
         elif callback_data == 'cancel_action':
             await self._handle_cancel_action(query, context)
+        elif callback_data.startswith('task_disclose:'):
+            await self._handle_task_disclosure(query, context)
         elif callback_data.startswith('task_'):
             await self._handle_task_callback(query, context)
         elif callback_data.startswith('client_'):
@@ -172,8 +174,6 @@ class TelegramBotHandler:
             await self._handle_menu_callback(query, context)
         elif callback_data.startswith('bulk_'):
             await self._handle_bulk_operations_callback(query, context)
-        elif callback_data.startswith('task_disclose:'):
-            await self._handle_task_disclosure(query, context)
         elif callback_data == 'task_edit_cancel':
             await self._handle_task_edit_cancel(query, context)
         elif callback_data == 'tasks_refresh':

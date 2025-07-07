@@ -95,7 +95,7 @@ async def _time_entry_handler_internal(update: Update, context:
             'MarkdownV2')
         return
     description = context.args[2] if len(context.args) > 2 else None
-    result = await task_service.add_time_entry(task_id, duration_minutes,
+    result = await task_service.add_manual_time_entry(task_id, duration_minutes,
         description)
     if result['success']:
         formatted_duration = format_duration(duration_minutes)
@@ -120,7 +120,7 @@ async def _time_summary_handler_internal(update: Update, context:
             format_error_message(error_msg,
             'Usage: /time_summary <task_id>'), parse_mode='MarkdownV2')
         return
-    result = await task_service.get_time_summary(task_id)
+    result = await task_service.get_task_time_summary(task_id)
     if result['success']:
         time_data = result['data']
         total_minutes = time_data.get('total_minutes', 0)

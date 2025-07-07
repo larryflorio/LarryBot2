@@ -17,7 +17,11 @@ class TestCalendarRefresh:
         """Create a bot handler instance for testing."""
         config = Config()
         command_registry = CommandRegistry()
-        return TelegramBotHandler(config, command_registry)
+        
+        with patch('telegram.ext.Application.builder') as mock_builder:
+            mock_app = MagicMock()
+            mock_builder.return_value.token.return_value.build.return_value = mock_app
+            return TelegramBotHandler(config, command_registry)
 
     @pytest.fixture
     def mock_query(self):

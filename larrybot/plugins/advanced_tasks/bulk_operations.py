@@ -30,12 +30,11 @@ async def _bulk_status_handler_internal(update: Update, context:
     """Internal implementation of bulk status handler."""
     if task_service is None:
         task_service = get_task_service()
-    task_ids = parse_task_ids(context.args[0])
-    if not task_ids:
+    is_valid, task_ids, error_message = parse_task_ids(context.args[0])
+    if not is_valid:
         await update.message.reply_text(MessageFormatter.
             format_error_message('Invalid task IDs',
-            'Provide valid task IDs separated by commas'), parse_mode=
-            'MarkdownV2')
+            error_message), parse_mode='MarkdownV2')
         return
     status = context.args[1]
     result = await task_service.bulk_update_status(task_ids, status)
@@ -58,12 +57,11 @@ async def _bulk_priority_handler_internal(update: Update, context:
     """Internal implementation of bulk priority handler."""
     if task_service is None:
         task_service = get_task_service()
-    task_ids = parse_task_ids(context.args[0])
-    if not task_ids:
+    is_valid, task_ids, error_message = parse_task_ids(context.args[0])
+    if not is_valid:
         await update.message.reply_text(MessageFormatter.
             format_error_message('Invalid task IDs',
-            'Provide valid task IDs separated by commas'), parse_mode=
-            'MarkdownV2')
+            error_message), parse_mode='MarkdownV2')
         return
     priority = context.args[1]
     result = await task_service.bulk_update_priority(task_ids, priority)
@@ -86,15 +84,14 @@ async def _bulk_assign_handler_internal(update: Update, context:
     """Internal implementation of bulk assign handler."""
     if task_service is None:
         task_service = get_task_service()
-    task_ids = parse_task_ids(context.args[0])
-    if not task_ids:
+    is_valid, task_ids, error_message = parse_task_ids(context.args[0])
+    if not is_valid:
         await update.message.reply_text(MessageFormatter.
             format_error_message('Invalid task IDs',
-            'Provide valid task IDs separated by commas'), parse_mode=
-            'MarkdownV2')
+            error_message), parse_mode='MarkdownV2')
         return
     client_name = context.args[1]
-    result = await task_service.bulk_assign_tasks(task_ids, client_name)
+    result = await task_service.bulk_assign_to_client(task_ids, client_name)
     if result['success']:
         await update.message.reply_text(MessageFormatter.
             format_success_message(f"✅ {result['message']}", {
@@ -114,12 +111,11 @@ async def _bulk_delete_handler_internal(update: Update, context:
     """Internal implementation of bulk delete handler."""
     if task_service is None:
         task_service = get_task_service()
-    task_ids = parse_task_ids(context.args[0])
-    if not task_ids:
+    is_valid, task_ids, error_message = parse_task_ids(context.args[0])
+    if not is_valid:
         await update.message.reply_text(MessageFormatter.
             format_error_message('Invalid task IDs',
-            'Provide valid task IDs separated by commas'), parse_mode=
-            'MarkdownV2')
+            error_message), parse_mode='MarkdownV2')
         return
     confirm = len(context.args) > 1 and context.args[1].lower() == 'confirm'
     if not confirm:

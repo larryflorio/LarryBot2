@@ -4,6 +4,7 @@ Comprehensive test script for the complete /addtask narrative flow.
 Tests all steps, action buttons, and edge cases.
 """
 
+import pytest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 from telegram import Update, CallbackQuery, User, Message, Chat
@@ -20,6 +21,7 @@ from larrybot.plugins.tasks import (
     _show_confirmation, _create_final_task
 )
 
+@pytest.mark.asyncio
 async def test_complete_narrative_flow():
     """Test the complete narrative flow from start to finish."""
     
@@ -232,6 +234,7 @@ async def test_complete_narrative_flow():
     
     return True
 
+@pytest.mark.asyncio
 async def test_action_buttons():
     """Test all action buttons in the narrative flow."""
     
