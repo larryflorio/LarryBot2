@@ -1091,6 +1091,15 @@ class ProgressiveDisclosureBuilder:
         all_main = main_actions + custom_actions
         for i in range(0, len(all_main), 3):
             buttons.append(all_main[i:i+3])
+        # Time Tracking button on its own row
+        buttons.append([
+            UnifiedButtonBuilder.create_button(
+                text='Time Tracking',
+                callback_data=f'task_time_menu:{task_id}',
+                button_type=ButtonType.INFO,
+                custom_emoji='⏱️'
+            )
+        ])
         # More Options (advanced actions)
         if disclosure_level < 3:
             buttons.append([

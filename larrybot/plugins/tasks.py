@@ -226,9 +226,7 @@ async def _list_tasks_with_filters(update: Update, status: Optional[str],
                         ActionType.DELETE, task['id'], 'task')]
                     keyboard_buttons.append(task_row)
                 keyboard_buttons.append([UnifiedButtonBuilder.create_button
-                    (text='🔄 Refresh', callback_data='tasks_refresh',
-                    button_type=ButtonType.SECONDARY), UnifiedButtonBuilder.
-                    create_button(text='🏠 Main Menu', callback_data=
+                    (text='🏠 Main Menu', callback_data=
                     'nav_main', button_type=ButtonType.PRIMARY)])
                 keyboard = InlineKeyboardMarkup(keyboard_buttons)
                 await update.message.reply_text(message, reply_markup=
@@ -310,7 +308,6 @@ async def _list_incomplete_tasks_default(update: Update) ->None:
             keyboard_buttons.append(row)
         # --- End 4-per-row button patch ---
         keyboard_buttons.append([
-            UnifiedButtonBuilder.create_button(text='🔄 Refresh', callback_data='tasks_refresh', button_type=ButtonType.SECONDARY),
             UnifiedButtonBuilder.create_button(text='🏠 Main Menu', callback_data='nav_main', button_type=ButtonType.INFO)
         ])
         keyboard = InlineKeyboardMarkup(keyboard_buttons)

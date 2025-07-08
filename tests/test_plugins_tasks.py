@@ -140,6 +140,36 @@ async def test_list_tasks_handler_only_incomplete_tasks(test_session, mock_updat
 
 
 @pytest.mark.asyncio
+async def test_list_tasks_handler_uses_actual_task_data(test_session, mock_update, mock_context, db_task_factory):
+    """Test that list_tasks handler uses actual task data instead of static values."""
+    mock_update.message.reply_text = AsyncMock()
+    
+    # Create tasks with different priorities and statuses
+    task1 = db_task_factory(description="High priority task", priority="High")
+    task2 = db_task_factory(description="Low priority task", priority="Low")
+    task3 = db_task_factory(description="In Progress task", status="In Progress")
+    
+    with patch("larrybot.plugins.tasks.get_session", return_value=iter([test_session])):
+        await list_tasks_handler(mock_update, mock_context)
+        
+        # Check that the message contains actual task data
+        mock_update.message.reply_text.assert_called_once()
+        response_text = mock_update.message.reply_text.call_args[0][0]
+        
+        # Verify actual priorities are shown (not static "Medium")
+        assert "High priority task" in response_text
+        assert "Low priority task" in response_text
+        assert "In Progress task" in response_text
+        
+        # Verify actual statuses are shown (not static "Todo")
+        # The MessageFormatter should show the actual status values
+        assert "In Progress" in response_text
+        
+        # Verify the response uses MarkdownV2
+        assert mock_update.message.reply_text.call_args[1]['parse_mode'] == 'MarkdownV2'
+
+
+@pytest.mark.asyncio
 async def test_done_task_handler_no_args(test_session, mock_update, mock_context):
     """Test done_task handler when no arguments are provided."""
     mock_update.message.reply_text = AsyncMock()
