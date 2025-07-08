@@ -778,7 +778,7 @@ class UnifiedButtonBuilder:
         style = template['style']
         emoji = template['emoji']
         if entity_type == 'task' and action_type == ActionType.COMPLETE:
-            callback_data = f'task_complete:{entity_id}'
+            callback_data = f'task_done:{entity_id}'
         else:
             callback_data = f'{entity_type}_{action_type.value}:{entity_id}'
         return UnifiedButtonBuilder.create_button(text=text, callback_data=

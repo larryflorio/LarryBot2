@@ -437,7 +437,9 @@ async def _handle_due_date_step(update_or_query, context: ContextTypes.
     if due_date_input == 'skip':
         due_date = None
     elif due_date_input == 'today':
-        due_date = datetime.now().date()
+        # Set to end of today (23:59:59) instead of start of day (00:00:00)
+        today = datetime.now().date()
+        due_date = datetime.combine(today, datetime.max.time())  # 23:59:59.999999
     elif due_date_input == 'tomorrow':
         due_date = (datetime.now() + timedelta(days=1)).date()
     elif due_date_input == 'week':
@@ -463,8 +465,8 @@ async def _handle_due_date_step(update_or_query, context: ContextTypes.
                 await update_or_query.message.reply_text(message,
                     parse_mode='MarkdownV2')
             return
-    context.user_data['partial_task']['due_date'] = due_date.isoformat(
-        ) if due_date else None
+    # Store datetime object directly instead of converting to string
+    context.user_data['partial_task']['due_date'] = due_date if due_date else None
     context.user_data['task_creation_state'
         ] = TaskCreationState.AWAITING_PRIORITY.value
     context.user_data['step_history'].append({'step': 'due_date', 'value': 
@@ -673,7 +675,12 @@ async def _show_confirmation(update_or_query, context: ContextTypes.
     partial_task = context.user_data['partial_task']
     summary_lines = [f"📝 **{partial_task['description']}**"]
     if partial_task['due_date']:
-        summary_lines.append(f"📅 Due: {partial_task['due_date']}")
+        # Handle both string and datetime objects for display
+        if isinstance(partial_task['due_date'], datetime):
+            due_date_display = partial_task['due_date'].strftime('%Y-%m-%d %H:%M')
+        else:
+            due_date_display = partial_task['due_date']
+        summary_lines.append(f"📅 Due: {due_date_display}")
     priority_emoji = {'Low': '🟢', 'Medium': '🟡', 'High': '🟠', 'Critical': '🔴'
         }.get(partial_task['priority'], '⚪')
     summary_lines.append(
@@ -723,10 +730,15 @@ async def _create_final_task(update_or_query, context: ContextTypes.
     due_date = None
     if partial_task['due_date']:
         try:
-            due_date_obj = datetime.strptime(partial_task['due_date'],
-                '%Y-%m-%d')
-            due_date = due_date_obj.replace(tzinfo=timezone.utc)
-        except ValueError:
+            # Handle both string format (from manual input) and datetime objects (from buttons)
+            if isinstance(partial_task['due_date'], str):
+                due_date_obj = datetime.strptime(partial_task['due_date'],
+                    '%Y-%m-%d')
+                due_date = due_date_obj.replace(tzinfo=timezone.utc)
+            else:
+                # Already a datetime object from button selection
+                due_date = partial_task['due_date'].replace(tzinfo=timezone.utc)
+        except (ValueError, AttributeError):
             due_date = None
     task_service = _get_task_service()
     result = await task_service.create_task_with_metadata(description=

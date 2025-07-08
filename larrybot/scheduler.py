@@ -103,17 +103,38 @@ def schedule_daily_report(bot_handler, chat_id, hour=9, minute=0):
     """Schedule the daily report to be sent every day at the specified time (default 9am)."""
 
     def send_report_job():
-        loop = asyncio.get_event_loop()
-        coro = bot_handler._send_daily_report(chat_id=chat_id, context=None)
-        if loop.is_running():
-            asyncio.run_coroutine_threadsafe(coro, loop)
-        else:
-            loop.run_until_complete(coro)
+        try:
+            logger.info(f'🔄 Executing scheduled daily report for chat_id {chat_id}')
+            loop = asyncio.get_event_loop()
+            coro = bot_handler._send_daily_report(chat_id=chat_id, context=None)
+            if loop.is_running():
+                asyncio.run_coroutine_threadsafe(coro, loop)
+                logger.info(f'✅ Daily report job submitted to event loop for chat_id {chat_id}')
+            else:
+                loop.run_until_complete(coro)
+                logger.info(f'✅ Daily report job completed for chat_id {chat_id}')
+        except Exception as e:
+            logger.error(f'❌ Error in daily report job for chat_id {chat_id}: {e}')
+    
     job_id = f'daily_report_{chat_id}'
     if scheduler.get_job(job_id):
         scheduler.remove_job(job_id)
-    scheduler.add_job(send_report_job, 'cron', hour=hour, minute=minute, id
-        =job_id, replace_existing=True)
-    logger.info(
-        f'Scheduled daily report for chat_id {chat_id} at {hour:02d}:{minute:02d}'
-        )
+        logger.info(f'🔄 Replaced existing daily report job for chat_id {chat_id}')
+    
+    try:
+        scheduler.add_job(send_report_job, 'cron', hour=hour, minute=minute, id
+            =job_id, replace_existing=True, misfire_grace_time=300)
+        logger.info(
+            f'✅ Scheduled daily report for chat_id {chat_id} at {hour:02d}:{minute:02d}')
+        
+        # Log next run time for verification
+        job = scheduler.get_job(job_id)
+        if job:
+            next_run = job.next_run_time
+            logger.info(f'📅 Next daily report scheduled for: {next_run}')
+        else:
+            logger.warning(f'⚠️ Could not retrieve job info for daily report {job_id}')
+            
+    except Exception as e:
+        logger.error(f'❌ Failed to schedule daily report for chat_id {chat_id}: {e}')
+        raise

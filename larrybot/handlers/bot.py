@@ -97,10 +97,22 @@ class TelegramBotHandler:
             category='system')
         self.command_registry.register('/start', self._start, start_metadata)
         daily_metadata = CommandMetadata(name='/daily', description=
-            'Send a daily report of events, overdue tasks, due today, and habits.'
-            , usage='/daily', category='system')
+            'Send daily report with tasks, habits, and calendar events',
+            usage='/daily', category='system')
         self.command_registry.register('/daily', self.daily_command,
             daily_metadata)
+        
+        scheduler_status_metadata = CommandMetadata(name='/scheduler_status', 
+            description='Check scheduler and daily report status',
+            usage='/scheduler_status', category='system')
+        self.command_registry.register('/scheduler_status', self.scheduler_status_command,
+            scheduler_status_metadata)
+        
+        trigger_daily_metadata = CommandMetadata(name='/trigger_daily', 
+            description='Manually trigger the daily report',
+            usage='/trigger_daily', category='system')
+        self.command_registry.register('/trigger_daily', self.trigger_daily_report_command,
+            trigger_daily_metadata)
 
     async def _handle_callback_query(self, update: Update, context:
         ContextTypes.DEFAULT_TYPE) ->None:
@@ -1511,6 +1523,12 @@ If you believe this is an error, please check your configuration."""
             logger.info('Main event loop set for reminder handler')
         except RuntimeError as e:
             logger.warning(f'Could not set event loop: {e}')
+        
+        # Schedule daily report for 9am
+        from larrybot.scheduler import schedule_daily_report
+        schedule_daily_report(self, self.config.ALLOWED_TELEGRAM_USER_ID, hour=9, minute=0)
+        logger.info('📅 Daily report scheduled for 9:00 AM')
+        
         from larrybot.core.task_manager import get_task_manager
         task_manager = get_task_manager()
         try:
@@ -2821,54 +2839,57 @@ If you believe this is an error, please check your configuration."""
                 format_error_message('Failed to generate daily report',
                 'Please try again later.'), parse_mode='MarkdownV2')
 
-    async def _handle_narrative_task_callback(self, query, context:
-        ContextTypes.DEFAULT_TYPE) ->None:
-        print(
-            f"[DEBUG] Received callback: {query.data}, state={context.user_data.get('task_creation_state')}"
-            )
+    async def scheduler_status_command(self, update, context):
+        """Handle /scheduler_status command to check scheduler and daily report status."""
+        logger.info('Scheduler status command invoked by user')
+        if not self._is_authorized(update):
+            await update.message.reply_text('🚫 Unauthorized access.')
+            return
         try:
-            if 'task_creation_state' not in context.user_data:
-                await safe_edit(query.edit_message_text, MessageFormatter.
-                    format_error_message('No active task creation session',
-                    'Use /addtask to start creating a task.'), parse_mode=
-                    'MarkdownV2')
-                return
-            parts = query.data.split(':')
-            if len(parts) < 2:
-                return
-            step_type = parts[1]
-            step_value = ':'.join(parts[2:]) if len(parts) > 2 else ''
-            from larrybot.plugins.tasks import _handle_description_step, _handle_due_date_step, _handle_priority_step, _handle_category_step, _handle_client_step, _handle_confirmation_step
-            from larrybot.nlp.enhanced_narrative_processor import TaskCreationState
-            current_state = context.user_data['task_creation_state']
-            logger.info(
-                f'Narrative callback: step_type={step_type}, current_state={current_state}, step_value={step_value}'
-                )
-            print(
-                f'[DEBUG] step_type={step_type!r}, current_state={current_state!r}'
-                )
-            if (step_type == 'due_date' and current_state ==
-                TaskCreationState.AWAITING_DUE_DATE.value):
-                await _handle_due_date_step(query, context, step_value)
-            elif step_type == 'priority' and current_state == TaskCreationState.AWAITING_PRIORITY.value:
-                await _handle_priority_step(query, context, step_value)
-            elif step_type == 'category' and current_state == TaskCreationState.AWAITING_CATEGORY.value:
-                await _handle_category_step(query, context, step_value)
-            elif step_type == 'client' and current_state == TaskCreationState.AWAITING_CLIENT.value:
-                await _handle_client_step(query, context, step_value)
-            elif step_type in ['confirm', 'edit', 'cancel'
-                ] and current_state == TaskCreationState.CONFIRMATION.value:
-                await _handle_confirmation_step(query, context, step_type)
+            from larrybot.scheduler import scheduler
+            job_id = f'daily_report_{self.config.ALLOWED_TELEGRAM_USER_ID}'
+            job = scheduler.get_job(job_id)
+            
+            if job:
+                next_run = job.next_run_time
+                message = f"""⏰ **Scheduler Status**
+
+✅ **Daily Report Job**: Active
+📅 **Next Run**: {next_run.strftime('%Y-%m-%d %H:%M:%S') if next_run else 'Unknown'}
+🆔 **Job ID**: `{job_id}`
+⏱️ **Schedule**: Daily at 9:00 AM
+
+🔄 **Scheduler Status**: {'Running' if scheduler.running else 'Stopped'}"""
             else:
-                logger.warning(
-                    f'Invalid narrative step: step_type={step_type}, current_state={current_state}'
-                    )
-                await safe_edit(query.edit_message_text, MessageFormatter.
-                    format_error_message(
-                    'Invalid step in task creation flow',
-                    'Please use /addtask to start over.'), parse_mode=
-                    'MarkdownV2')
+                message = f"""⏰ **Scheduler Status**
+
+❌ **Daily Report Job**: Not Found
+🆔 **Expected Job ID**: `{job_id}`
+⚠️ **Issue**: Daily report not scheduled
+
+🔄 **Scheduler Status**: {'Running' if scheduler.running else 'Stopped'}
+
+💡 **Solution**: Restart the bot to re-schedule the daily report."""
+            
+            await update.message.reply_text(message, parse_mode='Markdown')
         except Exception as e:
-            print(f'[DEBUG] Exception in _handle_narrative_task_callback: {e}')
-            import traceback
-            traceback.print_exc()
+            logger.error(f'Error in scheduler status command: {e}')
+            await update.message.reply_text(MessageFormatter.
+                format_error_message('Failed to check scheduler status',
+                str(e)), parse_mode='MarkdownV2')
+
+    async def trigger_daily_report_command(self, update, context):
+        """Handle /trigger_daily command to manually trigger the daily report."""
+        logger.info('Manual daily report trigger command invoked by user')
+        if not self._is_authorized(update):
+            await update.message.reply_text('🚫 Unauthorized access.')
+            return
+        try:
+            await update.message.reply_text('🔄 Manually triggering daily report...', parse_mode='Markdown')
+            await self._send_daily_report(chat_id=self.config.ALLOWED_TELEGRAM_USER_ID, context=context)
+            logger.info('✅ Manual daily report triggered successfully')
+        except Exception as e:
+            logger.error(f'Error in manual daily report trigger: {e}')
+            await update.message.reply_text(MessageFormatter.
+                format_error_message('Failed to trigger daily report',
+                str(e)), parse_mode='MarkdownV2')
