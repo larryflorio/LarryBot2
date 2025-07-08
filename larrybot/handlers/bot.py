@@ -236,6 +236,24 @@ class TelegramBotHandler:
         elif callback_data.startswith('task_view:'):
             task_id = int(callback_data.split(':')[1])
             await self._handle_task_view(query, context, task_id)
+        elif callback_data.startswith('task_attach_file:'):
+            task_id = int(callback_data.split(':')[1])
+            await self._handle_task_attach_file(query, context, task_id)
+        elif callback_data.startswith('task_add_note:'):
+            task_id = int(callback_data.split(':')[1])
+            await self._handle_task_add_note(query, context, task_id)
+        elif callback_data.startswith('task_time_menu:'):
+            task_id = int(callback_data.split(':')[1])
+            await self._handle_task_time_menu(query, context, task_id)
+        elif callback_data.startswith('task_start_time:'):
+            task_id = int(callback_data.split(':')[1])
+            await self._handle_task_start_time(query, context, task_id)
+        elif callback_data.startswith('task_stop_time:'):
+            task_id = int(callback_data.split(':')[1])
+            await self._handle_task_stop_time(query, context, task_id)
+        elif callback_data.startswith('task_time_stats:'):
+            task_id = int(callback_data.split(':')[1])
+            await self._handle_task_time_stats(query, context, task_id)
         elif callback_data == 'task_edit_cancel':
             await self._handle_task_edit_cancel(query, context)
         elif callback_data == 'tasks_refresh':
@@ -1873,11 +1891,10 @@ If you believe this is an error, please check your configuration."""
                     suggestions.append(
                         '💡 **Suggestion:** Use time tracking to monitor progress'
                         )
-                message = MessageFormatter.format_success_message(
-                    'Task Details', details)
+                # Use new UX formatting for task details
+                message = MessageFormatter.format_task_details_for_view(details)
                 if suggestions:
-                    escaped_suggestions = [MessageFormatter.escape_markdown
-                        (suggestion) for suggestion in suggestions]
+                    escaped_suggestions = [MessageFormatter.escape_markdown(suggestion) for suggestion in suggestions]
                     message += '\n\n' + '\n'.join(escaped_suggestions)
                 disclosure_level = context.user_data.get(
                     f'task_disclosure_{task_id}', 1)
@@ -2870,3 +2887,181 @@ If you believe this is an error, please check your configuration."""
             await update.message.reply_text(MessageFormatter.
                 format_error_message('Failed to trigger daily report',
                 str(e)), parse_mode='MarkdownV2')
+
+    async def _handle_task_attach_file(self, query, context: ContextTypes.
+        DEFAULT_TYPE, task_id: int) ->None:
+        """Handle task file attachment via callback."""
+        from larrybot.utils.ux_helpers import MessageFormatter
+        from larrybot.utils.enhanced_ux_helpers import UnifiedButtonBuilder, ButtonType
+        try:
+            # Set context for file attachment mode
+            context.user_data['attaching_file_to_task'] = task_id
+            keyboard = InlineKeyboardMarkup([
+                [UnifiedButtonBuilder.create_button(text='📎 Upload File', 
+                    callback_data=f'attachment_add:{task_id}', 
+                    button_type=ButtonType.PRIMARY)],
+                [UnifiedButtonBuilder.create_button(text='❌ Cancel', 
+                    callback_data=f'task_view:{task_id}', 
+                    button_type=ButtonType.SECONDARY)]
+            ])
+            await safe_edit(query.edit_message_text,
+                f"""📎 **Attach File to Task #{task_id}**
+
+Please send the file you want to attach to this task.
+
+**Supported formats:** Documents, images, PDFs, etc.
+**Max size:** 20MB
+
+Or use the button below to upload a file.""", 
+                reply_markup=keyboard, parse_mode='MarkdownV2')
+        except Exception as e:
+            logger.error(f'Error starting file attachment for task {task_id}: {e}')
+            await safe_edit(query.edit_message_text, MessageFormatter.
+                format_error_message('Error starting file attachment',
+                'Please try again or use /add_attachment command.'), parse_mode='MarkdownV2')
+
+    async def _handle_task_add_note(self, query, context: ContextTypes.
+        DEFAULT_TYPE, task_id: int) ->None:
+        """Handle task note/comment addition via callback."""
+        from larrybot.utils.ux_helpers import MessageFormatter
+        from larrybot.utils.enhanced_ux_helpers import UnifiedButtonBuilder, ButtonType
+        try:
+            # Set context for note addition mode
+            context.user_data['adding_note_to_task'] = task_id
+            keyboard = InlineKeyboardMarkup([
+                [UnifiedButtonBuilder.create_button(text='❌ Cancel', 
+                    callback_data=f'task_view:{task_id}', 
+                    button_type=ButtonType.SECONDARY)]
+            ])
+            await safe_edit(query.edit_message_text,
+                f"""📝 **Add Note to Task #{task_id}**
+
+Please reply with the note or comment you want to add to this task.
+
+**Examples:**
+• "Started working on this task"
+• "Waiting for client feedback"
+• "Blocked by dependency X"
+
+You can also use `/comment {task_id} <your note>` command.""", 
+                reply_markup=keyboard, parse_mode='MarkdownV2')
+        except Exception as e:
+            logger.error(f'Error starting note addition for task {task_id}: {e}')
+            await safe_edit(query.edit_message_text, MessageFormatter.
+                format_error_message('Error starting note addition',
+                'Please try again or use /comment command.'), parse_mode='MarkdownV2')
+
+    async def _handle_task_time_menu(self, query, context: ContextTypes.
+        DEFAULT_TYPE, task_id: int) ->None:
+        """Handle task time tracking menu via callback."""
+        from larrybot.utils.ux_helpers import MessageFormatter
+        from larrybot.utils.enhanced_ux_helpers import UnifiedButtonBuilder, ButtonType
+        from larrybot.storage.db import get_optimized_session
+        from larrybot.storage.task_repository import TaskRepository
+        try:
+            with get_optimized_session() as session:
+                repo = TaskRepository(session)
+                task = repo.get_task_by_id(task_id)
+                if not task:
+                    await safe_edit(query.edit_message_text,
+                        MessageFormatter.format_error_message(
+                        f'Task ID {task_id} not found',
+                        "The task may have already been deleted or doesn't exist."
+                        ), parse_mode='MarkdownV2')
+                    return
+                
+                # Check if time tracking is active
+                is_tracking = getattr(task, 'time_tracking_start', None) is not None
+                
+                if is_tracking:
+                    # Show stop tracking option
+                    keyboard = InlineKeyboardMarkup([
+                        [UnifiedButtonBuilder.create_button(text='⏹️ Stop Tracking', 
+                            callback_data=f'task_stop_time:{task_id}', 
+                            button_type=ButtonType.DANGER)],
+                        [UnifiedButtonBuilder.create_button(text='📊 View Time', 
+                            callback_data=f'task_time_stats:{task_id}', 
+                            button_type=ButtonType.INFO)],
+                        [UnifiedButtonBuilder.create_button(text='🔙 Back to Task', 
+                            callback_data=f'task_view:{task_id}', 
+                            button_type=ButtonType.SECONDARY)]
+                    ])
+                    message = f"""⏱️ **Time Tracking Active - Task #{task_id}**
+
+Time tracking is currently running for this task.
+
+**Task:** {MessageFormatter.escape_markdown(task.description)}"""
+                else:
+                    # Show start tracking option
+                    keyboard = InlineKeyboardMarkup([
+                        [UnifiedButtonBuilder.create_button(text='▶️ Start Tracking', 
+                            callback_data=f'task_start_time:{task_id}', 
+                            button_type=ButtonType.SUCCESS)],
+                        [UnifiedButtonBuilder.create_button(text='📊 View Time', 
+                            callback_data=f'task_time_stats:{task_id}', 
+                            button_type=ButtonType.INFO)],
+                        [UnifiedButtonBuilder.create_button(text='🔙 Back to Task', 
+                            callback_data=f'task_view:{task_id}', 
+                            button_type=ButtonType.SECONDARY)]
+                    ])
+                    message = f"""⏱️ **Time Tracking - Task #{task_id}**
+
+Track time spent on this task to monitor productivity.
+
+**Task:** {MessageFormatter.escape_markdown(task.description)}"""
+                
+                await safe_edit(query.edit_message_text, message, 
+                    reply_markup=keyboard, parse_mode='MarkdownV2')
+        except Exception as e:
+            logger.error(f'Error showing time tracking menu for task {task_id}: {e}')
+            await safe_edit(query.edit_message_text, MessageFormatter.
+                format_error_message('Error showing time tracking menu',
+                'Please try again or use /start_time_tracking command.'), parse_mode='MarkdownV2')
+
+    async def _handle_task_start_time(self, query, context: ContextTypes.
+        DEFAULT_TYPE, task_id: int) ->None:
+        """Handle task start time tracking."""
+        try:
+            from larrybot.plugins.advanced_tasks.time_tracking import start_time_tracking_handler
+            mock_update = type('MockUpdate', (), {'message': query.message,
+                'effective_user': query.from_user})()
+            context.args = [str(task_id)]
+            await start_time_tracking_handler(mock_update, context)
+        except Exception as e:
+            logger.error(f'Error starting time tracking for task {task_id}: {e}')
+            await safe_edit(query.edit_message_text, MessageFormatter.
+                format_error_message('Failed to start time tracking',
+                'Please try again or use /time_start command.'),
+                parse_mode='MarkdownV2')
+
+    async def _handle_task_stop_time(self, query, context: ContextTypes.
+        DEFAULT_TYPE, task_id: int) ->None:
+        """Handle task stop time tracking."""
+        try:
+            from larrybot.plugins.advanced_tasks.time_tracking import stop_time_tracking_handler
+            mock_update = type('MockUpdate', (), {'message': query.message,
+                'effective_user': query.from_user})()
+            context.args = [str(task_id)]
+            await stop_time_tracking_handler(mock_update, context)
+        except Exception as e:
+            logger.error(f'Error stopping time tracking for task {task_id}: {e}')
+            await safe_edit(query.edit_message_text, MessageFormatter.
+                format_error_message('Failed to stop time tracking',
+                'Please try again or use /time_stop command.'),
+                parse_mode='MarkdownV2')
+
+    async def _handle_task_time_stats(self, query, context: ContextTypes.
+        DEFAULT_TYPE, task_id: int) ->None:
+        """Handle task time statistics."""
+        try:
+            from larrybot.plugins.advanced_tasks.time_tracking import time_summary_handler
+            mock_update = type('MockUpdate', (), {'message': query.message,
+                'effective_user': query.from_user})()
+            context.args = [str(task_id)]
+            await time_summary_handler(mock_update, context)
+        except Exception as e:
+            logger.error(f'Error showing time statistics for task {task_id}: {e}')
+            await safe_edit(query.edit_message_text, MessageFormatter.
+                format_error_message('Failed to load time statistics',
+                'Please try again or use /time_summary command.'), parse_mode=
+                'MarkdownV2')
