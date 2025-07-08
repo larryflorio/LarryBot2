@@ -2971,7 +2971,7 @@ You can also use `/comment {task_id} <your note>` command.""",
                     return
                 
                 # Check if time tracking is active
-                is_tracking = getattr(task, 'time_tracking_start', None) is not None
+                is_tracking = getattr(task, 'started_at', None) is not None
                 
                 if is_tracking:
                     # Show stop tracking option
@@ -3027,6 +3027,9 @@ Track time spent on this task to monitor productivity.
                 'effective_user': query.from_user})()
             context.args = [str(task_id)]
             await start_time_tracking_handler(mock_update, context)
+            
+            # Refresh the time tracking menu to show updated state
+            await self._handle_task_time_menu(query, context, task_id)
         except Exception as e:
             logger.error(f'Error starting time tracking for task {task_id}: {e}')
             await safe_edit(query.edit_message_text, MessageFormatter.
@@ -3043,6 +3046,9 @@ Track time spent on this task to monitor productivity.
                 'effective_user': query.from_user})()
             context.args = [str(task_id)]
             await stop_time_tracking_handler(mock_update, context)
+            
+            # Refresh the time tracking menu to show updated state
+            await self._handle_task_time_menu(query, context, task_id)
         except Exception as e:
             logger.error(f'Error stopping time tracking for task {task_id}: {e}')
             await safe_edit(query.edit_message_text, MessageFormatter.
