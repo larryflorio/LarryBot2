@@ -882,7 +882,7 @@ class UnifiedButtonBuilder:
         Returns:
             InlineKeyboardMarkup with task-specific buttons
         """
-        available_actions = [ActionType.VIEW, ActionType.DELETE]
+        available_actions = [ActionType.DELETE]
         if status != 'Done':
             available_actions.append(ActionType.COMPLETE)
         if show_edit and status != 'Done':
@@ -1062,43 +1062,62 @@ class ProgressiveDisclosureBuilder:
         Any], disclosure_level: int=1) ->InlineKeyboardMarkup:
         """
         Build a progressive disclosure keyboard for tasks.
-        
-        Args:
-            task_id: Task ID
-            task_data: Task data
-            disclosure_level: Level of disclosure (1=basic, 2=advanced, 3=expert)
-            
-        Returns:
-            InlineKeyboardMarkup with progressive disclosure
+        Ensures no more than 3 buttons per row.
         """
+        from larrybot.utils.enhanced_ux_helpers import UnifiedButtonBuilder, ButtonType
         buttons = []
-        basic_actions = [ActionType.VIEW, ActionType.COMPLETE, ActionType.
-            DELETE]
-        if disclosure_level >= 2:
-            basic_actions.extend([ActionType.EDIT])
-            if task_data.get('status') in ['Todo', 'In Progress']:
-                buttons.append(UnifiedButtonBuilder.create_button(text=
-                    'Time Tracking', callback_data=
-                    f'task_time_menu:{task_id}', button_type=ButtonType.
-                    INFO, custom_emoji='⏱️'))
-        if disclosure_level >= 3:
-            buttons.append(UnifiedButtonBuilder.create_button(text=
-                '📊 Analytics', callback_data=f'task_analytics:{task_id}',
-                button_type=ButtonType.SECONDARY))
-            buttons.append(UnifiedButtonBuilder.create_button(text=
-                '🔗 Dependencies', callback_data=
-                f'task_dependencies:{task_id}', button_type=ButtonType.
-                SECONDARY))
-        for action in basic_actions:
-            button = UnifiedButtonBuilder.create_action_button(action_type=
-                action, entity_id=task_id, entity_type='task')
-            buttons.append(button)
+        # Main actions: Done, Edit, Delete, Attach File, Add Note
+        main_actions = []
+        if task_data.get('status', 'Todo') != 'Done':
+            main_actions.append(UnifiedButtonBuilder.create_action_button(ActionType.COMPLETE, task_id, 'task'))
+        main_actions.append(UnifiedButtonBuilder.create_action_button(ActionType.EDIT, task_id, 'task'))
+        main_actions.append(UnifiedButtonBuilder.create_action_button(ActionType.DELETE, task_id, 'task'))
+        # Custom actions: Attach File, Add Note
+        custom_actions = [
+            UnifiedButtonBuilder.create_button(
+                text='Attach File',
+                callback_data=f'task_attach_file:{task_id}',
+                button_type=ButtonType.SECONDARY,
+                custom_emoji='📎'
+            ),
+            UnifiedButtonBuilder.create_button(
+                text='Add Note',
+                callback_data=f'task_add_note:{task_id}',
+                button_type=ButtonType.SECONDARY,
+                custom_emoji='📝'
+            )
+        ]
+        # Group into rows of max 3
+        all_main = main_actions + custom_actions
+        for i in range(0, len(all_main), 3):
+            buttons.append(all_main[i:i+3])
+        # More Options (advanced actions)
         if disclosure_level < 3:
-            buttons.append(UnifiedButtonBuilder.create_button(text=
-                'More Options', callback_data=
-                f'task_disclose:{task_id}:{disclosure_level + 1}',
-                button_type=ButtonType.SECONDARY, custom_emoji='➕'))
-        return InlineKeyboardMarkup([buttons])
+            buttons.append([
+                UnifiedButtonBuilder.create_button(
+                    text='More Options',
+                    callback_data=f'task_disclose:{task_id}:{disclosure_level + 1}',
+                    button_type=ButtonType.SECONDARY,
+                    custom_emoji='➕'
+                )
+            ])
+        if disclosure_level >= 3:
+            # Advanced actions (Analytics, Dependencies, etc.)
+            adv_row = []
+            adv_row.append(UnifiedButtonBuilder.create_button(
+                text='Analytics',
+                callback_data=f'task_analytics:{task_id}',
+                button_type=ButtonType.SECONDARY,
+                custom_emoji='📊'
+            ))
+            adv_row.append(UnifiedButtonBuilder.create_button(
+                text='Dependencies',
+                callback_data=f'task_dependencies:{task_id}',
+                button_type=ButtonType.SECONDARY,
+                custom_emoji='🔗'
+            ))
+            buttons.append(adv_row)
+        return InlineKeyboardMarkup(buttons)
 
     @staticmethod
     def build_smart_disclosure_keyboard(entity_type: str, entity_id: int,

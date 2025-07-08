@@ -879,6 +879,84 @@ class MessageFormatter:
         return formatted_message
 
     @staticmethod
+    def format_task_details_for_view(details: dict) -> str:
+        """
+        Format task details for the detailed task view, following new UX rules:
+        - Priority and Category on separate lines
+        - Show client if category is Work
+        - Use /list emojis for priority and client
+        - Add relative due date
+        - Human-friendly, readable layout
+        """
+        from datetime import datetime
+        from larrybot.utils.ux_helpers import MessageFormatter
+        # Extract fields
+        description = details.get('description', '')
+        priority = details.get('priority', None)
+        due_date = details.get('due_date', None)
+        category = details.get('category', None)
+        created_at = details.get('created_at', None)
+        client = details.get('client', None)
+        # Priority emoji map (from /list)
+        priority_map = {'Low': '🟢', 'Medium': '🟡', 'High': '🟠', 'Critical': '🟥'}
+        priority_emoji = priority_map.get(priority, '⚪') if priority else ''
+        # Format due_date as date only and relative
+        due_date_str = ''
+        relative_due = ''
+        if due_date:
+            if isinstance(due_date, str):
+                try:
+                    due_date_obj = datetime.fromisoformat(due_date)
+                except Exception:
+                    due_date_obj = None
+            else:
+                due_date_obj = due_date
+            if due_date_obj:
+                due_date_str = due_date_obj.strftime('%b %d, %Y')
+                # Relative due (e.g., in 3 days)
+                from larrybot.utils.datetime_utils import get_current_datetime
+                now = get_current_datetime()
+                delta = (due_date_obj.date() - now.date()).days
+                if delta == 0:
+                    relative_due = '(Today)'
+                elif delta == 1:
+                    relative_due = '(Tomorrow)'
+                elif delta > 1:
+                    relative_due = f'(in {delta} days)'
+                elif delta < 0:
+                    relative_due = f'({abs(delta)} days ago)'
+        # Format created_at as readable date/time
+        created_at_str = ''
+        if created_at:
+            if isinstance(created_at, str):
+                try:
+                    created_at_obj = datetime.fromisoformat(created_at)
+                except Exception:
+                    created_at_obj = None
+            else:
+                created_at_obj = created_at
+            if created_at_obj:
+                created_at_str = created_at_obj.strftime('%b %d, %Y, %I:%M %p')
+        # Build message
+        message = f"""📝 *{MessageFormatter.escape_markdown(description)}*\n"""
+        if priority:
+            message += f"{priority_emoji} **Priority:** {MessageFormatter.escape_markdown(priority)}\n"
+        if category:
+            message += f"🏷️ **Category:** {MessageFormatter.escape_markdown(category)}\n"
+            # Show client if Work
+            if (category.lower() == 'work' or category == 'Work') and client:
+                client_name = getattr(client, 'name', None) if hasattr(client, 'name') else client.get('name') if isinstance(client, dict) else None
+                if client_name:
+                    message += f"👤 **Client:** {MessageFormatter.escape_markdown(client_name)}\n"
+        if due_date_str:
+            message += f"\n⏰ **Due:** {MessageFormatter.escape_markdown(due_date_str)}"
+            if relative_due:
+                message += f" {MessageFormatter.escape_markdown(relative_due)}"
+        if created_at_str:
+            message += f"\n📅 **Created:** {MessageFormatter.escape_markdown(created_at_str)}"
+        return message.strip()
+
+    @staticmethod
     def format_analytics(analytics: Dict) ->str:
         """
         Format analytics data with visual indicators.
