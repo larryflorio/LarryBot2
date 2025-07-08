@@ -253,6 +253,23 @@ async def _list_incomplete_tasks_default(update: Update) ->None:
     with next(get_session()) as session:
         repo = TaskRepository(session)
         incomplete_tasks = repo.list_incomplete_tasks()
+        # --- Begin sorting patch ---
+        # Define priority order: Critical=0, High=1, Medium=2, Low=3
+        priority_order = {'Critical': 0, 'High': 1, 'Medium': 2, 'Low': 3}
+        def sort_key(task):
+            # None due dates go last
+            due = task.due_date if task.due_date is not None else (9999, 99, 99)
+            # If due is a datetime, use it directly; else, use a tuple that sorts last
+            if hasattr(due, 'timestamp'):
+                due_val = due.timestamp()
+            elif isinstance(due, (tuple, list)):
+                due_val = due
+            else:
+                due_val = float('inf')
+            priority_val = priority_order.get(getattr(task, 'priority', 'Medium'), 2)
+            return (due_val, priority_val)
+        incomplete_tasks = sorted(incomplete_tasks, key=sort_key)
+        # --- End sorting patch ---
         if not incomplete_tasks:
             await update.message.reply_text(MessageFormatter.
                 format_info_message('📋 No Tasks Found', {'Status':
@@ -262,26 +279,42 @@ async def _list_incomplete_tasks_default(update: Update) ->None:
             return
         tasks_data = []
         for task in incomplete_tasks:
-            tasks_data.append({'id': task.id, 'description': task.
-                description, 'status': 'Todo', 'priority': 'Medium',
-                'created_at': task.created_at})
-        message = MessageFormatter.format_task_list(tasks_data,
-            'Incomplete Tasks')
+            # Use actual task data instead of static values
+            task_data = {
+                'id': task.id,
+                'description': task.description,
+                'priority': task.priority,  # Use actual priority from database
+                'category': task.category,  # Include category if available
+                'due_date': task.due_date,  # Include due date if available
+                'client': task.client if (task.category and str(task.category).lower() == 'work') else None,
+            }
+            tasks_data.append(task_data)
+        # --- Begin numbered list patch ---
+        # Render the message as a numbered list (prefix each task with its number)
+        message = MessageFormatter.format_task_list(tasks_data, 'Incomplete Tasks', numbered=True)
+        # --- End numbered list patch ---
         keyboard_buttons = []
-        for task in incomplete_tasks:
-            task_row = [UnifiedButtonBuilder.create_action_button(
-                ActionType.VIEW, task.id, 'task'), UnifiedButtonBuilder.
-                create_action_button(ActionType.COMPLETE, task.id, 'task'),
-                UnifiedButtonBuilder.create_action_button(ActionType.EDIT,
-                task.id, 'task'), UnifiedButtonBuilder.create_action_button
-                (ActionType.DELETE, task.id, 'task')]
-            keyboard_buttons.append(task_row)
-        keyboard_buttons.append([UnifiedButtonBuilder.create_button(text=
-            '🔄 Refresh', callback_data='tasks_refresh', button_type=ButtonType.SECONDARY), UnifiedButtonBuilder.create_button(text=
-            '🏠 Main Menu', callback_data='nav_main', button_type=ButtonType.INFO)])
+        # --- Begin 4-per-row button patch ---
+        row = []
+        for idx, task in enumerate(incomplete_tasks, 1):
+            button = UnifiedButtonBuilder.create_button(
+                text=str(idx),
+                callback_data=f'task_view:{task.id}',
+                button_type=ButtonType.INFO
+            )
+            row.append(button)
+            if len(row) == 4:
+                keyboard_buttons.append(row)
+                row = []
+        if row:
+            keyboard_buttons.append(row)
+        # --- End 4-per-row button patch ---
+        keyboard_buttons.append([
+            UnifiedButtonBuilder.create_button(text='🔄 Refresh', callback_data='tasks_refresh', button_type=ButtonType.SECONDARY),
+            UnifiedButtonBuilder.create_button(text='🏠 Main Menu', callback_data='nav_main', button_type=ButtonType.INFO)
+        ])
         keyboard = InlineKeyboardMarkup(keyboard_buttons)
-        await update.message.reply_text(message, reply_markup=keyboard,
-            parse_mode='MarkdownV2')
+        await update.message.reply_text(message, reply_markup=keyboard, parse_mode='MarkdownV2')
 
 
 async def done_task_handler(update: Update, context: ContextTypes.DEFAULT_TYPE

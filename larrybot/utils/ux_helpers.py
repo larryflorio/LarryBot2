@@ -659,69 +659,91 @@ class MessageFormatter:
         return '\u200b'.join(url)
 
     @staticmethod
-    def format_task_list(tasks: list, title: str='Tasks') ->str:
+    def _format_natural_date(due_date):
         """
-        Format a list of tasks with rich formatting.
-        
-        Args:
-            tasks: List of task objects or dictionaries
-            title: Title for the task list
-            
-        Returns:
-            Formatted task list string
+        Return a human-friendly date string: Today, Tomorrow, or Month Day (e.g., July 8).
+        """
+        from larrybot.utils.datetime_utils import ensure_local, get_current_datetime
+        import calendar
+        if not due_date:
+            return None
+        dt = ensure_local(due_date)
+        now = get_current_datetime()
+        delta = (dt.date() - now.date()).days
+        if delta == 0:
+            return 'Today'
+        elif delta == 1:
+            return 'Tomorrow'
+        else:
+            return f"{calendar.month_name[dt.month]} {dt.day}"
+
+    @staticmethod
+    def format_task_list(tasks: list, title: str='Tasks', numbered: bool=False) ->str:
+        """
+        Format a list of tasks with rich formatting for Telegram MarkdownV2.
+        - Natural language due date
+        - Only priority emoji (no text label)
+        - Show client for Work tasks
+        - Updated summary with emoji breakdown
+        - Clear dividers between tasks
         """
         if not tasks:
-            return f'📋 **{title}**\n\nNo tasks found.'
-        message = f'📋 **{title}** \\({len(tasks)} found\\)\n\n'
+            return f'📋 **{MessageFormatter.escape_markdown(title)}**\n\nNo tasks found.'
+        # Count priorities for summary
+        priority_map = {'Low': '🟢', 'Medium': '🟡', 'High': '🟠', 'Critical': '🟥'}
+        priority_counts = {'🟢': 0, '🟡': 0, '🟠': 0, '🟥': 0}
+        for task in tasks:
+            priority = getattr(task, 'priority', None) if hasattr(task, 'priority') else task.get('priority', None)
+            emoji = priority_map.get(priority, '⚪')
+            if emoji in priority_counts:
+                priority_counts[emoji] += 1
+        summary = f"📝 {len(tasks)} Incomplete Tasks: " + " | ".join(f"{k} {v}" for k, v in priority_counts.items() if v > 0)
+        message = f'{MessageFormatter.escape_markdown(summary)}\n\n'
+        divider = '────────────'
         for i, task in enumerate(tasks, 1):
             if hasattr(task, 'priority'):
                 task_id = task.id
                 description = task.description
                 priority = getattr(task, 'priority', 'Medium')
-                status = getattr(task, 'status', 'Todo')
                 category = getattr(task, 'category', None)
                 due_date = getattr(task, 'due_date', None)
-                tags = getattr(task, 'tags', None)
+                client = getattr(task, 'client', None)
             else:
                 task_id = task.get('id')
                 description = task.get('description', '')
                 priority = task.get('priority', 'Medium')
-                status = task.get('status', 'Todo')
                 category = task.get('category')
                 due_date = task.get('due_date')
-                tags = task.get('tags')
-            priority_emoji = {'Low': '🟢', 'Medium': '🟡', 'High': '🟠',
-                'Critical': '🔴'}.get(priority, '⚪')
-            status_emoji = {'Todo': '📝', 'In Progress': '🔄', 'Review': '👀',
-                'Done': '✅'}.get(status, '📝')
-            message += f"""• {priority_emoji} **{MessageFormatter.escape_markdown(description)}** \\(ID: {task_id}\\)
-"""
-            message += f'   {status_emoji} {status} \\| {priority}\n'
-            if category:
-                message += (
-                    f'   📂 {MessageFormatter.escape_markdown(category)}\n')
+                client = task.get('client', None)
+            priority_emoji = priority_map.get(priority, '⚪')
+            # Task description (bold), with optional numbering
+            if numbered:
+                message += f'{i}\\. {priority_emoji} *{MessageFormatter.escape_markdown(description)}*\n'
+            else:
+                message += f'{priority_emoji} *{MessageFormatter.escape_markdown(description)}*\n'
+            # Task ID on its own line
+            message += f'\(ID: {MessageFormatter.escape_markdown(str(task_id))}\)\n'
+            # Client (if Work)
+            if (category and (category.lower() == "work" or category == "Work") and client):
+                client_name = getattr(client, 'name', None) if hasattr(client, 'name') else client.get('name') if isinstance(client, dict) else None
+                if client_name:
+                    message += f'👤 Client: {MessageFormatter.escape_markdown(client_name)}\n'
+            # Due date
             if due_date:
+                from datetime import datetime as dtmod
                 if isinstance(due_date, str):
-                    message += f'   📅 Due: {due_date}\n'
-                else:
-                    message += f"   📅 Due: {due_date.strftime('%Y-%m-%d')}\n"
-            if tags:
-                if isinstance(tags, str):
-                    import json
                     try:
-                        tags_list = json.loads(tags)
-                    except (json.JSONDecodeError, TypeError):
-                        tags_list = [tag.strip() for tag in tags.split(',') if
-                            tag.strip()]
-                elif isinstance(tags, list):
-                    tags_list = tags
+                        due_date_obj = dtmod.fromisoformat(due_date)
+                    except Exception:
+                        due_date_obj = None
                 else:
-                    tags_list = []
-                if tags_list:
-                    message += f"""   🏷️ {', '.join([MessageFormatter.escape_markdown(str(tag)) for tag in tags_list])}
-"""
-            message += '\n'
-        return message
+                    due_date_obj = due_date
+                if due_date_obj:
+                    natural_due = MessageFormatter._format_natural_date(due_date_obj)
+                    message += f'📅 Due: {MessageFormatter.escape_markdown(natural_due)}\n'
+            # Divider with blank line before
+            message += f'\n────────────\n'
+        return message.strip()
 
     @staticmethod
     def format_client_list(clients: List[Dict]) ->str:
