@@ -718,11 +718,9 @@ class MessageFormatter:
             priority_emoji = priority_map.get(priority, '⚪')
             # Task description (bold), with optional numbering
             if numbered:
-                message += f'{i}\\. {priority_emoji} *{MessageFormatter.escape_markdown(description)}*\n'
+                message += f'{i}\. {priority_emoji} *{MessageFormatter.escape_markdown(description)}*\n'
             else:
                 message += f'{priority_emoji} *{MessageFormatter.escape_markdown(description)}*\n'
-            # Task ID on its own line
-            message += f'\(ID: {MessageFormatter.escape_markdown(str(task_id))}\)\n'
             # Client (if Work)
             if (category and (category.lower() == "work" or category == "Work") and client):
                 client_name = getattr(client, 'name', None) if hasattr(client, 'name') else client.get('name') if isinstance(client, dict) else None
