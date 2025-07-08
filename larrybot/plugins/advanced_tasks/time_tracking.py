@@ -13,6 +13,7 @@ from larrybot.core.event_bus import EventBus
 from larrybot.utils.decorators import command_handler, require_args
 from larrybot.utils.ux_helpers import MessageFormatter
 from .utils import get_task_service, validate_task_id, format_duration
+from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 _event_bus = None
 
 
@@ -61,11 +62,35 @@ async def _stop_time_tracking_handler_internal(update: Update, context:
         return
     result = await task_service.stop_time_tracking(task_id)
     if result['success']:
-        duration_minutes = result.get('duration_minutes', 0)
-        formatted_duration = format_duration(duration_minutes)
-        await update.message.reply_text(MessageFormatter.
-            format_success_message(f"⏹️ {result['message']}", {'Task ID':
-            task_id, 'Duration': formatted_duration}), parse_mode='MarkdownV2')
+        # Get session duration in minutes and hours
+        duration_hours = result.get('duration_hours', 0)
+        duration_minutes = int(round(duration_hours * 60))
+        if duration_minutes < 1 and duration_hours > 0:
+            duration_str = '<1m (%.2fh)' % duration_hours
+        else:
+            duration_str = f'{duration_minutes}m ({duration_hours:.2f}h)'
+        # Get total tracked time for the task
+        summary_result = await task_service.get_task_time_summary(task_id)
+        if summary_result.get('success'):
+            total_hours = summary_result['data'].get('actual_hours', 0)
+            total_minutes = int(round(total_hours * 60))
+            if total_minutes < 1 and total_hours > 0:
+                total_str = '<1m (%.2fh)' % total_hours
+            else:
+                total_str = f'{total_minutes}m ({total_hours:.2f}h)'
+        else:
+            total_str = 'N/A'
+        # Build improved message
+        message = (
+            f"✅ Time tracking stopped for Task #{task_id}\n\n"
+            f"⏱️ Session duration: {duration_str}\n"
+            f"🕒 Total tracked: {total_str}"
+        )
+        # Add Time Summary action button
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton('⏱️ Time Summary', callback_data=f'task_time_stats:{task_id}')]
+        ])
+        await update.message.reply_text(message, reply_markup=keyboard, parse_mode='MarkdownV2')
     else:
         await update.message.reply_text(MessageFormatter.
             format_error_message(result['message'],
