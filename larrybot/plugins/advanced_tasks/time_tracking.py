@@ -80,11 +80,15 @@ async def _stop_time_tracking_handler_internal(update: Update, context:
                 total_str = f'{total_minutes}m ({total_hours:.2f}h)'
         else:
             total_str = 'N/A'
-        # Build improved message
+        # Escape all dynamic content for MarkdownV2
+        esc = MessageFormatter.escape_markdown
+        esc_task_id = esc(str(task_id))
+        esc_duration_str = esc(duration_str)
+        esc_total_str = esc(total_str)
         message = (
-            f"✅ Time tracking stopped for Task #{task_id}\n\n"
-            f"⏱️ Session duration: {duration_str}\n"
-            f"🕒 Total tracked: {total_str}"
+            f"✅ Time tracking stopped for Task \#{esc_task_id}\n\n"
+            f"⏱️ Session duration: {esc_duration_str}\n"
+            f"🕒 Total tracked: {esc_total_str}"
         )
         # Add Time Summary action button
         keyboard = InlineKeyboardMarkup([
