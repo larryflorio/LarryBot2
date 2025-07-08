@@ -7,7 +7,8 @@ from larrybot.plugins.tasks import (
     narrative_add_task_handler, handle_narrative_task_creation,
     _handle_description_step, _handle_due_date_step, _handle_priority_step,
     _handle_category_step, _handle_client_step, _show_confirmation,
-    _create_final_task, _cancel_task_creation, _clear_task_creation_state
+    _create_final_task, _cancel_task_creation, _clear_task_creation_state,
+    handle_narrative_task_callback
 )
 from larrybot.nlp.enhanced_narrative_processor import TaskCreationState
 from larrybot.models.task import Task
@@ -240,7 +241,7 @@ class TestNarrativeTaskCreation:
         """Test showing task confirmation."""
         mock_context.user_data['partial_task'] = {
             'description': 'Test task',
-            'due_date': '2025-01-15',
+            'due_date': '2025-12-31',
             'priority': 'High',
             'category': 'Work',
             'client_id': 1,
@@ -270,7 +271,7 @@ class TestNarrativeTaskCreation:
         """Test successful final task creation."""
         mock_context.user_data['partial_task'] = {
             'description': 'Test task',
-            'due_date': '2025-01-15',
+            'due_date': '2025-12-31',
             'priority': 'High',
             'category': 'Work',
             'client_id': 1,
@@ -285,7 +286,7 @@ class TestNarrativeTaskCreation:
                     'id': 123,
                     'description': 'Test task',
                     'priority': 'High',
-                    'due_date': '2025-01-15',
+                    'due_date': '2025-12-31',
                     'category': 'Work'
                 }
             })
@@ -306,7 +307,7 @@ class TestNarrativeTaskCreation:
         mock_context.user_data['task_creation_state'] = TaskCreationState.CONFIRMATION.value
         mock_context.user_data['partial_task'] = {
             'description': 'Test task',
-            'due_date': '2025-01-15',
+            'due_date': '2025-12-31',
             'priority': 'High',
             'category': 'Work',
             'client_id': 1,
@@ -371,4 +372,113 @@ class TestNarrativeTaskCreation:
         assert 'awaiting_new_client' not in mock_context.user_data
         
         # Verify other data remains
-        assert 'other_data' in mock_context.user_data 
+        assert 'other_data' in mock_context.user_data
+
+    @pytest.mark.asyncio
+    async def test_handle_narrative_task_callback_due_date(self, mock_query, mock_context):
+        """Test the central callback handler with due_date step."""
+        mock_query.data = "addtask_step:due_date:today"
+        mock_context.user_data['task_creation_state'] = TaskCreationState.AWAITING_DUE_DATE.value
+        mock_context.user_data['partial_task'] = {
+            'description': 'Test task',
+            'due_date': None,
+            'priority': 'Medium',
+            'category': None,
+            'client_id': None,
+            'estimated_hours': None
+        }
+        mock_context.user_data['step_history'] = []
+        
+        # Mock the _handle_due_date_step function
+        with patch('larrybot.plugins.tasks._handle_due_date_step') as mock_handler:
+            await handle_narrative_task_callback(mock_query, mock_context)
+            
+            # Verify the correct handler was called
+            mock_handler.assert_called_once_with(mock_query, mock_context, "today")
+
+    @pytest.mark.asyncio
+    async def test_handle_narrative_task_callback_priority(self, mock_query, mock_context):
+        """Test the central callback handler with priority step."""
+        mock_query.data = "addtask_step:priority:High"
+        mock_context.user_data['task_creation_state'] = TaskCreationState.AWAITING_PRIORITY.value
+        mock_context.user_data['partial_task'] = {
+            'description': 'Test task',
+            'due_date': None,
+            'priority': 'Medium',
+            'category': None,
+            'client_id': None,
+            'estimated_hours': None
+        }
+        
+        # Mock the _handle_priority_step function
+        with patch('larrybot.plugins.tasks._handle_priority_step') as mock_handler:
+            await handle_narrative_task_callback(mock_query, mock_context)
+            
+            # Verify the correct handler was called
+            mock_handler.assert_called_once_with(mock_query, mock_context, "High")
+
+    @pytest.mark.asyncio
+    async def test_handle_narrative_task_callback_confirm(self, mock_query, mock_context):
+        """Test the central callback handler with confirm step."""
+        mock_query.data = "addtask_step:confirm"
+        mock_context.user_data['task_creation_state'] = TaskCreationState.CONFIRMATION.value
+        mock_context.user_data['partial_task'] = {
+            'description': 'Test task',
+            'due_date': None,
+            'priority': 'Medium',
+            'category': None,
+            'client_id': None,
+            'estimated_hours': None
+        }
+        
+        # Mock the _handle_confirmation_step function
+        with patch('larrybot.plugins.tasks._handle_confirmation_step') as mock_handler:
+            await handle_narrative_task_callback(mock_query, mock_context)
+            
+            # Verify the correct handler was called
+            mock_handler.assert_called_once_with(mock_query, mock_context, "confirm")
+
+    @pytest.mark.asyncio
+    async def test_handle_narrative_task_callback_cancel(self, mock_query, mock_context):
+        """Test the central callback handler with cancel step."""
+        mock_query.data = "addtask_step:cancel"
+        mock_context.user_data['task_creation_state'] = TaskCreationState.AWAITING_DUE_DATE.value
+        mock_context.user_data['partial_task'] = {
+            'description': 'Test task',
+            'due_date': None,
+            'priority': 'Medium',
+            'category': None,
+            'client_id': None,
+            'estimated_hours': None
+        }
+        
+        # Mock the _cancel_task_creation function
+        with patch('larrybot.plugins.tasks._cancel_task_creation') as mock_handler:
+            await handle_narrative_task_callback(mock_query, mock_context)
+            
+            # Verify the correct handler was called
+            mock_handler.assert_called_once_with(mock_query, mock_context)
+
+    @pytest.mark.asyncio
+    async def test_handle_narrative_task_callback_unknown_step(self, mock_query, mock_context):
+        """Test the central callback handler with unknown step type."""
+        mock_query.data = "addtask_step:unknown_step:value"
+        mock_context.user_data['task_creation_state'] = TaskCreationState.AWAITING_DUE_DATE.value
+        
+        await handle_narrative_task_callback(mock_query, mock_context)
+        
+        # Verify error message was sent
+        mock_query.edit_message_text.assert_called_once()
+        call_args = mock_query.edit_message_text.call_args
+        assert 'Unknown step type' in call_args[0][0]
+
+    @pytest.mark.asyncio
+    async def test_handle_narrative_task_callback_invalid_format(self, mock_query, mock_context):
+        """Test the central callback handler with invalid callback format."""
+        mock_query.data = "addtask_step"  # Missing step type
+        mock_context.user_data['task_creation_state'] = TaskCreationState.AWAITING_DUE_DATE.value
+        
+        await handle_narrative_task_callback(mock_query, mock_context)
+        
+        # Should return early without calling any handlers
+        # No assertions needed as it should just return 

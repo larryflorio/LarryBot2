@@ -13,6 +13,7 @@ from larrybot.utils.enhanced_ux_helpers import UnifiedButtonBuilder, ButtonType
 from larrybot.core.dependency_injection import ServiceLocator
 from larrybot.utils.ux_helpers import performance_monitor
 from larrybot.utils.enhanced_ux_helpers import escape_markdown_v2, UnifiedButtonBuilder, ButtonType
+from larrybot.utils.decorators import callback_handler
 
 
 def format_standardized_error(error_type: str, message: str, details: str=''
@@ -156,80 +157,6 @@ Cleared {cleared_count} metrics older than {hours} hour(s)\\."""
                     'Failed to clear performance metrics', str(e))
                 await update.message.reply_text(escape_markdown_v2(
                     error_msg), parse_mode='MarkdownV2')
-
-    async def handle_callback_query(self, update: Update, context:
-        ContextTypes.DEFAULT_TYPE) ->None:
-        """Handle performance-related callback queries."""
-        query = update.callback_query
-        await query.answer()
-        callback_data = query.data
-        try:
-            if (callback_data == 'perf_refresh' or callback_data ==
-                'perf_dashboard'):
-                dashboard_data = (self.performance_collector.
-                    get_performance_dashboard())
-                message = self._format_dashboard_message(dashboard_data)
-                keyboard = [[UnifiedButtonBuilder.create_button(text=
-                    '🔄 Refresh', callback_data='perf_refresh', button_type=
-                    ButtonType.INFO), UnifiedButtonBuilder.
-                    create_button(text='📊 Details', callback_data=
-                    'perf_details', button_type=ButtonType.INFO)], [
-                    UnifiedButtonBuilder.create_button(text='⚠️ Alerts',
-                    callback_data='perf_alerts', button_type=ButtonType.
-                    WARNING), UnifiedButtonBuilder.create_button(text=
-                    '📈 Trends', callback_data='perf_trends', button_type=
-                    ButtonType.INFO)]]
-                reply_markup = InlineKeyboardMarkup(keyboard)
-                await query.edit_message_text(escape_markdown_v2(message),
-                    parse_mode='MarkdownV2', reply_markup=reply_markup)
-            elif callback_data == 'perf_alerts' or callback_data == 'perf_alerts_refresh':
-                dashboard_data = (self.performance_collector.
-                    get_performance_dashboard())
-                alerts = dashboard_data.get('alerts', [])
-                if not alerts:
-                    message = """🟢 *Performance Alerts*
-
-No active performance alerts\\. System is running normally\\."""
-                else:
-                    message = self._format_alerts_message(alerts)
-                keyboard = [[UnifiedButtonBuilder.create_button(text=
-                    '🔄 Refresh', callback_data='perf_alerts_refresh',
-                    button_type=ButtonType.INFO), UnifiedButtonBuilder
-                    .create_button(text='📊 Dashboard', callback_data=
-                    'perf_dashboard', button_type=ButtonType.INFO)]]
-                reply_markup = InlineKeyboardMarkup(keyboard)
-                await query.edit_message_text(escape_markdown_v2(message),
-                    parse_mode='MarkdownV2', reply_markup=reply_markup)
-            elif callback_data == 'perf_trends':
-                dashboard_data = (self.performance_collector.
-                    get_performance_dashboard())
-                trends = dashboard_data.get('trends', {})
-                message = self._format_trends_message(trends)
-                keyboard = [[UnifiedButtonBuilder.create_button(text=
-                    '📊 Dashboard', callback_data='perf_dashboard',
-                    button_type=ButtonType.INFO), UnifiedButtonBuilder.
-                    create_button(text='🔄 Refresh', callback_data=
-                    'perf_trends', button_type=ButtonType.SECONDARY)]]
-                reply_markup = InlineKeyboardMarkup(keyboard)
-                await query.edit_message_text(escape_markdown_v2(message),
-                    parse_mode='MarkdownV2', reply_markup=reply_markup)
-            elif callback_data == 'perf_details':
-                dashboard_data = (self.performance_collector.
-                    get_performance_dashboard())
-                message = self._format_detailed_dashboard(dashboard_data)
-                keyboard = [[UnifiedButtonBuilder.create_button(text=
-                    '📊 Summary', callback_data='perf_dashboard',
-                    button_type=ButtonType.INFO), UnifiedButtonBuilder.
-                    create_button(text='🔄 Refresh', callback_data=
-                    'perf_details', button_type=ButtonType.SECONDARY)]]
-                reply_markup = InlineKeyboardMarkup(keyboard)
-                await query.edit_message_text(escape_markdown_v2(message),
-                    parse_mode='MarkdownV2', reply_markup=reply_markup)
-        except Exception as e:
-            logger.error(f'Error handling performance callback: {e}')
-            await query.message.reply_text(escape_markdown_v2(
-                f'❌ Error handling performance action: {str(e)}'),
-                parse_mode='MarkdownV2')
 
     def _format_dashboard_message(self, dashboard_data: Dict[str, Any]) ->str:
         """Format the main dashboard message."""
@@ -430,10 +357,280 @@ No active performance alerts\\. System is running normally\\."""
         return message
 
 
+# Global instance for callback handlers
+_performance_plugin = None
+
+
+@callback_handler('perf_refresh', 'Refresh performance dashboard', 'performance')
+async def handle_perf_refresh_callback(query, context: ContextTypes.DEFAULT_TYPE) ->None:
+    """Handle performance refresh callback."""
+    global _performance_plugin
+    if _performance_plugin is None:
+        _performance_plugin = PerformancePlugin()
+    
+    try:
+        dashboard_data = _performance_plugin.performance_collector.get_performance_dashboard()
+        message = _performance_plugin._format_dashboard_message(dashboard_data)
+        keyboard = [[UnifiedButtonBuilder.create_button(text=
+            '🔄 Refresh', callback_data='perf_refresh', button_type=
+            ButtonType.INFO), UnifiedButtonBuilder.
+            create_button(text='📊 Details', callback_data=
+            'perf_details', button_type=ButtonType.INFO)], [
+            UnifiedButtonBuilder.create_button(text='⚠️ Alerts',
+            callback_data='perf_alerts', button_type=ButtonType.
+            WARNING), UnifiedButtonBuilder.create_button(text=
+            '📈 Trends', callback_data='perf_trends', button_type=
+            ButtonType.INFO)]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(escape_markdown_v2(message),
+            parse_mode='MarkdownV2', reply_markup=reply_markup)
+        await query.answer("Dashboard refreshed!")
+    except Exception as e:
+        logger.error(f'Error refreshing performance dashboard: {e}')
+        await query.answer("Failed to refresh dashboard")
+        await query.edit_message_text(
+            format_standardized_error('performance_error', 'Failed to refresh dashboard', str(e)),
+            parse_mode='MarkdownV2'
+        )
+
+
+@callback_handler('perf_dashboard', 'Show performance dashboard', 'performance')
+async def handle_perf_dashboard_callback(query, context: ContextTypes.DEFAULT_TYPE) ->None:
+    """Handle performance dashboard callback."""
+    global _performance_plugin
+    if _performance_plugin is None:
+        _performance_plugin = PerformancePlugin()
+    
+    try:
+        dashboard_data = _performance_plugin.performance_collector.get_performance_dashboard()
+        message = _performance_plugin._format_dashboard_message(dashboard_data)
+        keyboard = [[UnifiedButtonBuilder.create_button(text=
+            '🔄 Refresh', callback_data='perf_refresh', button_type=
+            ButtonType.INFO), UnifiedButtonBuilder.
+            create_button(text='📊 Details', callback_data=
+            'perf_details', button_type=ButtonType.INFO)], [
+            UnifiedButtonBuilder.create_button(text='⚠️ Alerts',
+            callback_data='perf_alerts', button_type=ButtonType.
+            WARNING), UnifiedButtonBuilder.create_button(text=
+            '📈 Trends', callback_data='perf_trends', button_type=
+            ButtonType.INFO)]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(escape_markdown_v2(message),
+            parse_mode='MarkdownV2', reply_markup=reply_markup)
+        await query.answer("Dashboard loaded!")
+    except Exception as e:
+        logger.error(f'Error loading performance dashboard: {e}')
+        await query.answer("Failed to load dashboard")
+        await query.edit_message_text(
+            format_standardized_error('performance_error', 'Failed to load dashboard', str(e)),
+            parse_mode='MarkdownV2'
+        )
+
+
+@callback_handler('perf_details', 'Show detailed performance', 'performance')
+async def handle_perf_details_callback(query, context: ContextTypes.DEFAULT_TYPE) ->None:
+    """Handle performance details callback."""
+    global _performance_plugin
+    if _performance_plugin is None:
+        _performance_plugin = PerformancePlugin()
+    
+    try:
+        dashboard_data = _performance_plugin.performance_collector.get_performance_dashboard()
+        message = _performance_plugin._format_detailed_dashboard(dashboard_data)
+        keyboard = [[UnifiedButtonBuilder.create_button(text=
+            '📊 Summary', callback_data='perf_dashboard',
+            button_type=ButtonType.INFO), UnifiedButtonBuilder.
+            create_button(text='🔄 Refresh', callback_data=
+            'perf_refresh', button_type=ButtonType.INFO)]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(escape_markdown_v2(message),
+            parse_mode='MarkdownV2', reply_markup=reply_markup)
+        await query.answer("Details loaded!")
+    except Exception as e:
+        logger.error(f'Error loading performance details: {e}')
+        await query.answer("Failed to load details")
+        await query.edit_message_text(
+            format_standardized_error('performance_error', 'Failed to load details', str(e)),
+            parse_mode='MarkdownV2'
+        )
+
+
+@callback_handler('perf_alerts', 'Show performance alerts', 'performance')
+async def handle_perf_alerts_callback(query, context: ContextTypes.DEFAULT_TYPE) ->None:
+    """Handle performance alerts callback."""
+    global _performance_plugin
+    if _performance_plugin is None:
+        _performance_plugin = PerformancePlugin()
+    
+    try:
+        dashboard_data = _performance_plugin.performance_collector.get_performance_dashboard()
+        alerts = dashboard_data.get('alerts', [])
+        if not alerts:
+            message = """🟢 *Performance Alerts*
+
+No active performance alerts\\. System is running normally\\."""
+        else:
+            message = _performance_plugin._format_alerts_message(alerts)
+        keyboard = [[UnifiedButtonBuilder.create_button(text=
+            '🔄 Refresh', callback_data='perf_alerts_refresh',
+            button_type=ButtonType.INFO), UnifiedButtonBuilder
+            .create_button(text='📊 Dashboard', callback_data=
+            'perf_dashboard', button_type=ButtonType.INFO)]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(escape_markdown_v2(message),
+            parse_mode='MarkdownV2', reply_markup=reply_markup)
+        await query.answer("Alerts loaded!")
+    except Exception as e:
+        logger.error(f'Error loading performance alerts: {e}')
+        await query.answer("Failed to load alerts")
+        await query.edit_message_text(
+            format_standardized_error('performance_error', 'Failed to load alerts', str(e)),
+            parse_mode='MarkdownV2'
+        )
+
+
+@callback_handler('perf_alerts_refresh', 'Refresh performance alerts', 'performance')
+async def handle_perf_alerts_refresh_callback(query, context: ContextTypes.DEFAULT_TYPE) ->None:
+    """Handle performance alerts refresh callback."""
+    global _performance_plugin
+    if _performance_plugin is None:
+        _performance_plugin = PerformancePlugin()
+    
+    try:
+        dashboard_data = _performance_plugin.performance_collector.get_performance_dashboard()
+        alerts = dashboard_data.get('alerts', [])
+        if not alerts:
+            message = """🟢 *Performance Alerts*
+
+No active performance alerts\\. System is running normally\\."""
+        else:
+            message = _performance_plugin._format_alerts_message(alerts)
+        keyboard = [[UnifiedButtonBuilder.create_button(text=
+            '🔄 Refresh', callback_data='perf_alerts_refresh',
+            button_type=ButtonType.INFO), UnifiedButtonBuilder
+            .create_button(text='📊 Dashboard', callback_data=
+            'perf_dashboard', button_type=ButtonType.INFO)]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(escape_markdown_v2(message),
+            parse_mode='MarkdownV2', reply_markup=reply_markup)
+        await query.answer("Alerts refreshed!")
+    except Exception as e:
+        logger.error(f'Error refreshing performance alerts: {e}')
+        await query.answer("Failed to refresh alerts")
+        await query.edit_message_text(
+            format_standardized_error('performance_error', 'Failed to refresh alerts', str(e)),
+            parse_mode='MarkdownV2'
+        )
+
+
+@callback_handler('perf_trends', 'Show performance trends', 'performance')
+async def handle_perf_trends_callback(query, context: ContextTypes.DEFAULT_TYPE) ->None:
+    """Handle performance trends callback."""
+    global _performance_plugin
+    if _performance_plugin is None:
+        _performance_plugin = PerformancePlugin()
+    
+    try:
+        # Get trends data (this would need to be implemented in the performance collector)
+        trends = {'execution_times': [], 'memory_usage': [], 'cache_hit_rates': []}
+        message = _performance_plugin._format_trends_message(trends)
+        keyboard = [[UnifiedButtonBuilder.create_button(text=
+            '📊 Dashboard', callback_data='perf_dashboard',
+            button_type=ButtonType.INFO), UnifiedButtonBuilder.
+            create_button(text='🔄 Refresh', callback_data=
+            'perf_refresh', button_type=ButtonType.INFO)]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(escape_markdown_v2(message),
+            parse_mode='MarkdownV2', reply_markup=reply_markup)
+        await query.answer("Trends loaded!")
+    except Exception as e:
+        logger.error(f'Error loading performance trends: {e}')
+        await query.answer("Failed to load trends")
+        await query.edit_message_text(
+            format_standardized_error('performance_error', 'Failed to load trends', str(e)),
+            parse_mode='MarkdownV2'
+        )
+
+
+@callback_handler('perf_clear', 'Clear performance metrics', 'performance')
+async def handle_perf_clear_callback(query, context: ContextTypes.DEFAULT_TYPE) ->None:
+    """Handle performance clear callback."""
+    global _performance_plugin
+    if _performance_plugin is None:
+        _performance_plugin = PerformancePlugin()
+    
+    try:
+        cleared_count = _performance_plugin.performance_collector.clear_metrics()
+        message = f"""🧹 *Performance Metrics Cleared*
+
+Cleared all {cleared_count} performance metrics\\."""
+        keyboard = [[UnifiedButtonBuilder.create_button(text=
+            '📊 Dashboard', callback_data='perf_dashboard',
+            button_type=ButtonType.INFO), UnifiedButtonBuilder.
+            create_button(text='🔄 Refresh', callback_data=
+            'perf_refresh', button_type=ButtonType.INFO)]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(escape_markdown_v2(message),
+            parse_mode='MarkdownV2', reply_markup=reply_markup)
+        await query.answer(f"Cleared {cleared_count} metrics!")
+    except Exception as e:
+        logger.error(f'Error clearing performance metrics: {e}')
+        await query.answer("Failed to clear metrics")
+        await query.edit_message_text(
+            format_standardized_error('performance_error', 'Failed to clear metrics', str(e)),
+            parse_mode='MarkdownV2'
+        )
+
+
+@callback_handler('perf_export', 'Export performance data', 'performance')
+async def handle_perf_export_callback(query, context: ContextTypes.DEFAULT_TYPE) ->None:
+    """Handle performance export callback."""
+    global _performance_plugin
+    if _performance_plugin is None:
+        _performance_plugin = PerformancePlugin()
+    
+    try:
+        # Export metrics for the last 24 hours
+        metrics = _performance_plugin.performance_collector.export_metrics(hours=24)
+        if not metrics:
+            message = """📤 *Performance Export*
+
+No performance data available for export\\."""
+        else:
+            message = f"""📤 *Performance Export*
+
+Exported {len(metrics)} performance metrics from the last 24 hours\\.
+
+*Export Summary:*
+• Total Operations: {len(metrics)}
+• Time Range: Last 24 hours
+• Export Format: JSON
+
+Use the /perfstats command for detailed analysis\\."""
+        keyboard = [[UnifiedButtonBuilder.create_button(text=
+            '📊 Dashboard', callback_data='perf_dashboard',
+            button_type=ButtonType.INFO), UnifiedButtonBuilder.
+            create_button(text='🔄 Refresh', callback_data=
+            'perf_refresh', button_type=ButtonType.INFO)]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(escape_markdown_v2(message),
+            parse_mode='MarkdownV2', reply_markup=reply_markup)
+        await query.answer(f"Exported {len(metrics) if metrics else 0} metrics!")
+    except Exception as e:
+        logger.error(f'Error exporting performance data: {e}')
+        await query.answer("Failed to export data")
+        await query.edit_message_text(
+            format_standardized_error('performance_error', 'Failed to export data', str(e)),
+            parse_mode='MarkdownV2'
+        )
+
+
 def register(event_bus, command_registry, **kwargs):
     """Register the performance monitoring plugin."""
     plugin = PerformancePlugin()
     from larrybot.core.command_registry import CommandMetadata
+    
+    # Register commands
     command_registry.register(command='performance', handler=plugin.
         handle_performance_dashboard, metadata=CommandMetadata(name=
         'performance', description=
@@ -451,4 +648,15 @@ def register(event_bus, command_registry, **kwargs):
         handle_performance_clear, metadata=CommandMetadata(name='perfclear',
         description='🧹 Clear performance metrics [hours]', usage=
         'perfclear [hours]', category='monitoring'))
+    
+    # Register callback handlers
+    command_registry.register_callback('perf_refresh', handle_perf_refresh_callback)
+    command_registry.register_callback('perf_dashboard', handle_perf_dashboard_callback)
+    command_registry.register_callback('perf_details', handle_perf_details_callback)
+    command_registry.register_callback('perf_alerts', handle_perf_alerts_callback)
+    command_registry.register_callback('perf_alerts_refresh', handle_perf_alerts_refresh_callback)
+    command_registry.register_callback('perf_trends', handle_perf_trends_callback)
+    command_registry.register_callback('perf_clear', handle_perf_clear_callback)
+    command_registry.register_callback('perf_export', handle_perf_export_callback)
+    
     logger.info('Performance monitoring plugin registered successfully')

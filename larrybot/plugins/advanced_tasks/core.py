@@ -13,6 +13,7 @@ from larrybot.utils.ux_helpers import MessageFormatter
 from larrybot.utils.datetime_utils import parse_date_string
 from larrybot.utils.enhanced_ux_helpers import escape_markdown_v2
 from larrybot.core.event_utils import emit_task_event
+from larrybot.services.datetime_service import DateTimeService
 from .utils import get_task_service, validate_task_id
 _event_bus = None
 
@@ -41,9 +42,8 @@ async def _add_task_with_metadata_handler_internal(update: Update, context:
     if len(args) > 1:
         priority = args[1]
     if len(args) > 2:
-        try:
-            due_date = parse_date_string(args[2], '%Y-%m-%d')
-        except ValueError:
+        due_date = DateTimeService.parse_user_date(args[2])
+        if due_date is None:
             await update.message.reply_text(escape_markdown_v2(
                 'Invalid date format. Use YYYY-MM-DD'), parse_mode='MarkdownV2'
                 )
@@ -57,7 +57,7 @@ async def _add_task_with_metadata_handler_internal(update: Update, context:
         await update.message.reply_text(MessageFormatter.
             format_success_message('✅ Task created!', {'ID': task['id'],
             'Description': task['description'], 'Priority': task['priority'
-            ], 'Due Date': task['due_date'] or 'None', 'Category': task[
+            ], 'Due Date': DateTimeService.format_for_display(task['due_date']), 'Category': task[
             'category'] or 'None'}), parse_mode='MarkdownV2')
         emit_task_event(_event_bus, 'task_created', task)
     else:
@@ -101,9 +101,8 @@ async def _due_date_handler_internal(update: Update, context: ContextTypes.
             format_error_message(error_msg,
             'Usage: /due <task_id> <YYYY-MM-DD>'), parse_mode='MarkdownV2')
         return
-    try:
-        due_date = parse_date_string(context.args[1], '%Y-%m-%d')
-    except ValueError:
+    due_date = DateTimeService.parse_user_date(context.args[1])
+    if due_date is None:
         await update.message.reply_text(escape_markdown_v2(
             'Invalid date format. Use YYYY-MM-DD'), parse_mode='MarkdownV2')
         return
@@ -111,7 +110,7 @@ async def _due_date_handler_internal(update: Update, context: ContextTypes.
     if result['success']:
         await update.message.reply_text(MessageFormatter.
             format_success_message(f"✅ {result['message']}", {
-            'New Due Date': due_date.strftime('%Y-%m-%d')}), parse_mode=
+            'New Due Date': DateTimeService.format_date_for_display(due_date)}), parse_mode=
             'MarkdownV2')
     else:
         await update.message.reply_text(MessageFormatter.

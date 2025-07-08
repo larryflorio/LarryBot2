@@ -4,7 +4,7 @@ from larrybot.core.command_registry import CommandRegistry
 from larrybot.core.event_bus import EventBus
 from larrybot.storage.db import get_session
 from larrybot.storage.calendar_token_repository import CalendarTokenRepository
-from larrybot.utils.decorators import command_handler
+from larrybot.utils.decorators import command_handler, callback_handler
 from larrybot.utils.ux_helpers import MessageFormatter, KeyboardBuilder
 from larrybot.utils.enhanced_ux_helpers import UnifiedButtonBuilder, ButtonType
 from datetime import datetime, timezone, timedelta
@@ -40,6 +40,24 @@ def register(event_bus: EventBus, command_registry: CommandRegistry) ->None:
         )
     command_registry.register('/account_delete', account_delete_handler)
     command_registry.register('/calendar_all', calendar_all_handler)
+    
+    # Register callback handlers
+    command_registry.register_callback('calendar_refresh', handle_calendar_refresh_callback)
+
+
+@callback_handler('calendar_refresh', 'Refresh calendar view', 'calendar')
+async def handle_calendar_refresh_callback(query, context: ContextTypes.DEFAULT_TYPE) ->None:
+    """Handle calendar refresh callback."""
+    try:
+        # Re-run the agenda handler to refresh the calendar view
+        await agenda_handler(query, context)
+        await query.answer("Calendar refreshed!")
+    except Exception as e:
+        await query.answer("Failed to refresh calendar")
+        await query.edit_message_text(
+            MessageFormatter.format_error_message('Refresh Failed', f'Failed to refresh calendar: {e}'),
+            parse_mode='MarkdownV2'
+        )
 
 
 def extract_video_call_link(event):

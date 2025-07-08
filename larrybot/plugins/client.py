@@ -10,6 +10,7 @@ from larrybot.models.task import Task
 from larrybot.core.event_utils import emit_client_event, emit_task_event
 from larrybot.utils.ux_helpers import KeyboardBuilder, MessageFormatter
 from larrybot.utils.enhanced_ux_helpers import UnifiedButtonBuilder, ButtonType
+from larrybot.utils.decorators import command_handler, callback_handler
 from typing import Optional
 _client_event_bus = None
 
@@ -24,6 +25,14 @@ def register(event_bus: EventBus, command_registry: CommandRegistry) ->None:
     command_registry.register('/unassign', unassign_handler)
     command_registry.register('/client', client_handler)
     command_registry.register('/clientanalytics', clientanalytics_handler)
+    
+    # Register callback handlers
+    command_registry.register_callback('client_view', handle_client_view_callback)
+    command_registry.register_callback('client_edit', handle_client_edit_callback)
+    command_registry.register_callback('client_delete', handle_client_delete_callback)
+    command_registry.register_callback('client_analytics', handle_client_analytics_callback)
+    command_registry.register_callback('client_add', handle_client_add_callback)
+    command_registry.register_callback('client_refresh', handle_client_refresh_callback)
 
 
 async def addclient_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
@@ -365,3 +374,155 @@ async def clientanalytics_handler(update: Update, context: ContextTypes.
             elif overall_rate >= 80:
                 message += f'• 🎉 **Excellent overall performance!**\n'
         await update.message.reply_text(message, parse_mode='MarkdownV2')
+
+
+@callback_handler('client_view', 'View client details', 'client')
+async def handle_client_view_callback(query, context: ContextTypes.DEFAULT_TYPE) ->None:
+    """Handle client view callback."""
+    try:
+        client_id = int(query.data.split(':')[1])
+        with next(get_session()) as session:
+            repo = ClientRepository(session)
+            task_repo = TaskRepository(session)
+            client = repo.get_client_by_id(client_id)
+            if not client:
+                await query.answer("Client not found")
+                return
+            
+            tasks = task_repo.get_tasks_by_client(client.name)
+            completed_tasks = sum(1 for t in tasks if t.done)
+            
+            message = f"""👥 **Client Details**
+
+**Name**: {MessageFormatter.escape_markdown(client.name)}
+**ID**: {client.id}
+**Created**: {client.created_at.strftime('%Y-%m-%d %H:%M') if client.created_at else 'N/A'}
+
+**Tasks**: {len(tasks)} total \\({completed_tasks} completed\\)
+**Completion Rate**: {round(completed_tasks/len(tasks)*100, 1) if tasks else 0}%"""
+            
+            keyboard = InlineKeyboardMarkup([[
+                UnifiedButtonBuilder.create_button(text='✏️ Edit', callback_data=f'client_edit:{client.id}', button_type=ButtonType.INFO),
+                UnifiedButtonBuilder.create_button(text='🗑️ Delete', callback_data=f'client_delete:{client.id}', button_type=ButtonType.DANGER)
+            ], [
+                UnifiedButtonBuilder.create_button(text='📊 Analytics', callback_data=f'client_analytics:{client.id}', button_type=ButtonType.SECONDARY),
+                UnifiedButtonBuilder.create_button(text='⬅️ Back', callback_data='client_refresh', button_type=ButtonType.INFO)
+            ]])
+            
+            await query.edit_message_text(message, reply_markup=keyboard, parse_mode='MarkdownV2')
+            
+    except (ValueError, IndexError):
+        await query.answer("Invalid client ID")
+
+
+@callback_handler('client_edit', 'Edit client', 'client')
+async def handle_client_edit_callback(query, context: ContextTypes.DEFAULT_TYPE) ->None:
+    """Handle client edit callback."""
+    try:
+        client_id = int(query.data.split(':')[1])
+        with next(get_session()) as session:
+            repo = ClientRepository(session)
+            client = repo.get_client_by_id(client_id)
+            if not client:
+                await query.answer("Client not found")
+                return
+            
+            # For now, just show a message - full edit functionality would require state management
+            await query.answer("Edit functionality coming soon!")
+            
+    except (ValueError, IndexError):
+        await query.answer("Invalid client ID")
+
+
+@callback_handler('client_delete', 'Delete client', 'client')
+async def handle_client_delete_callback(query, context: ContextTypes.DEFAULT_TYPE) ->None:
+    """Handle client delete callback."""
+    try:
+        client_id = int(query.data.split(':')[1])
+        with next(get_session()) as session:
+            repo = ClientRepository(session)
+            task_repo = TaskRepository(session)
+            client = repo.get_client_by_id(client_id)
+            if not client:
+                await query.answer("Client not found")
+                return
+            
+            tasks = task_repo.get_tasks_by_client(client.name)
+            
+            # Unassign all tasks from this client
+            for task in tasks:
+                task_repo.unassign_task(task.id)
+            
+            # Delete the client
+            repo.remove_client(client.name)
+            emit_client_event(_client_event_bus, 'client_removed', client)
+            
+            await query.answer(f"Client '{client.name}' deleted successfully!")
+            await query.edit_message_text(
+                MessageFormatter.format_success_message(f"Client '{client.name}' deleted successfully!", {
+                    'Unassigned Tasks': len(tasks),
+                    'Client ID': client.id
+                }),
+                parse_mode='MarkdownV2'
+            )
+            
+    except (ValueError, IndexError):
+        await query.answer("Invalid client ID")
+
+
+@callback_handler('client_analytics', 'Client analytics', 'client')
+async def handle_client_analytics_callback(query, context: ContextTypes.DEFAULT_TYPE) ->None:
+    """Handle client analytics callback."""
+    try:
+        client_id = int(query.data.split(':')[1])
+        with next(get_session()) as session:
+            repo = ClientRepository(session)
+            task_repo = TaskRepository(session)
+            client = repo.get_client_by_id(client_id)
+            if not client:
+                await query.answer("Client not found")
+                return
+            
+            tasks = task_repo.get_tasks_by_client(client.name)
+            completed_tasks = sum(1 for t in tasks if t.done)
+            pending_tasks = len(tasks) - completed_tasks
+            
+            # Calculate analytics
+            completion_rate = round(completed_tasks/len(tasks)*100, 1) if tasks else 0
+            avg_priority = sum(t.priority_score for t in tasks) / len(tasks) if tasks else 0
+            
+            message = f"""📊 **Client Analytics**
+
+**Client**: {MessageFormatter.escape_markdown(client.name)}
+
+**Task Statistics**:
+• Total Tasks: {len(tasks)}
+• Completed: {completed_tasks}
+• Pending: {pending_tasks}
+• Completion Rate: {completion_rate}%
+
+**Performance Metrics**:
+• Average Priority: {avg_priority:.1f}
+• Active Since: {client.created_at.strftime('%Y-%m-%d') if client.created_at else 'N/A'}"""
+            
+            keyboard = InlineKeyboardMarkup([[
+                UnifiedButtonBuilder.create_button(text='⬅️ Back', callback_data=f'client_view:{client.id}', button_type=ButtonType.INFO)
+            ]])
+            
+            await query.edit_message_text(message, reply_markup=keyboard, parse_mode='MarkdownV2')
+            
+    except (ValueError, IndexError):
+        await query.answer("Invalid client ID")
+
+
+@callback_handler('client_add', 'Add new client', 'client')
+async def handle_client_add_callback(query, context: ContextTypes.DEFAULT_TYPE) ->None:
+    """Handle client add callback."""
+    await query.answer("Use /addclient <name> to add a new client")
+
+
+@callback_handler('client_refresh', 'Refresh client list', 'client')
+async def handle_client_refresh_callback(query, context: ContextTypes.DEFAULT_TYPE) ->None:
+    """Handle client refresh callback."""
+    # Re-run the allclients handler to refresh the list
+    await allclients_handler(query, context)

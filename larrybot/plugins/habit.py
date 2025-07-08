@@ -7,6 +7,7 @@ from larrybot.storage.habit_repository import HabitRepository
 from larrybot.utils.ux_helpers import KeyboardBuilder, MessageFormatter
 from larrybot.utils.enhanced_ux_helpers import UnifiedButtonBuilder, ButtonType
 from larrybot.utils.datetime_utils import get_current_datetime
+from larrybot.utils.decorators import command_handler, callback_handler
 from typing import Optional
 _habit_event_bus = None
 
@@ -21,6 +22,194 @@ def register(event_bus: EventBus, command_registry: CommandRegistry) ->None:
     command_registry.register('/habit_delete', habit_delete_handler)
     command_registry.register('/habit_progress', habit_progress_handler)
     command_registry.register('/habit_stats', habit_stats_handler)
+    
+    # Register callback handlers
+    command_registry.register_callback('habit_done', handle_habit_done_callback)
+    command_registry.register_callback('habit_progress', handle_habit_progress_callback)
+    command_registry.register_callback('habit_delete', handle_habit_delete_callback)
+    command_registry.register_callback('habit_add', handle_habit_add_callback)
+    command_registry.register_callback('habit_stats', handle_habit_stats_callback)
+    command_registry.register_callback('habit_refresh', handle_habit_refresh_callback)
+
+
+@callback_handler('habit_done', 'Mark habit as done', 'habit')
+async def handle_habit_done_callback(query, context: ContextTypes.DEFAULT_TYPE) ->None:
+    """Handle habit done callback."""
+    try:
+        habit_id = int(query.data.split(':')[1])
+        with next(get_session()) as session:
+            repo = HabitRepository(session)
+            habit = repo.get_habit_by_id(habit_id)
+            if not habit:
+                await query.answer("Habit not found")
+                return
+            
+            # Mark habit as done
+            habit = repo.mark_habit_done(habit.name)
+            if not habit:
+                await query.answer("Failed to mark habit as done")
+                return
+            
+            streak_emoji = ('🔥' if habit.streak >= 7 else '📈' if habit.streak >= 3 else '✅')
+            milestone_message = ''
+            if habit.streak == 7:
+                milestone_message = '\n🎉 **7-day streak milestone!**'
+            elif habit.streak == 30:
+                milestone_message = '\n🏆 **30-day streak milestone!**'
+            elif habit.streak == 100:
+                milestone_message = '\n👑 **100-day streak milestone!**'
+            
+            await query.answer(f"Habit completed! {streak_emoji}")
+            
+            # Update the message to show completion
+            await query.edit_message_text(
+                MessageFormatter.format_success_message(
+                    f'Habit completed for today! {streak_emoji}',
+                    {
+                        'Habit': habit.name,
+                        'Current Streak': f'{habit.streak} days {streak_emoji}',
+                        'Last Completed': habit.last_completed.strftime('%Y-%m-%d %H:%M') if habit.last_completed else 'N/A'
+                    }
+                ) + milestone_message,
+                parse_mode='MarkdownV2'
+            )
+            
+    except (ValueError, IndexError):
+        await query.answer("Invalid habit ID")
+
+
+@callback_handler('habit_progress', 'Show habit progress', 'habit')
+async def handle_habit_progress_callback(query, context: ContextTypes.DEFAULT_TYPE) ->None:
+    """Handle habit progress callback."""
+    try:
+        habit_id = int(query.data.split(':')[1])
+        with next(get_session()) as session:
+            repo = HabitRepository(session)
+            habit = repo.get_habit_by_id(habit_id)
+            if not habit:
+                await query.answer("Habit not found")
+                return
+            
+            # Calculate progress statistics
+            today = get_current_datetime().date()
+            if habit.last_completed:
+                if hasattr(habit.last_completed, 'date'):
+                    last_completed_date = habit.last_completed.date()
+                else:
+                    last_completed_date = habit.last_completed
+                days_since_last = (today - last_completed_date).days
+                completion_rate = "Today" if days_since_last == 0 else f"{days_since_last} days ago"
+            else:
+                completion_rate = "Never"
+            
+            message = f"""📊 **Habit Progress**
+
+**Habit**: {MessageFormatter.escape_markdown(habit.name)}
+
+**Current Status**:
+• Streak: {habit.streak} days
+• Last Completed: {completion_rate}
+• Created: {habit.created_at.strftime('%Y-%m-%d') if habit.created_at else 'N/A'}
+
+**Achievements**:
+• {'🔥 7-day streak' if habit.streak >= 7 else '📈 Building momentum'}
+• {'🏆 30-day streak' if habit.streak >= 30 else '🔥 Keep going!'}
+• {'👑 100-day streak' if habit.streak >= 100 else '🏆 Long way to go!'}"""
+            
+            keyboard = InlineKeyboardMarkup([[
+                UnifiedButtonBuilder.create_button(text='⬅️ Back', callback_data='habit_refresh', button_type=ButtonType.INFO)
+            ]])
+            
+            await query.edit_message_text(message, reply_markup=keyboard, parse_mode='MarkdownV2')
+            
+    except (ValueError, IndexError):
+        await query.answer("Invalid habit ID")
+
+
+@callback_handler('habit_delete', 'Delete habit', 'habit')
+async def handle_habit_delete_callback(query, context: ContextTypes.DEFAULT_TYPE) ->None:
+    """Handle habit delete callback."""
+    try:
+        habit_id = int(query.data.split(':')[1])
+        with next(get_session()) as session:
+            repo = HabitRepository(session)
+            habit = repo.get_habit_by_id(habit_id)
+            if not habit:
+                await query.answer("Habit not found")
+                return
+            
+            # Delete the habit
+            repo.delete_habit(habit.name)
+            
+            await query.answer(f"Habit '{habit.name}' deleted successfully!")
+            await query.edit_message_text(
+                MessageFormatter.format_success_message(f"Habit '{habit.name}' deleted successfully!", {
+                    'Habit ID': habit.id,
+                    'Streak Lost': f'{habit.streak} days'
+                }),
+                parse_mode='MarkdownV2'
+            )
+            
+    except (ValueError, IndexError):
+        await query.answer("Invalid habit ID")
+
+
+@callback_handler('habit_add', 'Add new habit', 'habit')
+async def handle_habit_add_callback(query, context: ContextTypes.DEFAULT_TYPE) ->None:
+    """Handle habit add callback."""
+    await query.answer("Use /habit_add <name> to add a new habit")
+
+
+@callback_handler('habit_stats', 'Show habit statistics', 'habit')
+async def handle_habit_stats_callback(query, context: ContextTypes.DEFAULT_TYPE) ->None:
+    """Handle habit stats callback."""
+    with next(get_session()) as session:
+        repo = HabitRepository(session)
+        habits = repo.list_habits()
+        
+        if not habits:
+            await query.answer("No habits found")
+            return
+        
+        # Calculate overall statistics
+        total_habits = len(habits)
+        total_streaks = sum(h.streak for h in habits)
+        avg_streak = total_streaks / total_habits if total_habits > 0 else 0
+        max_streak = max(h.streak for h in habits) if habits else 0
+        
+        today = get_current_datetime().date()
+        completed_today = 0
+        for habit in habits:
+            if habit.last_completed:
+                if hasattr(habit.last_completed, 'date'):
+                    last_completed_date = habit.last_completed.date()
+                else:
+                    last_completed_date = habit.last_completed
+                if (today - last_completed_date).days == 0:
+                    completed_today += 1
+        
+        message = f"""📊 **Habit Statistics**
+
+**Overall Progress**:
+• Total Habits: {total_habits}
+• Completed Today: {completed_today}/{total_habits}
+• Average Streak: {avg_streak:.1f} days
+• Best Streak: {max_streak} days
+
+**Today's Completion Rate**: {round(completed_today/total_habits*100, 1) if total_habits > 0 else 0}%"""
+        
+        keyboard = InlineKeyboardMarkup([[
+            UnifiedButtonBuilder.create_button(text='⬅️ Back', callback_data='habit_refresh', button_type=ButtonType.INFO)
+        ]])
+        
+        await query.edit_message_text(message, reply_markup=keyboard, parse_mode='MarkdownV2')
+
+
+@callback_handler('habit_refresh', 'Refresh habit list', 'habit')
+async def handle_habit_refresh_callback(query, context: ContextTypes.DEFAULT_TYPE) ->None:
+    """Handle habit refresh callback."""
+    # Re-run the habit_list handler to refresh the list
+    await habit_list_handler(query, context)
 
 
 async def habit_add_handler(update: Update, context: ContextTypes.DEFAULT_TYPE

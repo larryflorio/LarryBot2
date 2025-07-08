@@ -245,15 +245,19 @@ class TestScheduler:
         # Clean up
         scheduler.shutdown()
 
-    def test_scheduler_without_event_bus(self, test_session):
+    def test_scheduler_without_event_bus(self, test_session, db_task_factory):
         """Test scheduler behavior when no event bus is provided."""
         # Start scheduler without event bus
         start_scheduler(None)
         
-        # Create a past reminder
+        # Create a task first
+        task = db_task_factory()
+        task_id = task.id
+        
+        # Create a past reminder for that task
         repo = ReminderRepository(test_session)
         past_time = datetime.now() - timedelta(hours=1)
-        reminder = repo.add_reminder(1, past_time)
+        reminder = repo.add_reminder(task_id, past_time)
         reminder_id = reminder.id  # Store ID before scheduler runs
         
         # Patch get_session to use test_session

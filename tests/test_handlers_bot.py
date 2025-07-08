@@ -462,7 +462,6 @@ class TestTelegramBotHandler:
             ('calendar_today', '_handle_calendar_callback'),
             ('filter_date', '_handle_filter_callback'),
             ('add_task', '_handle_add_task'),
-            ('addtask_step:description', '_handle_narrative_task_callback'),
         ]
         
         for callback_data, expected_handler in test_cases:
@@ -476,6 +475,35 @@ class TestTelegramBotHandler:
             else:
                 # Should not call any handler for no_action
                 await handler._handle_callback_operations(mock_query, mock_context)
+
+    async def test_callback_registry_routing(self, command_registry):
+        """Test callback routing through the registry system."""
+        mock_config = MagicMock(spec=Config)
+        mock_config.TELEGRAM_BOT_TOKEN = "test_token"
+        mock_config.ALLOWED_TELEGRAM_USER_ID = 123456789
+        handler = TelegramBotHandler(mock_config, command_registry)
+        
+        mock_query = MagicMock()
+        mock_context = MagicMock()
+        
+        # Register a test callback handler
+        async def test_callback_handler(query, context):
+            return 'test_callback_ok'
+        
+        command_registry.register_callback('test_callback', test_callback_handler)
+        
+        # Test that the callback is routed through the registry
+        mock_query.data = 'test_callback:value'
+        
+        with patch.object(command_registry, 'get_callback_handler') as mock_get_handler:
+            mock_get_handler.return_value = AsyncMock()
+            await handler._handle_callback_operations(mock_query, mock_context)
+            
+            # Verify the registry was consulted
+            mock_get_handler.assert_called_once_with('test_callback:value')
+            
+            # Verify the handler was called
+            mock_get_handler.return_value.assert_awaited_once_with(mock_query, mock_context)
 
     async def test_authorization_edge_cases(self, command_registry):
         """Test authorization edge cases."""

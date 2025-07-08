@@ -7,11 +7,12 @@ from larrybot.storage.task_repository import TaskRepository
 from larrybot.core.event_utils import emit_task_event
 from larrybot.utils.ux_helpers import MessageFormatter, KeyboardBuilder
 from larrybot.services.task_service import TaskService
-from larrybot.utils.decorators import command_handler
+from larrybot.utils.decorators import command_handler, callback_handler
 from typing import Optional
 from larrybot.utils.datetime_utils import get_current_datetime
 from larrybot.nlp.enhanced_narrative_processor import TaskCreationState, ContextType
 from larrybot.storage.client_repository import ClientRepository
+from larrybot.services.datetime_service import DateTimeService
 from datetime import datetime, timedelta, timezone
 import json
 from larrybot.utils.enhanced_ux_helpers import UnifiedButtonBuilder, ActionType, ButtonType
@@ -29,6 +30,46 @@ def register(event_bus: EventBus, command_registry: CommandRegistry) ->None:
     command_registry.register('/edit', edit_task_handler)
     command_registry.register('/remove', remove_task_handler)
     command_registry.register('/addtask', narrative_add_task_handler)
+    
+    # Register callback handlers for narrative task flow
+    command_registry.register_callback('addtask_step', handle_narrative_task_callback)
+
+
+@callback_handler('addtask_step', 'Handle narrative task creation callbacks', 'tasks', True, 2)
+async def handle_narrative_task_callback(query, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Central handler for all addtask_step callbacks."""
+    callback_data = query.data
+    parts = callback_data.split(':')
+    
+    if len(parts) < 2:
+        return
+    
+    step_type = parts[1]
+    step_value = parts[2] if len(parts) > 2 else None
+    
+    # Route to appropriate step handler
+    if step_type == 'due_date':
+        await _handle_due_date_step(query, context, step_value)
+    elif step_type == 'priority':
+        await _handle_priority_step(query, context, step_value)
+    elif step_type == 'category':
+        await _handle_category_step(query, context, step_value)
+    elif step_type == 'client':
+        await _handle_client_step(query, context, step_value)
+    elif step_type == 'confirm':
+        await _handle_confirmation_step(query, context, 'confirm')
+    elif step_type == 'cancel':
+        await _cancel_task_creation(query, context)
+    elif step_type == 'edit':
+        await _handle_confirmation_step(query, context, 'edit')
+    else:
+        # Unknown step type - send error message
+        from larrybot.utils.ux_helpers import MessageFormatter
+        message = MessageFormatter.format_error_message(
+            'Unknown step type',
+            f'Step type "{step_type}" is not recognized. Please try again.'
+        )
+        await query.edit_message_text(message, parse_mode='MarkdownV2')
 
 
 def _get_task_service() ->TaskService:
@@ -75,13 +116,12 @@ Examples:
                 parse_mode='MarkdownV2')
             return
     if len(args) > 2:
-        try:
-            due_date = get_current_datetime().strptime(args[2], '%Y-%m-%d')
-        except ValueError:
+        due_date = DateTimeService.parse_user_date(args[2])
+        if due_date is None:
             await update.message.reply_text(MessageFormatter.
                 format_error_message('Invalid date format',
                 MessageFormatter.escape_markdown(
-                'Please use YYYY-MM-DD format or select from the buttons.')
+                'Please use YYYY-MM-DD format (e.g., 2025-07-15).')
                 ), parse_mode='MarkdownV2')
             return
     if len(args) > 3:
@@ -437,24 +477,16 @@ async def _handle_due_date_step(update_or_query, context: ContextTypes.
     if due_date_input == 'skip':
         due_date = None
     elif due_date_input == 'today':
-        # Set to end of today (23:59:59) instead of start of day (00:00:00)
-        today = datetime.now().date()
-        due_date = datetime.combine(today, datetime.max.time())  # 23:59:59.999999
+        due_date = DateTimeService.create_due_date_for_today()
     elif due_date_input == 'tomorrow':
-        due_date = (datetime.now() + timedelta(days=1)).date()
+        due_date = DateTimeService.create_due_date_for_tomorrow()
     elif due_date_input == 'week':
-        today = datetime.now().date()
-        days_until_sunday = (6 - today.weekday()) % 7
-        due_date = today + timedelta(days=days_until_sunday)
+        due_date = DateTimeService.create_due_date_for_week()
     elif due_date_input == 'next_week':
-        today = datetime.now().date()
-        days_until_next_sunday = (6 - today.weekday()) % 7 + 7
-        due_date = today + timedelta(days=days_until_next_sunday)
+        due_date = DateTimeService.create_due_date_for_next_week()
     else:
-        try:
-            due_date_obj = datetime.strptime(due_date_input, '%Y-%m-%d')
-            due_date = due_date_obj.replace(tzinfo=timezone.utc)
-        except ValueError:
+        due_date = DateTimeService.parse_user_date(due_date_input)
+        if due_date is None:
             message = MessageFormatter.format_error_message(
                 'Invalid date format', MessageFormatter.escape_markdown(
                 'Please use YYYY-MM-DD format or select from the buttons.'))
@@ -675,11 +707,7 @@ async def _show_confirmation(update_or_query, context: ContextTypes.
     partial_task = context.user_data['partial_task']
     summary_lines = [f"📝 **{partial_task['description']}**"]
     if partial_task['due_date']:
-        # Handle both string and datetime objects for display
-        if isinstance(partial_task['due_date'], datetime):
-            due_date_display = partial_task['due_date'].strftime('%Y-%m-%d %H:%M')
-        else:
-            due_date_display = partial_task['due_date']
+        due_date_display = DateTimeService.format_for_display(partial_task['due_date'])
         summary_lines.append(f"📅 Due: {due_date_display}")
     priority_emoji = {'Low': '🟢', 'Medium': '🟡', 'High': '🟠', 'Critical': '🔴'
         }.get(partial_task['priority'], '⚪')
@@ -729,17 +757,18 @@ async def _create_final_task(update_or_query, context: ContextTypes.
     partial_task = context.user_data['partial_task']
     due_date = None
     if partial_task['due_date']:
-        try:
-            # Handle both string format (from manual input) and datetime objects (from buttons)
-            if isinstance(partial_task['due_date'], str):
-                due_date_obj = datetime.strptime(partial_task['due_date'],
-                    '%Y-%m-%d')
-                due_date = due_date_obj.replace(tzinfo=timezone.utc)
+        # Convert to UTC for storage using DateTimeService
+        due_date = DateTimeService.format_for_storage(partial_task['due_date'])
+        # Validate the due date
+        if not DateTimeService.validate_due_date(due_date):
+            message = MessageFormatter.format_error_message(
+                'Invalid due date', MessageFormatter.escape_markdown(
+                'Due date cannot be in the past. Please select a future date.'))
+            if hasattr(update_or_query, 'edit_message_text'):
+                await update_or_query.edit_message_text(message, parse_mode='MarkdownV2')
             else:
-                # Already a datetime object from button selection
-                due_date = partial_task['due_date'].replace(tzinfo=timezone.utc)
-        except (ValueError, AttributeError):
-            due_date = None
+                await update_or_query.message.reply_text(message, parse_mode='MarkdownV2')
+            return
     task_service = _get_task_service()
     result = await task_service.create_task_with_metadata(description=
         partial_task['description'], priority=partial_task['priority'],
@@ -752,7 +781,7 @@ async def _create_final_task(update_or_query, context: ContextTypes.
         message = MessageFormatter.format_success_message(
             '✅ Task created successfully!', {'ID': task_data['id'],
             'Description': task_data['description'], 'Priority': task_data[
-            'priority'], 'Due Date': task_data['due_date'] or 'None',
+            'priority'], 'Due Date': DateTimeService.format_for_display(task_data['due_date']),
             'Category': task_data['category'] or 'None'})
         print('[DEBUG] outgoing success message:\n', message)
         if hasattr(update_or_query, 'edit_message_text'):

@@ -164,6 +164,14 @@ class TelegramBotHandler:
         ContextTypes.DEFAULT_TYPE) ->None:
         """Handle the actual callback operations with proper routing."""
         callback_data = query.data
+        
+        # Try to get callback handler from registry first
+        callback_handler = self.command_registry.get_callback_handler(callback_data)
+        if callback_handler:
+            await callback_handler(query, context)
+            return
+        
+        # Fallback to existing hardcoded handlers
         if callback_data == 'no_action':
             return
         elif callback_data == 'nav_back':
@@ -200,8 +208,6 @@ class TelegramBotHandler:
             await self._handle_filter_callback(query, context)
         elif callback_data == 'add_task':
             await self._handle_add_task(query, context)
-        elif callback_data.startswith('addtask_step:'):
-            await self._handle_narrative_task_callback(query, context)
         else:
             from larrybot.utils.enhanced_ux_helpers import UnifiedButtonBuilder, ButtonType
             error_keyboard = InlineKeyboardMarkup([[UnifiedButtonBuilder.
@@ -242,40 +248,12 @@ class TelegramBotHandler:
         if callback_data.startswith('client_tasks:'):
             client_id = int(callback_data.split(':')[1])
             await self._handle_client_tasks(query, context, client_id)
-        elif callback_data.startswith('client_analytics:'):
-            client_id = int(callback_data.split(':')[1])
-            await self._handle_client_analytics(query, context, client_id)
-        elif callback_data.startswith('client_delete:'):
-            client_id = int(callback_data.split(':')[1])
-            await self._handle_client_delete(query, context, client_id)
-        elif callback_data.startswith('client_view:'):
-            client_id = int(callback_data.split(':')[1])
-            await self._handle_client_view(query, context, client_id)
-        elif callback_data.startswith('client_edit:'):
-            client_id = int(callback_data.split(':')[1])
-            await self._handle_client_edit(query, context, client_id)
+        # Other client callbacks are now handled by the registry
 
     async def _handle_habit_callback(self, query, context: ContextTypes.
         DEFAULT_TYPE) ->None:
         """Handle habit-related callback queries."""
-        callback_data = query.data
-        if callback_data.startswith('habit_done:'):
-            habit_id = int(callback_data.split(':')[1])
-            await self._handle_habit_done(query, context, habit_id)
-        elif callback_data.startswith('habit_progress:'):
-            habit_id = int(callback_data.split(':')[1])
-            await self._handle_habit_progress(query, context, habit_id)
-        elif callback_data.startswith('habit_delete:'):
-            habit_id = int(callback_data.split(':')[1])
-            await self._handle_habit_delete(query, context, habit_id)
-        elif callback_data == 'habit_add':
-            await self._handle_habit_add(query, context)
-        elif callback_data == 'habit_stats':
-            await self._handle_habit_stats(query, context)
-        elif callback_data == 'habit_refresh':
-            await self._handle_habit_refresh(query, context)
-        elif callback_data == 'habit_list':
-            await self._handle_habit_refresh(query, context)
+        # All habit callbacks are now handled by the registry
 
     async def _handle_confirmation_callback(self, query, context:
         ContextTypes.DEFAULT_TYPE) ->None:
@@ -2100,8 +2078,7 @@ If you believe this is an error, please check your configuration."""
             await self._handle_calendar_sync(query, context)
         elif callback_data == 'calendar_settings':
             await self._handle_calendar_settings(query, context)
-        elif callback_data == 'calendar_refresh':
-            await self._handle_calendar_refresh(query, context)
+        # calendar_refresh is now handled by the registry
         else:
             await safe_edit(query.edit_message_text, MessageFormatter.
                 format_error_message('Unknown calendar action',

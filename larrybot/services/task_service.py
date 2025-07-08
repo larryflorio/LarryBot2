@@ -9,6 +9,7 @@ from larrybot.storage.db import get_session
 import json
 import re
 from larrybot.utils.datetime_utils import get_utc_now, ensure_timezone_aware
+from larrybot.services.datetime_service import DateTimeService
 
 
 class TaskService(BaseService):
@@ -34,7 +35,7 @@ class TaskService(BaseService):
             if priority not in ['Low', 'Medium', 'High', 'Critical']:
                 return self._handle_error(ValueError(
                     f'Invalid priority: {priority}'))
-            if due_date and ensure_timezone_aware(due_date) < get_utc_now():
+            if due_date and not DateTimeService.validate_due_date(due_date):
                 return self._handle_error(ValueError(
                     'Due date cannot be in the past'))
             if parent_id:
@@ -95,7 +96,7 @@ class TaskService(BaseService):
         ) ->Dict[str, Any]:
         """Update task due date."""
         try:
-            if ensure_timezone_aware(due_date) < get_utc_now():
+            if not DateTimeService.validate_due_date(due_date):
                 return self._handle_error(ValueError(
                     'Due date cannot be in the past'))
             task = self.task_repository.update_due_date(task_id, due_date)
@@ -103,7 +104,7 @@ class TaskService(BaseService):
                 return self._handle_error(ValueError(
                     f'Task {task_id} not found'))
             return self._create_success_response(self._task_to_dict(task),
-                f"Task {task_id} due date updated to {due_date.strftime('%Y-%m-%d %H:%M')}"
+                f"Task {task_id} due date updated to {DateTimeService.format_for_display(due_date)}"
                 )
         except Exception as e:
             return self._handle_error(e, 'Error updating task due date')

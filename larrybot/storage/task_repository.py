@@ -11,6 +11,7 @@ from larrybot.utils.caching import cached, cache_invalidate, cache_clear
 from larrybot.utils.cache_automation import auto_invalidate_cache, OperationType, invalidate_caches_for
 from larrybot.utils.background_processing import background_task, submit_background_job
 from larrybot.utils.datetime_utils import get_current_datetime, get_current_utc_datetime, get_today_date, get_start_of_day, get_end_of_day, get_utc_now
+from larrybot.services.datetime_service import DateTimeService
 import logging
 from larrybot.models.enums import TaskStatus
 logger = logging.getLogger(__name__)
@@ -149,7 +150,7 @@ class TaskRepository:
     @cached(ttl=180.0)
     def get_overdue_tasks(self) ->List[Task]:
         """Get all overdue tasks with optimized client loading."""
-        now = get_current_utc_datetime()
+        now = get_utc_now()
         return self.session.query(Task).options(joinedload(Task.client)
             ).filter(Task.due_date < now, Task.done == False).order_by(Task
             .due_date.asc()).all()
@@ -164,9 +165,8 @@ class TaskRepository:
 
     def get_tasks_due_today(self) ->List[Task]:
         """Get tasks due today."""
-        today = get_today_date()
-        start_of_day = get_start_of_day()
-        end_of_day = get_end_of_day()
+        start_of_day = DateTimeService.get_start_of_day()
+        end_of_day = DateTimeService.get_end_of_day()
         return self.get_tasks_due_between(start_of_day, end_of_day)
 
     @auto_invalidate_cache(OperationType.TASK_DUE_DATE_CHANGE)

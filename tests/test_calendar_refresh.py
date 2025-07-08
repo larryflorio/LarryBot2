@@ -41,9 +41,11 @@ class TestCalendarRefresh:
     @pytest.mark.asyncio
     async def test_calendar_refresh_callback_handled(self, bot_handler, mock_query, mock_context):
         """Test that calendar_refresh callback is properly handled."""
-        # Test that the callback is routed correctly
+        # Test that the callback is routed correctly through the main callback handler
         with patch.object(bot_handler, '_handle_calendar_refresh', new_callable=AsyncMock) as mock_handler:
-            await bot_handler._handle_calendar_callback(mock_query, mock_context)
+            # Mock the command registry to return our handler
+            bot_handler.command_registry.get_callback_handler = MagicMock(return_value=mock_handler)
+            await bot_handler._handle_callback_operations(mock_query, mock_context)
             mock_handler.assert_called_once_with(mock_query, mock_context)
 
     @pytest.mark.asyncio

@@ -30,6 +30,31 @@ def command_handler(command: str, description: str='', usage: str='',
     return decorator
 
 
+def callback_handler(pattern: str, description: str='', plugin: str='general', 
+                    requires_auth: bool=True, expected_parts: int=2):
+    """
+    Decorator to register a function as a callback handler with metadata.
+    
+    Usage:
+        @callback_handler("my_callback", "Description", "plugin_name", True, 3)
+        async def my_callback_handler(query, context: ContextTypes.DEFAULT_TYPE):
+            # callback handler implementation
+    """
+    def decorator(func: Callable) -> Callable:
+        @functools.wraps(func)
+        async def wrapper(query, context: ContextTypes.DEFAULT_TYPE) -> Any:
+            return await func(query, context)
+        wrapper._callback_metadata = {
+            'pattern': pattern,
+            'description': description or f'Handler for {pattern}',
+            'plugin': plugin,
+            'requires_auth': requires_auth,
+            'expected_parts': expected_parts
+        }
+        return wrapper
+    return decorator
+
+
 def event_listener(event_name: str):
     """
     Decorator to register a function as an event listener.
@@ -50,31 +75,27 @@ def event_listener(event_name: str):
     return decorator
 
 
-def require_args(min_args: int=1, max_args: Optional[int]=None):
+def require_args(min_args: int, max_args: Optional[int] = None):
     """
-    Decorator to validate command arguments.
+    Decorator to require a minimum number of arguments for a command.
     
     Usage:
-        @require_args(1, 3)
-        async def my_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            # handler implementation
+        @require_args(1, 3)  # Require 1-3 arguments
+        @require_args(1)     # Require at least 1 argument
     """
-
-    def decorator(func: Callable) ->Callable:
-
+    def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
-        async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE
-            ) ->Any:
-            args = context.args or []
+        async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
+            args = context.args if hasattr(context, 'args') else []
             if len(args) < min_args:
                 await update.message.reply_text(
-                    f'Usage: {func.__name__} requires at least {min_args} argument(s)'
-                    )
+                    f'❌ This command requires at least {min_args} argument(s).'
+                )
                 return
             if max_args is not None and len(args) > max_args:
                 await update.message.reply_text(
-                    f'Usage: {func.__name__} accepts at most {max_args} argument(s)'
-                    )
+                    f'❌ This command accepts at most {max_args} argument(s).'
+                )
                 return
             return await func(update, context)
         return wrapper
@@ -162,3 +183,18 @@ def cache_result(ttl_seconds: int=300):
             return result
         return wrapper
     return decorator
+
+
+def validate_callback_data(callback_data: str, expected_parts: int) -> bool:
+    """
+    Validate callback data format.
+    
+    Args:
+        callback_data: The callback data string
+        expected_parts: Minimum number of parts expected when split by ':'
+        
+    Returns:
+        True if validation passes, False otherwise
+    """
+    parts = callback_data.split(':')
+    return len(parts) >= expected_parts

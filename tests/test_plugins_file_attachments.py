@@ -31,7 +31,7 @@ async def test_attach_file_handler_invalid_args():
     call_args = update.message.reply_text.call_args
     response_text = call_args[0][0]
     parse_mode = call_args[1].get('parse_mode')
-    assert "Usage: attach_file_handler requires at least 1 argument(s)" in response_text
+    assert "❌ This command requires at least 1 argument(s)." in response_text
 
 @pytest.mark.asyncio
 @patch("larrybot.plugins.file_attachments._get_attachment_service")
