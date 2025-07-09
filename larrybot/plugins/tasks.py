@@ -13,6 +13,7 @@ from larrybot.utils.datetime_utils import get_current_datetime
 from larrybot.nlp.enhanced_narrative_processor import TaskCreationState, ContextType
 from larrybot.storage.client_repository import ClientRepository
 from larrybot.services.datetime_service import DateTimeService
+from larrybot.models.enums import TaskPriority
 from datetime import datetime, timedelta, timezone
 import json
 from larrybot.utils.enhanced_ux_helpers import UnifiedButtonBuilder, ActionType, ButtonType
@@ -252,19 +253,19 @@ async def _list_incomplete_tasks_default(update: Update) ->None:
         repo = TaskRepository(session)
         incomplete_tasks = repo.list_incomplete_tasks()
         # --- Begin sorting patch ---
-        # Define priority order: Critical=0, High=1, Medium=2, Low=3
-        priority_order = {'Critical': 0, 'High': 1, 'Medium': 2, 'Low': 3}
+        # Define priority order using enum values: Critical=4, High=3, Medium=2, Low=1
+        priority_order = {4: 0, 3: 1, 2: 2, 1: 3}  # Map enum values to sort order
         def sort_key(task):
-            # None due dates go last
-            due = task.due_date if task.due_date is not None else (9999, 99, 99)
-            # If due is a datetime, use it directly; else, use a tuple that sorts last
-            if hasattr(due, 'timestamp'):
-                due_val = due.timestamp()
-            elif isinstance(due, (tuple, list)):
-                due_val = due
+            # Handle due date sorting - None due dates go last
+            if task.due_date is not None and hasattr(task.due_date, 'timestamp'):
+                due_val = task.due_date.timestamp()
             else:
+                # Use a very large timestamp for tasks without due dates
                 due_val = float('inf')
-            priority_val = priority_order.get(getattr(task, 'priority', 'Medium'), 2)
+            
+            # Get priority as integer from enum, default to Medium (2)
+            priority_enum = task.priority_enum or TaskPriority.MEDIUM
+            priority_val = priority_order.get(priority_enum.value, 2)
             return (due_val, priority_val)
         incomplete_tasks = sorted(incomplete_tasks, key=sort_key)
         # --- End sorting patch ---
