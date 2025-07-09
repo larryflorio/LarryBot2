@@ -63,7 +63,7 @@ async def _stop_time_tracking_handler_internal(update: Update, context:
     result = await task_service.stop_time_tracking(task_id)
     if result['success']:
         # Get session duration in minutes and hours
-        duration_hours = result.get('duration_hours', 0)
+        duration_hours = result.get('data', {}).get('duration_hours', 0)
         total_minutes = int(round(duration_hours * 60))
         if total_minutes < 1 and duration_hours > 0:
             session_str = '<1m (0.00h)'

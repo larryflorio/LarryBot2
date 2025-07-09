@@ -239,7 +239,7 @@ class TaskRepository:
         return False
 
     def stop_time_tracking(self, task_id: int) ->Optional[float]:
-        """Stop time tracking and return duration in hours."""
+        """Stop time tracking and return duration in hours. Also create a TaskTimeEntry record for the session."""
         import logging
         logger = logging.getLogger("larrybot.time_tracking")
         task = self.session.query(Task).filter_by(id=task_id).first()
@@ -249,12 +249,24 @@ class TaskRepository:
             logger.info(f"[TimeTracking] Stopping for task {task_id}: started_at={task.started_at}, end_time={end_time}")
             delta = safe_datetime_arithmetic(end_time, task.started_at)
             duration = max(0, delta.total_seconds() / 3600)
+            duration_minutes = int(delta.total_seconds() / 60)
             logger.info(f"[TimeTracking] Computed duration (hours): {duration}")
             logger.info(f"[TimeTracking] actual_hours before: {task.actual_hours}")
+            # Create TaskTimeEntry for this session
+            from larrybot.models.task_time_entry import TaskTimeEntry
+            time_entry = TaskTimeEntry(
+                task_id=task_id,
+                started_at=task.started_at,
+                ended_at=end_time,
+                duration_minutes=duration_minutes,
+                description=None
+            )
+            self.session.add(time_entry)
             task.actual_hours = (task.actual_hours or 0) + duration
             logger.info(f"[TimeTracking] actual_hours after: {task.actual_hours}")
             task.started_at = None
             self.session.commit()
+            self.session.expire_all()
             return duration
         return None
 
