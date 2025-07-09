@@ -12,9 +12,17 @@ from concurrent.futures import ThreadPoolExecutor
 from larrybot.utils.datetime_utils import get_current_datetime, get_current_utc_datetime
 scheduler = BackgroundScheduler()
 _event_bus = None
+_main_loop = None  # Store reference to main event loop
 logger = logging.getLogger(__name__)
 _thread_pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix='scheduler'
     )
+
+
+def set_main_event_loop(loop):
+    """Set the main event loop for the scheduler."""
+    global _main_loop
+    _main_loop = loop
+    logger.info('Main event loop set for scheduler')
 
 
 def check_due_reminders():
@@ -105,14 +113,22 @@ def schedule_daily_report(bot_handler, chat_id, hour=9, minute=0):
     def send_report_job():
         try:
             logger.info(f'🔄 Executing scheduled daily report for chat_id {chat_id}')
-            loop = asyncio.get_event_loop()
+            
+            # Use the stored main event loop instead of trying to get it from the scheduler thread
+            if _main_loop is None:
+                logger.error(f'❌ No main event loop available for daily report job for chat_id {chat_id}')
+                return
+                
             coro = bot_handler._send_daily_report(chat_id=chat_id, context=None)
-            if loop.is_running():
-                asyncio.run_coroutine_threadsafe(coro, loop)
+            
+            if _main_loop.is_running():
+                # Submit to the main event loop if it's running
+                asyncio.run_coroutine_threadsafe(coro, _main_loop)
                 logger.info(f'✅ Daily report job submitted to event loop for chat_id {chat_id}')
             else:
-                loop.run_until_complete(coro)
-                logger.info(f'✅ Daily report job completed for chat_id {chat_id}')
+                # This shouldn't happen in normal operation, but handle it gracefully
+                logger.warning(f'⚠️ Main event loop not running for daily report job for chat_id {chat_id}')
+                
         except Exception as e:
             logger.error(f'❌ Error in daily report job for chat_id {chat_id}: {e}')
     
@@ -127,13 +143,16 @@ def schedule_daily_report(bot_handler, chat_id, hour=9, minute=0):
         logger.info(
             f'✅ Scheduled daily report for chat_id {chat_id} at {hour:02d}:{minute:02d}')
         
-        # Log next run time for verification
-        job = scheduler.get_job(job_id)
-        if job:
-            next_run = job.next_run_time
-            logger.info(f'📅 Next daily report scheduled for: {next_run}')
+        # Log next run time for verification (only if scheduler is running)
+        if scheduler.running:
+            job = scheduler.get_job(job_id)
+            if job and hasattr(job, 'next_run_time') and job.next_run_time:
+                next_run = job.next_run_time
+                logger.info(f'📅 Next daily report scheduled for: {next_run}')
+            else:
+                logger.info(f'📅 Daily report job created (next run time not available)')
         else:
-            logger.warning(f'⚠️ Could not retrieve job info for daily report {job_id}')
+            logger.info(f'📅 Daily report job created (scheduler not running)')
             
     except Exception as e:
         logger.error(f'❌ Failed to schedule daily report for chat_id {chat_id}: {e}')

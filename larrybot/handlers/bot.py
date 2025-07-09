@@ -1499,8 +1499,11 @@ If you believe this is an error, please check your configuration."""
     def run(self) ->None:
         try:
             loop = asyncio.get_event_loop()
-            set_main_event_loop(loop)
-            print('Main event loop set for reminder handler', flush=True)
+            from larrybot.plugins.reminder import set_main_event_loop as set_reminder_loop
+            from larrybot.scheduler import set_main_event_loop as set_scheduler_loop
+            set_reminder_loop(loop)
+            set_scheduler_loop(loop)
+            print('Main event loop set for reminder handler and scheduler', flush=True)
         except RuntimeError:
             print('Could not set event loop before bot start', flush=True)
         from larrybot.scheduler import schedule_daily_report
@@ -1515,8 +1518,11 @@ If you believe this is an error, please check your configuration."""
         """
         try:
             loop = asyncio.get_running_loop()
-            set_main_event_loop(loop)
-            logger.info('Main event loop set for reminder handler')
+            from larrybot.plugins.reminder import set_main_event_loop as set_reminder_loop
+            from larrybot.scheduler import set_main_event_loop as set_scheduler_loop
+            set_reminder_loop(loop)
+            set_scheduler_loop(loop)
+            logger.info('Main event loop set for reminder handler and scheduler')
         except RuntimeError as e:
             logger.warning(f'Could not set event loop: {e}')
         

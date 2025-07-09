@@ -459,24 +459,63 @@ class TaskService(BaseService):
 
     async def get_task_time_summary(self, task_id: int) ->Dict[str, Any]:
         """Get comprehensive time summary for a task."""
+        import logging
+        logger = logging.getLogger(__name__)
+        
         try:
+            logger.info(f"Getting time summary for task {task_id}")
+            
             task = self.task_repository.get_task_by_id(task_id)
             if not task:
+                logger.warning(f"Task {task_id} not found for time summary")
                 return self._handle_error(ValueError(
                     f'Task {task_id} not found'))
+            
             time_summary = self.task_repository.get_task_time_summary(task_id)
             comments = self.task_repository.get_comments(task_id)
-            return self._create_success_response({'task_id': task_id,
-                'task_description': task.description, 'estimated_hours':
-                time_summary.get('estimated_hours', 0), 'actual_hours':
-                time_summary.get('actual_hours', 0), 'time_entries_hours':
-                time_summary.get('time_entries_hours', 0),
-                'time_entries_count': time_summary.get('time_entries_count',
-                0), 'comments_count': len(comments), 'efficiency': 
-                time_summary.get('estimated_hours', 0) / time_summary.get(
-                'actual_hours', 1) * 100 if time_summary.get('actual_hours',
-                0) > 0 else 0}, f'Time summary for task {task_id}')
+            
+            # Validate time summary data
+            if not isinstance(time_summary, dict):
+                logger.error(f"Invalid time summary data type: {type(time_summary)}")
+                return self._handle_error(ValueError('Invalid time summary data'))
+            
+            # Extract and validate time data
+            estimated_hours = time_summary.get('estimated_hours', 0)
+            actual_hours = time_summary.get('actual_hours', 0)
+            time_entries_hours = time_summary.get('time_entries_hours', 0)
+            time_entries_count = time_summary.get('time_entries_count', 0)
+            
+            # Ensure numeric types
+            try:
+                estimated_hours = float(estimated_hours or 0)
+                actual_hours = float(actual_hours or 0)
+                time_entries_hours = float(time_entries_hours or 0)
+                time_entries_count = int(time_entries_count or 0)
+            except (ValueError, TypeError) as e:
+                logger.error(f"Invalid numeric data in time summary: {e}")
+                return self._handle_error(ValueError('Invalid time data format'))
+            
+            # Calculate efficiency
+            efficiency = 0
+            if actual_hours > 0:
+                efficiency = (estimated_hours / actual_hours) * 100
+            
+            response_data = {
+                'task_id': task_id,
+                'task_description': task.description,
+                'estimated_hours': estimated_hours,
+                'actual_hours': actual_hours,
+                'time_entries_hours': time_entries_hours,
+                'time_entries_count': time_entries_count,
+                'comments_count': len(comments),
+                'efficiency': efficiency
+            }
+            
+            logger.info(f"Time summary for task {task_id}: {time_entries_hours}h, {time_entries_count} entries")
+            return self._create_success_response(response_data, f'Time summary for task {task_id}')
+            
         except Exception as e:
+            logger.error(f"Error getting time summary for task {task_id}: {e}", exc_info=True)
             return self._handle_error(e, 'Error getting time summary')
 
     async def search_tasks_by_text(self, search_text: str, case_sensitive:

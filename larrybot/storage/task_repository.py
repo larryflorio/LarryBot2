@@ -244,20 +244,29 @@ class TaskRepository:
         logger = logging.getLogger("larrybot.time_tracking")
         task = self.session.query(Task).filter_by(id=task_id).first()
         if task and task.started_at:
-            from larrybot.utils.datetime_utils import safe_datetime_arithmetic, get_current_utc_datetime
-            end_time = get_current_utc_datetime()
+            from larrybot.utils.basic_datetime import get_utc_now, ensure_timezone_aware
+            end_time = get_utc_now()
             logger.info(f"[TimeTracking] Stopping for task {task_id}: started_at={task.started_at}, end_time={end_time}")
-            delta = safe_datetime_arithmetic(end_time, task.started_at)
-            duration = max(0, delta.total_seconds() / 3600)
-            duration_minutes = int(delta.total_seconds() / 60)
+            
+            # Ensure both datetimes are timezone-aware before subtraction
+            started_at_aware = ensure_timezone_aware(task.started_at)
+            end_time_aware = ensure_timezone_aware(end_time)
+            
+            # Calculate duration ensuring it's never negative
+            delta = end_time_aware - started_at_aware
+            duration_seconds = max(0, delta.total_seconds())
+            duration = duration_seconds / 3600  # Convert to hours
+            duration_minutes = int(duration_seconds / 60)  # Convert to minutes
+            
             logger.info(f"[TimeTracking] Computed duration (hours): {duration}")
             logger.info(f"[TimeTracking] actual_hours before: {task.actual_hours}")
+            
             # Create TaskTimeEntry for this session
             from larrybot.models.task_time_entry import TaskTimeEntry
             time_entry = TaskTimeEntry(
                 task_id=task_id,
-                started_at=task.started_at,
-                ended_at=end_time,
+                started_at=started_at_aware,
+                ended_at=end_time_aware,
                 duration_minutes=duration_minutes,
                 description=None
             )
@@ -273,13 +282,22 @@ class TaskRepository:
     def add_time_entry(self, task_id: int, started_at: datetime, ended_at:
         datetime, description: str='') ->bool:
         """Add a time entry for a task."""
+        from larrybot.utils.basic_datetime import ensure_timezone_aware
+        
         task = self.session.query(Task).filter_by(id=task_id).first()
         if task:
-            duration_minutes = int((ended_at - started_at).total_seconds() / 60
-                )
+            # Ensure both datetimes are timezone-aware before calculation
+            started_at_aware = ensure_timezone_aware(started_at)
+            ended_at_aware = ensure_timezone_aware(ended_at)
+            
+            # Calculate duration ensuring it's never negative
+            delta = ended_at_aware - started_at_aware
+            duration_seconds = max(0, delta.total_seconds())
+            duration_minutes = int(duration_seconds / 60)
             duration_hours = duration_minutes / 60.0
+            
             time_entry = TaskTimeEntry(task_id=task_id, started_at=
-                started_at, ended_at=ended_at, duration_minutes=
+                started_at_aware, ended_at=ended_at_aware, duration_minutes=
                 duration_minutes, description=description)
             self.session.add(time_entry)
             task.actual_hours = (task.actual_hours or 0) + duration_hours
@@ -296,8 +314,14 @@ class TaskRepository:
         total_estimated = float(task.estimated_hours or 0)
         time_entries = self.session.query(TaskTimeEntry).filter_by(task_id=
             task_id).all()
-        total_from_entries = sum(entry.duration_minutes for entry in
-            time_entries) / 60.0
+        
+        # Safely calculate total from entries, handling None values
+        total_from_entries = 0.0
+        for entry in time_entries:
+            if entry.duration_minutes is not None:
+                total_from_entries += entry.duration_minutes
+        total_from_entries = total_from_entries / 60.0
+        
         return {'estimated_hours': total_estimated, 'actual_hours':
             total_actual, 'time_entries_hours': total_from_entries,
             'time_entries_count': len(time_entries)}

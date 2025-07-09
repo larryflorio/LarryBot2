@@ -19,3 +19,8 @@ class TaskTimeEntry(Base):
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow,
         nullable=False)
     task = relationship('Task', back_populates='time_entries')
+
+    @property
+    def hours(self) -> float:
+        """Get duration in hours."""
+        return (self.duration_minutes or 0) / 60.0

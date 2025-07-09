@@ -143,6 +143,9 @@ async def _time_entry_handler_internal(update: Update, context:
 async def _time_summary_handler_internal(update: Update, context:
     ContextTypes.DEFAULT_TYPE, task_service=None) ->None:
     """Internal implementation of time summary handler."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     if task_service is None:
         task_service = get_task_service()
     is_valid, task_id, error_msg = validate_task_id(context.args[0])
@@ -151,22 +154,46 @@ async def _time_summary_handler_internal(update: Update, context:
             format_error_message(error_msg,
             'Usage: /time_summary <task_id>'), parse_mode='MarkdownV2')
         return
-    result = await task_service.get_task_time_summary(task_id)
-    if result['success']:
-        time_data = result['data']
-        total_minutes = time_data.get('total_minutes', 0)
-        entry_count = time_data.get('entry_count', 0)
-        formatted_total = format_duration(total_minutes)
+    
+    logger.info(f"Time summary requested for task {task_id}")
+    
+    try:
+        result = await task_service.get_task_time_summary(task_id)
+        if result['success']:
+            time_data = result['data']
+            
+            # Use correct field names that match service response
+            total_hours = time_data.get('time_entries_hours', 0)
+            entry_count = time_data.get('time_entries_count', 0)
+            
+            # Validate data types
+            if not isinstance(total_hours, (int, float)) or not isinstance(entry_count, int):
+                logger.error(f"Invalid time data types: hours={type(total_hours)}, count={type(entry_count)}")
+                raise ValueError("Invalid time data received from service")
+            
+            total_minutes = int(round(total_hours * 60))
+            formatted_total = format_duration(total_minutes)
+            
+            # Calculate average per entry
+            avg_minutes = total_minutes // entry_count if entry_count > 0 else 0
+            avg_formatted = format_duration(avg_minutes)
+            
+            logger.info(f"Time summary completed: {total_hours}h, {entry_count} entries")
+            
+            await update.message.reply_text(MessageFormatter.
+                format_success_message(f'⏱️ Time Summary for Task #{task_id}',
+                {'Total Time': formatted_total, 'Entries': entry_count,
+                'Average per Entry': avg_formatted}), parse_mode='MarkdownV2')
+        else:
+            logger.error(f"Time summary service failed: {result.get('message', 'Unknown error')}")
+            await update.message.reply_text(MessageFormatter.
+                format_error_message(result['message'],
+                'Check the task ID and try again.'), parse_mode='MarkdownV2')
+    except Exception as e:
+        logger.error(f"Error in time summary handler for task {task_id}: {e}", exc_info=True)
         await update.message.reply_text(MessageFormatter.
-            format_success_message(f'⏱️ Time Summary for Task #{task_id}',
-            {'Total Time': formatted_total, 'Entries': entry_count,
-            'Average per Entry': format_duration(total_minutes //
-            entry_count) if entry_count > 0 else '0m'}), parse_mode=
-            'MarkdownV2')
-    else:
-        await update.message.reply_text(MessageFormatter.
-            format_error_message(result['message'],
-            'Check the task ID and try again.'), parse_mode='MarkdownV2')
+            format_error_message('Failed to load time summary',
+            'Please try again or contact support.'), parse_mode='MarkdownV2')
 
 
 @command_handler('/time_start', 'Start time tracking for task',
