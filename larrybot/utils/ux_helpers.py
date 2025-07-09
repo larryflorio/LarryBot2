@@ -729,6 +729,7 @@ class MessageFormatter:
             # Due date
             if due_date:
                 from datetime import datetime as dtmod
+                from larrybot.utils.datetime_utils import is_overdue
                 if isinstance(due_date, str):
                     try:
                         due_date_obj = dtmod.fromisoformat(due_date)
@@ -738,7 +739,10 @@ class MessageFormatter:
                     due_date_obj = due_date
                 if due_date_obj:
                     natural_due = MessageFormatter._format_natural_date(due_date_obj)
-                    message += f'📅 Due: {MessageFormatter.escape_markdown(natural_due)}\n'
+                    overdue_status = ""
+                    if is_overdue(due_date_obj):
+                        overdue_status = " ❗ *OVERDUE*"
+                    message += f'📅 Due: {MessageFormatter.escape_markdown(natural_due)}{overdue_status}\n'
             # Divider with blank line before
             message += f'\n────────────\n'
         return message.strip()

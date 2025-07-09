@@ -198,6 +198,54 @@ class TestNoInfoEmojiInOutput:
         
         # Should still have an emoji for consistency
         assert 'emoji' in info_style, "ButtonType.INFO missing emoji configuration"
+
+    def test_format_task_list_overdue_detection(self):
+        """Test that format_task_list correctly shows overdue status."""
+        from datetime import datetime, timedelta
+        from larrybot.utils.basic_datetime import get_current_datetime
+        
+        # Create test tasks
+        current_time = get_current_datetime()
+        past_date = current_time - timedelta(days=1)  # Yesterday (overdue)
+        future_date = current_time + timedelta(days=1)  # Tomorrow (not overdue)
+        
+        test_tasks = [
+            {
+                'id': 1,
+                'description': 'Overdue task',
+                'priority': 'High',
+                'due_date': past_date
+            },
+            {
+                'id': 2,
+                'description': 'Future task',
+                'priority': 'Medium',
+                'due_date': future_date
+            },
+            {
+                'id': 3,
+                'description': 'No due date task',
+                'priority': 'Low'
+            }
+        ]
+        
+        # Format the task list
+        result = MessageFormatter.format_task_list(test_tasks, 'Test Tasks')
+        
+        # Check that overdue task shows overdue indicator
+        assert '❗ *OVERDUE*' in result, "Overdue task should show overdue indicator"
+        assert 'Overdue task' in result, "Overdue task description should be present"
+        
+        # Check that future task doesn't show overdue indicator
+        assert 'Future task' in result, "Future task description should be present"
+        # The future task should have a due date but no overdue indicator
+        future_task_line = [line for line in result.split('\n') if 'Future task' in line][0]
+        assert '❗ *OVERDUE*' not in future_task_line, "Future task should not show overdue indicator"
+        
+        # Check that no due date task doesn't show overdue indicator
+        assert 'No due date task' in result, "No due date task description should be present"
+        no_due_task_line = [line for line in result.split('\n') if 'No due date task' in line][0]
+        assert '❗ *OVERDUE*' not in no_due_task_line, "Task without due date should not show overdue indicator"
     
     def test_action_templates_no_info_emoji(self):
         """Test that action templates don't include ℹ️ emoji."""
