@@ -64,30 +64,32 @@ async def _stop_time_tracking_handler_internal(update: Update, context:
     if result['success']:
         # Get session duration in minutes and hours
         duration_hours = result.get('duration_hours', 0)
-        duration_minutes = int(round(duration_hours * 60))
-        if duration_minutes < 1 and duration_hours > 0:
-            duration_str = '<1m (%.2fh)' % duration_hours
+        total_minutes = int(round(duration_hours * 60))
+        if total_minutes < 1 and duration_hours > 0:
+            session_str = '<1m (0.00h)'
         else:
-            duration_str = f'{duration_minutes}m ({duration_hours:.2f}h)'
+            h, m = divmod(total_minutes, 60)
+            session_str = (f'{h}h {m}m' if h else f'{m}m') + f' ({duration_hours:.2f}h)'
         # Get total tracked time for the task
         summary_result = await task_service.get_task_time_summary(task_id)
         if summary_result.get('success'):
             total_hours = summary_result['data'].get('actual_hours', 0)
-            total_minutes = int(round(total_hours * 60))
-            if total_minutes < 1 and total_hours > 0:
-                total_str = '<1m (%.2fh)' % total_hours
+            total_total_minutes = int(round(total_hours * 60))
+            if total_total_minutes < 1 and total_hours > 0:
+                total_str = '<1m (0.00h)'
             else:
-                total_str = f'{total_minutes}m ({total_hours:.2f}h)'
+                h, m = divmod(total_total_minutes, 60)
+                total_str = (f'{h}h {m}m' if h else f'{m}m') + f' ({total_hours:.2f}h)'
         else:
             total_str = 'N/A'
         # Escape all dynamic content for MarkdownV2
         esc = MessageFormatter.escape_markdown
         esc_task_id = esc(str(task_id))
-        esc_duration_str = esc(duration_str)
+        esc_session_str = esc(session_str)
         esc_total_str = esc(total_str)
         message = (
             f"✅ Time tracking stopped for Task \#{esc_task_id}\n\n"
-            f"⏱️ Session duration: {esc_duration_str}\n"
+            f"⏱️ Session duration: {esc_session_str}\n"
             f"🕒 Total tracked: {esc_total_str}"
         )
         # Add Time Summary action button

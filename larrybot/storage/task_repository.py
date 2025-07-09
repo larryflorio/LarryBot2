@@ -240,13 +240,19 @@ class TaskRepository:
 
     def stop_time_tracking(self, task_id: int) ->Optional[float]:
         """Stop time tracking and return duration in hours."""
+        import logging
+        logger = logging.getLogger("larrybot.time_tracking")
         task = self.session.query(Task).filter_by(id=task_id).first()
         if task and task.started_at:
             from larrybot.utils.datetime_utils import safe_datetime_arithmetic, get_current_utc_datetime
             end_time = get_current_utc_datetime()
+            logger.info(f"[TimeTracking] Stopping for task {task_id}: started_at={task.started_at}, end_time={end_time}")
             delta = safe_datetime_arithmetic(end_time, task.started_at)
             duration = max(0, delta.total_seconds() / 3600)
+            logger.info(f"[TimeTracking] Computed duration (hours): {duration}")
+            logger.info(f"[TimeTracking] actual_hours before: {task.actual_hours}")
             task.actual_hours = (task.actual_hours or 0) + duration
+            logger.info(f"[TimeTracking] actual_hours after: {task.actual_hours}")
             task.started_at = None
             self.session.commit()
             return duration
