@@ -14,6 +14,7 @@ from larrybot.utils.datetime_utils import get_current_datetime, get_current_utc_
 from larrybot.services.datetime_service import DateTimeService
 import logging
 from larrybot.models.enums import TaskStatus
+from larrybot.utils.datetime_utils import ensure_timezone_aware
 logger = logging.getLogger(__name__)
 
 
@@ -433,12 +434,19 @@ class TaskRepository:
                 filters.append(Task._priority == priority)
         if category:
             filters.append(Task.category == category)
+        # PATCH: Ensure datetime filters are timezone-aware
         if due_before:
-            filters.append(Task.due_date < due_before)
+            due_before_aware = ensure_timezone_aware(due_before)
+            filters.append(Task.due_date <= due_before_aware)
         if due_after:
-            filters.append(Task.due_date > due_after)
+            due_after_aware = ensure_timezone_aware(due_after)
+            filters.append(Task.due_date >= due_after_aware)
         if overdue_only:
-            filters.append(Task.due_date < get_utc_now())
+            from larrybot.utils.basic_datetime import get_utc_now
+            now = get_utc_now()
+            # For overdue tasks, we need to handle both naive and timezone-aware due dates
+            # Compare with current time, ensuring proper timezone handling
+            filters.append(Task.due_date < now)
             filters.append(Task.done == False)
         if client_id:
             filters.append(Task.client_id == client_id)

@@ -10,7 +10,6 @@ from larrybot.core.event_bus import EventBus
 from larrybot.utils.decorators import command_handler, require_args
 from larrybot.utils.ux_helpers import MessageFormatter
 from larrybot.core.event_utils import emit_task_event
-from .utils import format_task_list_message
 _event_bus = None
 
 
@@ -46,7 +45,7 @@ async def _advanced_tasks_handler_internal(update: Update, context:
                 format_info_message('📋 Advanced Task Filter', {'Status':
                 'No tasks found matching criteria'}), parse_mode='MarkdownV2')
         else:
-            message = format_task_list_message(tasks, 'Advanced Task Filter')
+            message = MessageFormatter.format_task_list(tasks, 'Advanced Task Filter')
             await update.message.reply_text(message, parse_mode='MarkdownV2')
             emit_task_event(_event_bus, 'tasks_filtered', {'filters':
                 filters, 'count': len(tasks)})
@@ -71,7 +70,7 @@ async def _overdue_tasks_handler_internal(update: Update, context:
                 format_success_message('✅ Overdue Tasks', {'Status':
                 'No overdue tasks found'}), parse_mode='MarkdownV2')
         else:
-            message = format_task_list_message(tasks, 'Overdue Tasks')
+            message = MessageFormatter.format_task_list(tasks, 'Overdue Tasks')
             await update.message.reply_text(message, parse_mode='MarkdownV2')
             emit_task_event(_event_bus, 'overdue_tasks_viewed', {'count':
                 len(tasks)})
@@ -87,7 +86,17 @@ async def _today_tasks_handler_internal(update: Update, context:
     if task_service is None:
         from larrybot.plugins.advanced_tasks import get_task_service
         task_service = get_task_service()
-    result = await task_service.get_tasks_with_filters({'due_today': True})
+    
+    # Use DateTimeService for proper timezone handling
+    from larrybot.services.datetime_service import DateTimeService
+    start_of_today = DateTimeService.get_start_of_day()
+    end_of_today = DateTimeService.get_end_of_day()
+    
+    result = await task_service.get_tasks_with_filters(
+        due_after=start_of_today, 
+        due_before=end_of_today,
+        done=False
+    )
     if result['success']:
         tasks = result['data']
         if not tasks:
@@ -95,7 +104,7 @@ async def _today_tasks_handler_internal(update: Update, context:
                 format_info_message("📅 Today's Tasks", {'Status':
                 'No tasks due today'}), parse_mode='MarkdownV2')
         else:
-            message = format_task_list_message(tasks, "Today's Tasks")
+            message = MessageFormatter.format_task_list(tasks, "Today's Tasks")
             await update.message.reply_text(message, parse_mode='MarkdownV2')
             emit_task_event(_event_bus, 'today_tasks_viewed', {'count': len
                 (tasks)})
@@ -119,7 +128,7 @@ async def _week_tasks_handler_internal(update: Update, context:
                 format_info_message("📅 This Week's Tasks", {'Status':
                 'No tasks due this week'}), parse_mode='MarkdownV2')
         else:
-            message = format_task_list_message(tasks, "This Week's Tasks")
+            message = MessageFormatter.format_task_list(tasks, "This Week's Tasks")
             await update.message.reply_text(message, parse_mode='MarkdownV2')
             emit_task_event(_event_bus, 'week_tasks_viewed', {'count': len(
                 tasks)})
@@ -150,8 +159,7 @@ async def _search_tasks_handler_internal(update: Update, context:
                 format_info_message(f"🔍 Search Results: '{query}'", {
                 'Status': 'No tasks found'}), parse_mode='MarkdownV2')
         else:
-            message = format_task_list_message(tasks,
-                f"Search Results: '{query}'")
+            message = MessageFormatter.format_task_list(tasks, f"Search Results: '{query}'")
             await update.message.reply_text(message, parse_mode='MarkdownV2')
             emit_task_event(_event_bus, 'tasks_searched', {'query': query,
                 'options': search_options, 'count': len(tasks)})

@@ -47,7 +47,7 @@ analytics_advanced_handler = analytics_handler
 productivity_report_handler = productivity_report_handler
 _tag_handler_internal = _tags_handler_internal
 _filter_priority_handler_internal = _priority_handler_internal
-from .utils import get_task_service, validate_task_id, format_task_list_message
+from .utils import get_task_service, validate_task_id
 _get_task_service = get_task_service
 _advanced_task_event_bus = None
 

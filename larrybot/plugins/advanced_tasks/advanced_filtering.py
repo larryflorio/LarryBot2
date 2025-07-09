@@ -12,7 +12,7 @@ from larrybot.utils.decorators import command_handler, require_args
 from larrybot.utils.ux_helpers import MessageFormatter
 from larrybot.core.event_utils import emit_task_event
 from larrybot.utils.datetime_utils import parse_date_string
-from .utils import format_task_list_message
+
 _event_bus = None
 
 
@@ -51,8 +51,7 @@ async def _filter_advanced_handler_internal(update: Update, context:
                 format_info_message('🔍 Advanced Filter Results', {'Status':
                 'No tasks found matching criteria'}), parse_mode='MarkdownV2')
         else:
-            message = format_task_list_message(tasks, 'Advanced Filter Results'
-                )
+            message = MessageFormatter.format_task_list(tasks, 'Advanced Filter Results')
             await update.message.reply_text(message, parse_mode='MarkdownV2')
             emit_task_event(_event_bus, 'advanced_filter_applied', {
                 'filters': filters, 'count': len(tasks)})
@@ -93,8 +92,7 @@ async def _tags_multi_handler_internal(update: Update, context:
                 {'Tags': ', '.join(tags), 'Status': 'No tasks found'}),
                 parse_mode='MarkdownV2')
         else:
-            message = format_task_list_message(tasks,
-                f'Multi-Tag Filter ({match_type})')
+            message = MessageFormatter.format_task_list(tasks, f'Multi-Tag Filter ({match_type})')
             await update.message.reply_text(message, parse_mode='MarkdownV2')
             emit_task_event(_event_bus, 'multi_tag_filter_applied', {'tags':
                 tags, 'match_type': match_type, 'count': len(tasks)})
@@ -134,7 +132,7 @@ async def _time_range_handler_internal(update: Update, context:
                 , 'Include Completed': 'Yes' if include_completed else 'No',
                 'Status': 'No tasks found'}), parse_mode='MarkdownV2')
         else:
-            message = format_task_list_message(tasks, 'Time Range Filter')
+            message = MessageFormatter.format_task_list(tasks, 'Time Range Filter')
             await update.message.reply_text(message, parse_mode='MarkdownV2')
             emit_task_event(_event_bus, 'time_range_filter_applied', {
                 'start_date': start_date.isoformat(), 'end_date': end_date.
@@ -178,7 +176,7 @@ async def _priority_range_handler_internal(update: Update, context:
                 f'{min_priority} to {max_priority}', 'Status':
                 'No tasks found'}), parse_mode='MarkdownV2')
         else:
-            message = format_task_list_message(tasks, 'Priority Range Filter')
+            message = MessageFormatter.format_task_list(tasks, 'Priority Range Filter')
             await update.message.reply_text(message, parse_mode='MarkdownV2')
             emit_task_event(_event_bus, 'priority_range_filter_applied', {
                 'min_priority': min_priority, 'max_priority': max_priority,

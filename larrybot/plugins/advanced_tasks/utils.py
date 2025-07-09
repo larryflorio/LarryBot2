@@ -60,38 +60,7 @@ def parse_task_ids(task_ids_str: str) ->tuple[bool, list[int], str]:
             ], 'Invalid task ID format. Use comma-separated numbers (e.g., 1,2,3)'
 
 
-def format_task_list_message(tasks: list, title: str='Tasks') ->str:
-    """
-    Format a list of tasks into a readable message.
-    
-    Args:
-        tasks: List of task objects or dictionaries
-        title: Title for the task list
-        
-    Returns:
-        str: Formatted message string
-    """
-    if not tasks:
-        return f'📋 **{title}**\n\nNo tasks found.'
-    message = f'📋 **{title}** ({len(tasks)} tasks)\n\n'
-    for i, task in enumerate(tasks[:10], 1):
-        if isinstance(task, dict):
-            task_id = task.get('id', 'N/A')
-            description = task.get('description', 'No description')
-            status = task.get('status', 'Todo')
-            priority = task.get('priority', 'Medium')
-        else:
-            task_id = getattr(task, 'id', 'N/A')
-            description = getattr(task, 'description', 'No description')
-            status = getattr(task, 'status', 'Todo')
-            priority = getattr(task, 'priority', 'Medium')
-        if len(description) > 50:
-            description = description[:47] + '...'
-        message += f'{i}. **#{task_id}** {description}\n'
-        message += f'   📊 {status} | 🔥 {priority}\n\n'
-    if len(tasks) > 10:
-        message += f'*... and {len(tasks) - 10} more tasks*\n'
-    return message
+
 
 
 def get_priority_emoji(priority: str) ->str:

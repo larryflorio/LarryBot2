@@ -2729,9 +2729,9 @@ If you believe this is an error, please check your configuration."""
         """Send a comprehensive daily report with tasks, habits, and motivational content."""
         logger.info('Generating daily report')
         try:
-            today = get_current_datetime().date()
-            start_of_today = datetime.combine(today, datetime.min.time())
-            end_of_today = datetime.combine(today, datetime.max.time())
+            from larrybot.services.datetime_service import DateTimeService
+            start_of_today = DateTimeService.get_start_of_day()
+            end_of_today = DateTimeService.get_end_of_day()
             with get_optimized_session() as session:
                 task_repository = TaskRepository(session)
                 task_service = TaskService(task_repository)
@@ -2746,10 +2746,11 @@ If you believe this is an error, please check your configuration."""
                 habit_repo = HabitRepository(session)
                 habits = habit_repo.list_habits()
                 habits_due = []
+                today_date = get_current_datetime().date()
                 for habit in habits:
                     last_completed = habit.last_completed.date(
                         ) if habit.last_completed else None
-                    if last_completed != today:
+                    if last_completed != today_date:
                         habits_due.append(habit)
             from larrybot.services.calendar_service import CalendarService
             calendar_service = CalendarService()
@@ -2768,7 +2769,7 @@ If you believe this is an error, please check your configuration."""
             quote = random.choice(quotes)
             lines = []
             lines.append(
-                f"🗓️ **Daily Report – {today.strftime('%A, %b %d')}**\n")
+                f"🗓️ **Daily Report – {today_date.strftime('%A, %b %d')}**\n")
             lines.append("📅 **Today's Calendar Events:**")
             if events:
                 for time, name, duration in events:
