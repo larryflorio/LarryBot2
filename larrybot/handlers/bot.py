@@ -1508,7 +1508,7 @@ If you believe this is an error, please check your configuration."""
             print('Could not set event loop before bot start', flush=True)
         from larrybot.scheduler import schedule_daily_report
         schedule_daily_report(self, self.config.ALLOWED_TELEGRAM_USER_ID,
-            hour=9, minute=0)
+            hour=8, minute=30)
         self.application.run_polling()
 
     async def run_async(self) ->None:
@@ -1526,10 +1526,10 @@ If you believe this is an error, please check your configuration."""
         except RuntimeError as e:
             logger.warning(f'Could not set event loop: {e}')
         
-        # Schedule daily report for 9am
+        # Schedule daily report for 8:30am
         from larrybot.scheduler import schedule_daily_report
-        schedule_daily_report(self, self.config.ALLOWED_TELEGRAM_USER_ID, hour=9, minute=0)
-        logger.info('📅 Daily report scheduled for 9:00 AM')
+        schedule_daily_report(self, self.config.ALLOWED_TELEGRAM_USER_ID, hour=8, minute=30)
+        logger.info('📅 Daily report scheduled for 8:30 AM')
         
         from larrybot.core.task_manager import get_task_manager
         task_manager = get_task_manager()
@@ -2819,6 +2819,8 @@ If you believe this is an error, please check your configuration."""
             elif context and chat_id:
                 await context.bot.send_message(chat_id=chat_id, text=
                     message, parse_mode='Markdown')
+            elif chat_id:  # Handle case where only chat_id is provided (scheduled jobs)
+                await self.application.bot.send_message(chat_id=chat_id, text=message, parse_mode='Markdown')
             else:
                 logger.error(
                     'No valid message target provided for daily report')
@@ -2858,7 +2860,7 @@ If you believe this is an error, please check your configuration."""
 ✅ **Daily Report Job**: Active
 📅 **Next Run**: {next_run.strftime('%Y-%m-%d %H:%M:%S') if next_run else 'Unknown'}
 🆔 **Job ID**: `{job_id}`
-⏱️ **Schedule**: Daily at 9:00 AM
+            ⏱️ **Schedule**: Daily at 8:30 AM
 
 🔄 **Scheduler Status**: {'Running' if scheduler.running else 'Stopped'}"""
             else:

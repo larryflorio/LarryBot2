@@ -39,7 +39,7 @@ class TestDailyReportScheduler:
         mock_bot_handler._send_daily_report = Mock()
         
         # Schedule the daily report
-        schedule_daily_report(mock_bot_handler, 12345, hour=9, minute=0)
+        schedule_daily_report(mock_bot_handler, 12345, hour=8, minute=30)
         
         # Get the job and verify it exists
         job_id = 'daily_report_12345'
@@ -52,10 +52,47 @@ class TestDailyReportScheduler:
         mock_bot_handler._send_daily_report = Mock()
         
         # Schedule the daily report
-        schedule_daily_report(mock_bot_handler, 12345, hour=9, minute=0)
+        schedule_daily_report(mock_bot_handler, 12345, hour=8, minute=30)
         
         # Verify the job exists
         job_id = 'daily_report_12345'
         job = scheduler.get_job(job_id)
         assert job is not None, "Job should be created"
-        assert job.id == job_id, "Job ID should match" 
+        assert job.id == job_id, "Job ID should match"
+
+    @pytest.mark.asyncio
+    async def test_daily_report_sending_with_chat_id_only(self):
+        """Test that daily report can be sent when only chat_id is provided (scheduled scenario)."""
+        from larrybot.handlers.bot import TelegramBotHandler
+        from larrybot.config.loader import Config
+        from larrybot.core.command_registry import CommandRegistry
+        
+        # Create a mock config
+        mock_config = Mock(spec=Config)
+        mock_config.TELEGRAM_BOT_TOKEN = "test_token"
+        mock_config.ALLOWED_TELEGRAM_USER_ID = 12345
+        
+        # Create a mock command registry
+        mock_registry = Mock(spec=CommandRegistry)
+        
+        # Create bot handler with mocked application
+        bot_handler = TelegramBotHandler(mock_config, mock_registry)
+        bot_handler.application = Mock()
+        bot_handler.application.bot = Mock()
+        
+        # Track calls to send_message
+        send_message_calls = []
+        async def mock_send_message(*args, **kwargs):
+            send_message_calls.append((args, kwargs))
+            return Mock()
+        bot_handler.application.bot.send_message = mock_send_message
+        
+        # Test the _send_daily_report method with only chat_id (no context)
+        await bot_handler._send_daily_report(chat_id=12345, context=None)
+        
+        # Verify that send_message was called with the correct parameters
+        assert len(send_message_calls) == 1, "send_message should be called exactly once"
+        args, kwargs = send_message_calls[0]
+        assert kwargs['chat_id'] == 12345
+        assert 'Daily Report' in kwargs['text']
+        assert kwargs['parse_mode'] == 'Markdown' 
