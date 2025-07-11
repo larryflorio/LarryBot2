@@ -732,30 +732,18 @@ class UnifiedButtonBuilder:
         'emoji': '❌', 'text': 'Cancel', 'style': ButtonType.DANGER}}
 
     @staticmethod
-    def create_button(text: str, callback_data: str, button_type:
-        ButtonType=ButtonType.PRIMARY, custom_emoji: Optional[str]=None
-        ) ->InlineKeyboardButton:
+    def create_button(text: str, callback_data: str, button_type: ButtonType=ButtonType.PRIMARY, custom_emoji: Optional[str]=None) -> InlineKeyboardButton:
         """
         Create a single button with consistent styling.
-        
         Args:
-            text: Button text
+            text: Button text (include emoji if desired)
             callback_data: Callback data for the button
-            button_type: Type of button for styling
-            custom_emoji: Custom emoji to override default
-            
+            button_type: Type of button for styling (no longer affects emoji)
+            custom_emoji: (DEPRECATED, ignored)
         Returns:
-            InlineKeyboardButton with consistent styling
+            InlineKeyboardButton with the exact text provided
         """
-        style = UnifiedButtonBuilder.BUTTON_STYLES[button_type]
-        emoji = custom_emoji or style['emoji']
-        if emoji and not any(text.startswith(e) for e in ['👁️', '✏️', '🗑️',
-            '✅', '▶️', '⏹️', '🔄', '🏠', '⚠️', '❌', '📊', '⚙️', '🔍', '⏱️', '🔗',
-            '➕', '📅']):
-            display_text = f'{emoji} {text}'
-        else:
-            display_text = text
-        return InlineKeyboardButton(text=display_text, callback_data=callback_data)
+        return InlineKeyboardButton(text=text, callback_data=callback_data)
 
     @staticmethod
     def create_action_button(action_type: ActionType, entity_id: Union[int,

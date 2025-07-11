@@ -196,6 +196,8 @@ class TelegramBotHandler:
             await self._handle_bulk_operations_callback(query, context)
         elif callback_data == 'task_edit_cancel':
             await self._handle_task_edit_cancel(query, context)
+        elif callback_data == 'tasks_list':
+            await self._handle_tasks_list(query, context)
         elif callback_data == 'tasks_refresh':
             await self._handle_tasks_refresh(query, context)
         elif callback_data.startswith('reminder_'):
@@ -208,6 +210,10 @@ class TelegramBotHandler:
             await self._handle_filter_callback(query, context)
         elif callback_data == 'add_task':
             await self._handle_add_task(query, context)
+        elif callback_data == 'help_quick':
+            await self._handle_help_quick(query, context)
+        elif callback_data.startswith('help_'):
+            await self._handle_help_section(query, context)
         else:
             from larrybot.utils.enhanced_ux_helpers import UnifiedButtonBuilder, ButtonType
             error_keyboard = InlineKeyboardMarkup([[UnifiedButtonBuilder.
@@ -256,6 +262,8 @@ class TelegramBotHandler:
             await self._handle_task_time_stats(query, context, task_id)
         elif callback_data == 'task_edit_cancel':
             await self._handle_task_edit_cancel(query, context)
+        elif callback_data == 'tasks_list':
+            await self._handle_tasks_list(query, context)
         elif callback_data == 'tasks_refresh':
             await self._handle_tasks_refresh(query, context)
 
@@ -334,11 +342,10 @@ class TelegramBotHandler:
 
     async def _show_task_menu(self, query, context: ContextTypes.DEFAULT_TYPE
         ) ->None:
-        """Show task management menu."""
-        from larrybot.utils.ux_helpers import NavigationHelper
+        """[DEPRECATED] Show task management menu. Use /list instead."""
         await safe_edit(query.edit_message_text,
-            '📋 **Task Management**\n\nSelect an option:', reply_markup=
-            NavigationHelper.get_task_menu_keyboard(), parse_mode='MarkdownV2')
+            '📋 **Task Management**\n\nThis menu is deprecated. Use the main menu or /list to view your tasks.',
+            parse_mode='MarkdownV2')
 
     async def _show_client_menu(self, query, context: ContextTypes.DEFAULT_TYPE
         ) ->None:
@@ -1320,81 +1327,31 @@ This is a single-user bot designed for personal use. Only the configured user ca
 If you believe this is an error, please check your configuration."""
                 )
             return
-        user_info = self.config.get_single_user_info()
+        
         user_first_name = (update.effective_user.first_name if update.
             effective_user.first_name else 'there')
-        welcome_message = f"""🎉 **Welcome to LarryBot2**
+        
+        # Concise welcome message
+        welcome_message = f"""🎉 **Welcome back, {user_first_name}!**
 
-🎯 **What I Can Do For You:**
-
-📋 **Task Management**
-• Create tasks with natural language: `/add "Call client tomorrow at 2pm"`
-• Set priorities, due dates, and categories
-• Track time spent on tasks
-• Bulk operations for efficiency
-
-📅 **Smart Scheduling**
-• Google Calendar integration
-• Intelligent reminders and notifications
-• Time zone awareness
-• Agenda management
-
-📈 **Productivity Insights**
-• Analytics and progress tracking
-• Performance monitoring
-• Productivity reports
-• Smart task suggestions
-
-🔄 **Habit Building**
-• Track daily habits
-• Streak monitoring
-• Progress visualization
-• Habit analytics
-
-👥 **Client Management**
-• Organize tasks by client
-• Client-specific analytics
-• Project tracking
-• Time allocation insights
-
-🎮 **Quick Start Commands:**
-• `/add "Your first task"` - Create a task
-• `/list` - View all tasks
-• `/today` - See today's agenda
-• `/analytics` - View productivity insights
-• `/help` - Full command reference
-
-💡 **Pro Tips:**
-• Use natural language for task creation
-• Try `/suggest` for intelligent task recommendations
-• Use `/bulk_operations` for managing multiple tasks
-• Check `/health` for system status
-
-🔧 **Need Help?**
-• `/help` - Complete command reference
-• `/health` - System status and diagnostics
-• `/examples` - See usage examples
-
-🌟 **Ready to boost your productivity?** Use the buttons below to get started!"""
-        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-        keyboard = [[UnifiedButtonBuilder.create_button(text='➕ Add Task',
-            callback_data='add_task', button_type=ButtonType.INFO),
-            UnifiedButtonBuilder.create_button(text='📋 View Tasks',
-            callback_data='menu_tasks', button_type=ButtonType.INFO),
-            UnifiedButtonBuilder.create_button(text='🔄 Refresh Tasks',
-            callback_data='tasks_refresh', button_type=ButtonType.INFO)], [
-            UnifiedButtonBuilder.create_button(text='🔄 Habits',
-            callback_data='menu_habits', button_type=ButtonType.INFO),
-            UnifiedButtonBuilder.create_button(text='👥 Clients',
-            callback_data='menu_clients', button_type=ButtonType.INFO),
-            UnifiedButtonBuilder.create_button(text="📅 Today's Calendar",
-            callback_data='calendar_today', button_type=ButtonType.INFO)],
-            [UnifiedButtonBuilder.create_button(text='📊 Analytics',
-            callback_data='menu_analytics', button_type=ButtonType.INFO),
-            UnifiedButtonBuilder.create_button(text='⏰ Reminders',
-            callback_data='menu_reminders', button_type=ButtonType.INFO),
-            UnifiedButtonBuilder.create_button(text='🏠 Main Menu',
-            callback_data='nav_main', button_type=ButtonType.INFO)]]
+Ready to boost your productivity? Here's what you can do:"""
+        
+        # Streamlined button layout - 2x3 grid with essential actions
+        keyboard = [
+            [
+                UnifiedButtonBuilder.create_button('➕ Add Task', 'add_task', ButtonType.PRIMARY),
+                UnifiedButtonBuilder.create_button('📋 View Tasks', 'tasks_list', ButtonType.INFO)
+            ],
+            [
+                UnifiedButtonBuilder.create_button('📅 Today', 'calendar_today', ButtonType.INFO),
+                UnifiedButtonBuilder.create_button('🔄 Habits', 'menu_habits', ButtonType.INFO)
+            ],
+            [
+                UnifiedButtonBuilder.create_button('⏰ Reminders', 'menu_reminders', ButtonType.INFO),
+                UnifiedButtonBuilder.create_button('❓ Help', 'help_quick', ButtonType.SECONDARY)
+            ]
+        ]
+        
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(welcome_message, parse_mode=
             'Markdown', reply_markup=reply_markup)
@@ -1943,6 +1900,169 @@ If you believe this is an error, please check your configuration."""
             callback_data='cancel_action', button_type=ButtonType.INFO)]])
         await safe_edit(query.edit_message_text, escaped_message,
             reply_markup=keyboard, parse_mode='MarkdownV2')
+
+    async def _handle_help_quick(self, query, context: ContextTypes.DEFAULT_TYPE
+        ) ->None:
+        """Handle quick help button click."""
+        try:
+            help_message = """❓ **Quick Help**
+
+Choose what you'd like to learn about:"""
+            
+            keyboard = [
+                [
+                    UnifiedButtonBuilder.create_button('📋 Tasks', 'help_tasks', ButtonType.INFO),
+                    UnifiedButtonBuilder.create_button('📅 Calendar', 'help_calendar', ButtonType.INFO)
+                ],
+                [
+                    UnifiedButtonBuilder.create_button('🔄 Habits', 'help_habits', ButtonType.INFO),
+                    UnifiedButtonBuilder.create_button('👥 Clients', 'help_clients', ButtonType.INFO)
+                ],
+                [
+                    UnifiedButtonBuilder.create_button('⏰ Reminders', 'help_reminders', ButtonType.INFO),
+                    UnifiedButtonBuilder.create_button('📊 Analytics', 'help_analytics', ButtonType.INFO)
+                ],
+                [
+                    UnifiedButtonBuilder.create_button('🔧 Advanced', 'help_advanced', ButtonType.SECONDARY),
+                    UnifiedButtonBuilder.create_button('🏠 Back', 'nav_main', ButtonType.SECONDARY)
+                ]
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(help_message, parse_mode='Markdown', reply_markup=reply_markup)
+        except Exception as e:
+            await safe_edit(query.edit_message_text, MessageFormatter.
+                format_error_message('Failed to show help menu',
+                f'Error: {str(e)}'), parse_mode='MarkdownV2')
+
+    async def _handle_help_section(self, query, context: ContextTypes.DEFAULT_TYPE
+        ) ->None:
+        """Handle help section button clicks."""
+        try:
+            callback_data = query.data
+            section = callback_data.split('_')[1] if '_' in callback_data else 'general'
+            
+            help_sections = {
+                'tasks': {
+                    'title': '📋 **Task Management**',
+                    'content': """**Quick Commands:**
+• `/addtask <description>` - Create a new task
+• `/list` - View all tasks
+• `/done <id>` - Mark task complete
+• `/edit <id> <new description>` - Edit task
+
+**Advanced Features:**
+• Set priorities: `/addtask "Call client" priority:High`
+• Add due dates: `/addtask "Review docs" due:tomorrow`
+• Assign to clients: `/addtask "Project work" client:John`
+• Time tracking: `/time_start <id>` and `/time_stop <id>`"""
+                },
+                'calendar': {
+                    'title': '📅 **Calendar Integration**',
+                    'content': """**Calendar Commands:**
+• `/calendar_today` - View today's schedule
+• `/calendar_week` - This week's agenda
+• `/calendar_sync` - Sync with Google Calendar
+• `/calendar_settings` - Configure calendar
+
+**Smart Scheduling:**
+• Tasks with due dates appear in calendar
+• Automatic time zone handling
+• Integration with Google Calendar
+• Reminder notifications"""
+                },
+                'habits': {
+                    'title': '🔄 **Habit Tracking**',
+                    'content': """**Habit Commands:**
+• `/habit_add <name> <description>` - Create habit
+• `/habit_done <id>` - Mark habit complete
+• `/habit_stats` - View habit progress
+• `/habit_list` - List all habits
+
+**Features:**
+• Daily streak tracking
+• Progress visualization
+• Habit analytics
+• Reminder notifications"""
+                },
+                'clients': {
+                    'title': '👥 **Client Management**',
+                    'content': """**Client Commands:**
+• `/client_add <name>` - Add new client
+• `/client_tasks <name>` - View client's tasks
+• `/client_analytics <name>` - Client insights
+• `/client_list` - List all clients
+
+**Benefits:**
+• Organize tasks by client
+• Track time per client
+• Client-specific analytics
+• Project management"""
+                },
+                'reminders': {
+                    'title': '⏰ **Reminders**',
+                    'content': """**Reminder Commands:**
+• `/addreminder <description> <datetime>` - Create reminder
+• `/reminders` - View active reminders
+• `/reminder_snooze <id> <duration>` - Snooze reminder
+• `/reminder_dismiss <id>` - Dismiss reminder
+
+**Features:**
+• Flexible scheduling
+• Snooze options
+• Notification system
+• Integration with tasks"""
+                },
+                'analytics': {
+                    'title': '📊 **Analytics & Insights**',
+                    'content': """**Analytics Commands:**
+• `/analytics` - General productivity insights
+• `/analytics detailed` - Detailed breakdown
+• `/analytics advanced` - Advanced metrics
+• `/productivity_report` - Full report
+
+**Metrics Tracked:**
+• Task completion rates
+• Time tracking data
+• Habit streaks
+• Client productivity
+• Performance trends"""
+                },
+                'advanced': {
+                    'title': '🔧 **Advanced Features**',
+                    'content': """**Advanced Commands:**
+• `/bulk_operations` - Manage multiple tasks
+• `/search --advanced` - Advanced search
+• `/filter_advanced` - Complex filtering
+• `/time_tracking` - Detailed time analysis
+
+**Power Features:**
+• Bulk task operations
+• Advanced filtering
+• File attachments
+• Task dependencies
+• Subtasks
+• Performance monitoring"""
+                }
+            }
+            
+            if section in help_sections:
+                content = help_sections[section]
+                message = f"{content['title']}\n\n{content['content']}"
+                
+                keyboard = [
+                    [UnifiedButtonBuilder.create_button('🏠 Back to Help', 'help_quick', ButtonType.SECONDARY)]
+                ]
+                
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await query.edit_message_text(message, parse_mode='Markdown', reply_markup=reply_markup)
+            else:
+                await query.edit_message_text("❓ Help section not found. Use /help for full command reference.", parse_mode='Markdown')
+                
+        except Exception as e:
+            await safe_edit(query.edit_message_text, MessageFormatter.
+                format_error_message('Failed to show help section',
+                f'Error: {str(e)}'), parse_mode='MarkdownV2')
 
     async def _handle_client_view(self, query, context: ContextTypes.
         DEFAULT_TYPE, client_id: int) ->None:
@@ -3080,3 +3200,12 @@ Track time spent on this task to monitor productivity.
                 format_error_message('Failed to load time statistics',
                 'Please try again or use /time_summary command.'), parse_mode=
                 'MarkdownV2')
+
+    async def _handle_tasks_list(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Unified task list view for all entry points (callback version of /list)."""
+        from larrybot.plugins.tasks import _list_incomplete_tasks_default
+        class DummyUpdate:
+            def __init__(self, query):
+                self.message = query.message
+        dummy_update = DummyUpdate(query)
+        await _list_incomplete_tasks_default(dummy_update)

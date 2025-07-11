@@ -144,7 +144,7 @@
 ### System Commands (3 commands)
 **Core bot functionality**
 
-- `/start` - Start bot and show welcome
+- `/start` - Start bot and show streamlined welcome with quick actions
 - `/help` - Show available commands
 - `/daily` - Daily report
 

@@ -23,7 +23,16 @@ By the end of this guide, you'll know how to:
 
 Let's start with the basics - creating your first task.
 
-### Step 1: Create a Simple Task
+### Step 1: Start Your Bot
+
+Send this message to your bot:
+```
+/start
+```
+
+You'll see a clean welcome message with quick action buttons to get started.
+
+### Step 2: Create a Simple Task
 
 Send this message to your bot:
 ```

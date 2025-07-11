@@ -50,7 +50,7 @@ Get LarryBot2 up and running in minutes with this simple guide.
 ### Step 5: Test Your Bot
 
 1. **Open Telegram** and find your bot
-2. **Send `/start`** to begin
+2. **Send `/start`** to see the streamlined welcome
 3. **Try creating a task**: `/add "Buy groceries"`
 4. **You're ready!** 🎉
 
