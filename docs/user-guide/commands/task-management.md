@@ -41,6 +41,26 @@ This creates a high-priority work task due July 5th.
 
 **Format:** `/add "description" [priority] [due_date] [category]`
 
+### Guided Task Creation
+
+Use the interactive narrative flow for step-by-step task creation:
+
+```
+/addtask
+```
+
+This starts a guided conversation where LarryBot2 asks you:
+1. **Task description** - What needs to be done?
+2. **Due date** - When is it due? (supports natural language like "Monday", "next week")
+3. **Priority** - How urgent is it?
+4. **Category** - What type of task is it?
+5. **Client** (optional) - Who is this for?
+
+**Natural Language Due Dates in Guided Flow:**
+- "Monday", "Friday", "next Monday"
+- "today", "tomorrow", "next week"
+- "this weekend", "in 3 days", "next month"
+
 **Examples:**
 ```
 /add "Call client about project" high 2025-07-01 work
@@ -59,12 +79,27 @@ Set task priorities to focus on what matters most:
 
 ### Due Dates
 
-Set due dates in YYYY-MM-DD format:
+Set due dates using natural language or YYYY-MM-DD format:
 
+**Natural Language Examples:**
+```
+/add "Review quarterly reports" "next Monday"
+/add "Submit expense report" "tomorrow"
+/add "Buy groceries" "this weekend"
+/add "Call client" "next week"
+/add "Schedule meeting" "Friday"
+```
+
+**Structured Format:**
 ```
 /add "Review quarterly reports" 2025-07-15
 /add "Submit expense report" 2025-07-01
 ```
+
+**Supported Natural Language:**
+- Day names: "Monday", "Friday", "next Monday"
+- Relative dates: "today", "tomorrow", "next week", "this weekend"
+- Time periods: "in 3 days", "next month", "end of month"
 
 ### Categories
 

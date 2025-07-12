@@ -45,7 +45,7 @@ async def _add_task_with_metadata_handler_internal(update: Update, context:
         due_date = DateTimeService.parse_user_date(args[2])
         if due_date is None:
             await update.message.reply_text(escape_markdown_v2(
-                'Invalid date format. Use YYYY-MM-DD'), parse_mode='MarkdownV2'
+                'Invalid date format. Use natural language (e.g., "Monday", "next week") or YYYY-MM-DD format.'), parse_mode='MarkdownV2'
                 )
             return
     if len(args) > 3:
@@ -104,7 +104,7 @@ async def _due_date_handler_internal(update: Update, context: ContextTypes.
     due_date = DateTimeService.parse_user_date(context.args[1])
     if due_date is None:
         await update.message.reply_text(escape_markdown_v2(
-            'Invalid date format. Use YYYY-MM-DD'), parse_mode='MarkdownV2')
+            'Invalid date format. Use natural language (e.g., "Monday", "next week") or YYYY-MM-DD format.'), parse_mode='MarkdownV2')
         return
     result = await task_service.update_task_due_date(task_id, due_date)
     if result['success']:

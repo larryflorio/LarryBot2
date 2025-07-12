@@ -482,3 +482,101 @@ class TestNarrativeTaskCreation:
         
         # Should return early without calling any handlers
         # No assertions needed as it should just return 
+
+    @pytest.mark.asyncio
+    async def test_handle_due_date_step_with_natural_language(self, mock_update, mock_context):
+        """Test handling due date step with natural language input."""
+        mock_context.user_data['task_creation_state'] = TaskCreationState.AWAITING_DUE_DATE.value
+        mock_context.user_data['partial_task'] = {
+            'description': 'Test task',
+            'due_date': None,
+            'priority': 'Medium',
+            'category': None,
+            'client_id': None,
+            'estimated_hours': None
+        }
+        mock_context.user_data['step_history'] = []
+        
+        # Test with natural language input
+        await _handle_due_date_step(mock_update, mock_context, "Monday")
+        
+        # Check state was updated
+        assert mock_context.user_data['task_creation_state'] == TaskCreationState.AWAITING_PRIORITY.value
+        assert mock_context.user_data['partial_task']['due_date'] is not None
+        assert len(mock_context.user_data['step_history']) == 1
+        
+        # Verify message was sent with buttons
+        mock_update.message.reply_text.assert_called_once()
+        call_args = mock_update.message.reply_text.call_args
+        assert 'reply_markup' in call_args[1]
+
+    @pytest.mark.asyncio
+    async def test_handle_due_date_step_with_invalid_natural_language(self, mock_update, mock_context):
+        """Test handling due date step with invalid natural language input."""
+        mock_context.user_data['task_creation_state'] = TaskCreationState.AWAITING_DUE_DATE.value
+        mock_context.user_data['partial_task'] = {
+            'description': 'Test task',
+            'due_date': None,
+            'priority': 'Medium',
+            'category': None,
+            'client_id': None,
+            'estimated_hours': None
+        }
+        mock_context.user_data['step_history'] = []
+        
+        # Test with invalid natural language input
+        await _handle_due_date_step(mock_update, mock_context, "invalid date string")
+        
+        # Check state was NOT updated (should remain in due date step)
+        assert mock_context.user_data['task_creation_state'] == TaskCreationState.AWAITING_DUE_DATE.value
+        assert mock_context.user_data['partial_task']['due_date'] is None
+        assert len(mock_context.user_data['step_history']) == 0
+        
+        # Verify error message was sent
+        mock_update.message.reply_text.assert_called_once()
+        call_args = mock_update.message.reply_text.call_args
+        message_text = call_args[0][0]
+        assert 'Invalid date format' in message_text
+        assert 'natural language' in message_text.lower()
+
+    @pytest.mark.asyncio
+    async def test_handle_due_date_step_with_mixed_formats(self, mock_update, mock_context):
+        """Test handling due date step with various date formats."""
+        mock_context.user_data['task_creation_state'] = TaskCreationState.AWAITING_DUE_DATE.value
+        mock_context.user_data['partial_task'] = {
+            'description': 'Test task',
+            'due_date': None,
+            'priority': 'Medium',
+            'category': None,
+            'client_id': None,
+            'estimated_hours': None
+        }
+        mock_context.user_data['step_history'] = []
+        
+        # Test various date formats
+        test_cases = [
+            "2025-07-15",  # Structured format
+            "tomorrow",    # Natural language
+            "next week",   # Natural language
+            "Monday",      # Natural language
+        ]
+        
+        for date_input in test_cases:
+            # Reset context for each test
+            mock_context.user_data['partial_task']['due_date'] = None
+            mock_context.user_data['step_history'] = []
+            mock_context.user_data['task_creation_state'] = TaskCreationState.AWAITING_DUE_DATE.value
+            mock_update.message.reply_text.reset_mock()
+            
+            await _handle_due_date_step(mock_update, mock_context, date_input)
+            
+            # Should either succeed (move to next step) or show error
+            if mock_context.user_data['task_creation_state'] == TaskCreationState.AWAITING_PRIORITY.value:
+                # Success case
+                assert mock_context.user_data['partial_task']['due_date'] is not None
+                assert len(mock_context.user_data['step_history']) == 1
+            else:
+                # Error case - should still be in due date step
+                assert mock_context.user_data['task_creation_state'] == TaskCreationState.AWAITING_DUE_DATE.value
+                assert mock_context.user_data['partial_task']['due_date'] is None
+                assert len(mock_context.user_data['step_history']) == 0 

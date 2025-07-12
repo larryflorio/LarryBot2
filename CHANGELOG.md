@@ -5,6 +5,7 @@ All notable changes to LarryBot2 will be documented in this file.
 ## [2.5] - 2025-07-08
 
 ### Added
+- **Natural Language Date Parsing**: DateTimeService now supports natural language inputs like "Monday", "tomorrow", "next week" using dateparser integration
 - **Centralized DateTimeService**: Comprehensive datetime parsing, validation, and formatting service
 - **Timezone-Safe Operations**: All datetime operations now properly handle timezone awareness
 - **Unified DateTime Handling**: Consistent datetime processing across all task creation flows
@@ -12,7 +13,9 @@ All notable changes to LarryBot2 will be documented in this file.
 - **Future Date Enforcement**: Automatic validation to prevent past due dates
 
 ### Changed
-- **Narrative Task Creation**: `/addtask` flow now uses centralized DateTimeService for consistent datetime handling
+- **Narrative Task Creation**: `/addtask` flow now supports natural language due dates (e.g., "Monday", "next week") in addition to YYYY-MM-DD format
+- **Task Creation Commands**: All task creation commands (`/add`, `/addtask`) now accept natural language date inputs
+- **Error Messages**: Updated date parsing error messages to inform users about natural language support
 - **Advanced Tasks Plugin**: All datetime operations migrated to use DateTimeService
 - **Task Service Layer**: Enhanced with timezone-aware datetime processing
 - **Task Repository**: Improved datetime handling for database operations
@@ -20,6 +23,8 @@ All notable changes to LarryBot2 will be documented in this file.
 - **Test Data**: Updated test fixtures to use future dates instead of past dates
 
 ### Technical Improvements
+- **Enhanced DateTimeService**: Added natural language parsing with graceful fallback to structured parsing
+- **Performance Optimization**: Structured parsing attempted first for optimal performance, NLP parsing as fallback
 - **Eliminated Naive Datetime Issues**: All datetime objects are now timezone-aware by default
 - **Consistent Timezone Handling**: Unified approach to timezone conversions and formatting
 - **Improved Error Messages**: Clear, user-friendly error messages for datetime validation failures

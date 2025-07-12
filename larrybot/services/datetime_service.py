@@ -21,29 +21,57 @@ class DateTimeService:
     """
     
     @staticmethod
-    def parse_user_date(date_str: str) -> Optional[datetime]:
+    def parse_user_date(date_str: str, use_nlp: bool = True) -> Optional[datetime]:
         """
-        Parse user input (YYYY-MM-DD) to timezone-aware datetime.
+        Parse user input to timezone-aware datetime.
+        
+        Supports both structured (YYYY-MM-DD) and natural language formats.
         
         Args:
-            date_str: Date string in YYYY-MM-DD format
+            date_str: Date string (YYYY-MM-DD or natural language like "Monday", "next week")
+            use_nlp: Whether to attempt NLP parsing after structured parsing fails
             
         Returns:
             Timezone-aware datetime at end of day (23:59:59) in local timezone,
             or None if parsing fails
         """
-        try:
-            # Parse as local date
-            local_date = datetime.strptime(date_str, '%Y-%m-%d')
-            # Convert to end of day in local timezone
-            local_datetime = local_date.replace(hour=23, minute=59, second=59, microsecond=999999)
-            # Make timezone-aware (assume local timezone)
-            timezone_aware = local_datetime.replace(tzinfo=timezone.utc)
-            logger.debug(f"Parsed date '{date_str}' to {timezone_aware}")
-            return timezone_aware
-        except ValueError as e:
-            logger.warning(f"Failed to parse date '{date_str}': {e}")
+        if not date_str or not date_str.strip():
+            logger.warning("Empty date string provided")
             return None
+            
+        date_str = date_str.strip()
+        
+        # Try structured parsing first (faster for known formats)
+        try:
+            local_date = datetime.strptime(date_str, '%Y-%m-%d')
+            local_datetime = local_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+            timezone_aware = local_datetime.replace(tzinfo=timezone.utc)
+            logger.debug(f"Parsed structured date '{date_str}' to {timezone_aware}")
+            return timezone_aware
+        except ValueError:
+            logger.debug(f"Structured parsing failed for '{date_str}', attempting NLP parsing")
+        
+        # Fallback to NLP parsing if enabled
+        if use_nlp:
+            try:
+                from dateparser import parse as parse_date
+                parsed_date = parse_date(date_str, settings={'PREFER_DATES_FROM': 'future'})
+                if parsed_date:
+                    # Ensure timezone-aware
+                    if parsed_date.tzinfo is None:
+                        parsed_date = parsed_date.replace(tzinfo=timezone.utc)
+                    
+                    # Convert to end of day for consistency with structured parsing
+                    end_of_day = parsed_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+                    logger.debug(f"Parsed NLP date '{date_str}' to {end_of_day}")
+                    return end_of_day
+                else:
+                    logger.debug(f"NLP parsing returned None for '{date_str}'")
+            except Exception as e:
+                logger.debug(f"NLP parsing failed for '{date_str}': {e}")
+        
+        logger.warning(f"Failed to parse date '{date_str}' with both structured and NLP methods")
+        return None
     
     @staticmethod
     def parse_user_datetime(datetime_str: str, format_str: str = '%Y-%m-%d %H:%M:%S') -> Optional[datetime]:

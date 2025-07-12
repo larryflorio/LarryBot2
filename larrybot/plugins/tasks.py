@@ -122,7 +122,7 @@ Examples:
             await update.message.reply_text(MessageFormatter.
                 format_error_message('Invalid date format',
                 MessageFormatter.escape_markdown(
-                'Please use YYYY-MM-DD format (e.g., 2025-07-15).')
+                'Please use natural language (e.g., "Monday", "next week") or YYYY-MM-DD format.')
                 ), parse_mode='MarkdownV2')
             return
     if len(args) > 3:
@@ -520,7 +520,7 @@ async def _handle_due_date_step(update_or_query, context: ContextTypes.
         if due_date is None:
             message = MessageFormatter.format_error_message(
                 'Invalid date format', MessageFormatter.escape_markdown(
-                'Please use YYYY-MM-DD format or select from the buttons.'))
+                'Please use natural language (e.g., "Monday", "next week") or YYYY-MM-DD format.'))
             if hasattr(update_or_query, 'edit_message_text'):
                 await update_or_query.edit_message_text(message, parse_mode
                     ='MarkdownV2')
