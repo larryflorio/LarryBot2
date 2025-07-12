@@ -665,7 +665,7 @@ async def _handle_client_step(update_or_query, context: ContextTypes.
     elif client_input is None:
         with next(get_session()) as session:
             client_repo = ClientRepository(session)
-            clients = client_repo.list_clients()
+            clients = client_repo.get_clients_with_task_counts()
         if not clients:
             client_id = None
             next_state = TaskCreationState.CONFIRMATION.value
@@ -676,12 +676,11 @@ async def _handle_client_step(update_or_query, context: ContextTypes.
                 for j in range(2):
                     if i + j < len(clients):
                         client = clients[i + j]
-                        task_count = len(client.tasks) if hasattr(client,
-                            'tasks') else 0
+                        task_count = client['active_task_count'] or 0
                         row.append(UnifiedButtonBuilder.create_button(text=
-                            f'👤 {MessageFormatter.escape_markdown(client.name)} ({task_count})'
+                            f'👤 {MessageFormatter.escape_markdown(client["name"])} ({task_count})'
                             , callback_data=
-                            f'addtask_step:client:{client.id}', button_type
+                            f'addtask_step:client:{client["id"]}', button_type
                             =ButtonType.INFO))
                 client_buttons.append(row)
             client_buttons.append([UnifiedButtonBuilder.create_button(text=
