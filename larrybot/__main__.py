@@ -105,6 +105,33 @@ async def async_main():
             logger.info(
                 '🤖 Initializing Telegram bot with network optimizations...')
             bot_handler = TelegramBotHandler(config, command_registry)
+            
+            # Set up persistent bot menu and commands
+            logger.info('📋 Setting up bot menu and commands...')
+            try:
+                from telegram import BotCommand
+                from telegram.error import TelegramError
+                from dotenv import load_dotenv
+                import os
+                
+                load_dotenv()
+                token = os.environ.get("TELEGRAM_BOT_TOKEN")
+                if token:
+                    bot = bot_handler.application.bot
+                    commands = [
+                        BotCommand("start", "Show main menu"),
+                        BotCommand("addtask", "Create a new task (narrative flow)"),
+                        BotCommand("list", "View your tasks"),
+                        BotCommand("agenda", "View your agenda"),
+                    ]
+                    await bot.set_my_commands(commands)
+                    await bot.set_chat_menu_button(menu_button={"type": "commands"})
+                    logger.info('✅ Bot menu and commands set successfully')
+                else:
+                    logger.warning('⚠️ TELEGRAM_BOT_TOKEN not found - skipping menu setup')
+            except Exception as e:
+                logger.warning(f'⚠️ Failed to set bot menu: {e}')
+            
             logger.info('🔌 Registering plugin event handlers...')
             register_event_handler(bot_handler.application, config.
                 ALLOWED_TELEGRAM_USER_ID)

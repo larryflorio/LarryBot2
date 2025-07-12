@@ -527,4 +527,63 @@ class TestTelegramBotHandler:
         # Test with no effective_user attribute
         mock_update = MagicMock()
         del mock_update.effective_user
-        assert not handler._is_authorized(mock_update) 
+        assert not handler._is_authorized(mock_update)
+
+    async def test_handle_add_task_narrative_flow(self, command_registry):
+        """Test that add task button starts the narrative flow."""
+        mock_config = MagicMock(spec=Config)
+        mock_config.TELEGRAM_BOT_TOKEN = "test_token"
+        mock_config.ALLOWED_TELEGRAM_USER_ID = 123456789
+        handler = TelegramBotHandler(mock_config, command_registry)
+        
+        # Create mock query
+        mock_query = MagicMock()
+        mock_query.from_user = MagicMock()
+        mock_query.from_user.id = 123456789
+        mock_query.edit_message_text = AsyncMock()
+        
+        # Create mock context
+        mock_context = MagicMock()
+        mock_context.user_data = {}
+        
+        # Test the narrative flow integration
+        with patch('larrybot.plugins.tasks.narrative_add_task_handler') as mock_narrative:
+            await handler._handle_add_task(mock_query, mock_context)
+            
+            # Verify narrative handler was called
+            mock_narrative.assert_called_once()
+            
+            # Verify the mock update was created correctly
+            call_args = mock_narrative.call_args
+            mock_update = call_args[0][0]
+            assert mock_update.effective_user == mock_query.from_user
+            assert mock_update.message.reply_text == mock_query.edit_message_text
+
+    async def test_handle_add_task_fallback(self, command_registry):
+        """Test that add task button falls back to help message if narrative flow fails."""
+        mock_config = MagicMock(spec=Config)
+        mock_config.TELEGRAM_BOT_TOKEN = "test_token"
+        mock_config.ALLOWED_TELEGRAM_USER_ID = 123456789
+        handler = TelegramBotHandler(mock_config, command_registry)
+        
+        # Create mock query
+        mock_query = MagicMock()
+        mock_query.from_user = MagicMock()
+        mock_query.from_user.id = 123456789
+        mock_query.edit_message_text = AsyncMock()
+        
+        # Create mock context
+        mock_context = MagicMock()
+        mock_context.user_data = {}
+        
+        # Test the fallback behavior when narrative flow raises an exception
+        with patch('larrybot.plugins.tasks.narrative_add_task_handler', side_effect=Exception("Test error")):
+            await handler._handle_add_task(mock_query, mock_context)
+            
+            # Verify fallback message was sent
+            mock_query.edit_message_text.assert_called_once()
+            call_args = mock_query.edit_message_text.call_args
+            message = call_args[0][0]
+            assert "Add New Task" in message
+            assert "/addtask" in message
+            assert "Try \\`/addtask\\` for the best experience" in message 

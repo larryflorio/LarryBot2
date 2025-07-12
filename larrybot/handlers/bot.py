@@ -1875,31 +1875,51 @@ Ready to boost your productivity? Here's what you can do:"""
 
     async def _handle_add_task(self, query, context: ContextTypes.DEFAULT_TYPE
         ) ->None:
-        """Handle add task button press - guide user to use the /add command."""
+        """Handle add task button press - start the narrative task creation flow."""
+        from larrybot.plugins.tasks import narrative_add_task_handler
         from larrybot.utils.ux_helpers import MessageFormatter
-        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-        context.user_data['add_task_mode'] = True
-        message = '📝 **Add New Task**\n\n'
-        message += '**How to add a task:**\n'
-        message += '• Use `/add <description>` for a simple task\n'
-        message += '• Use `/add <description> priority:<level>` for priority\n'
-        message += '• Use `/add <description> due:<date>` for due date\n'
-        message += (
-            '• Use `/add <description> client:<name>` for client assignment\n\n'
-            )
-        message += '**Examples:**\n'
-        message += '• `/add Review quarterly reports`\n'
-        message += '• `/add Call client priority:High due:tomorrow`\n'
-        message += '• `/add Prepare presentation client:John Doe`\n\n'
-        message += '**Tip:** You can combine multiple options in one command!'
-        escaped_message = MessageFormatter.escape_markdown(message)
-        keyboard = InlineKeyboardMarkup([[UnifiedButtonBuilder.
-            create_button(text='📋 View Tasks', callback_data=
-            'tasks_refresh', button_type=ButtonType.INFO),
-            UnifiedButtonBuilder.create_button(text='❌ Cancel',
-            callback_data='cancel_action', button_type=ButtonType.INFO)]])
-        await safe_edit(query.edit_message_text, escaped_message,
-            reply_markup=keyboard, parse_mode='MarkdownV2')
+        from unittest.mock import Mock
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        
+        try:
+            # Create a mock update object for the narrative handler
+            class MockUpdate:
+                def __init__(self, query):
+                    self.effective_user = query.from_user
+                    self.message = Mock()
+                    self.message.reply_text = query.edit_message_text
+            
+            # Start the narrative flow
+            mock_update = MockUpdate(query)
+            await narrative_add_task_handler(mock_update, context)
+            
+        except Exception as e:
+            # Fallback to original behavior if narrative flow fails
+            logger.error(f"Error starting narrative task creation: {e}")
+            message = '📝 **Add New Task**\n\n'
+            message += '**How to add a task:**\n'
+            message += '• Use `/addtask` for guided task creation\n'
+            message += '• Use `/add <description>` for a simple task\n'
+            message += '• Use `/add <description> priority:<level>` for priority\n'
+            message += '• Use `/add <description> due:<date>` for due date\n'
+            message += (
+                '• Use `/add <description> client:<name>` for client assignment\n\n'
+                )
+            message += '**Examples:**\n'
+            message += '• `/addtask` - Start guided task creation\n'
+            message += '• `/add Review quarterly reports`\n'
+            message += '• `/add Call client priority:High due:tomorrow`\n\n'
+            message += '**Tip:** Try `/addtask` for the best experience!'
+            escaped_message = MessageFormatter.escape_markdown(message)
+            keyboard = InlineKeyboardMarkup([[UnifiedButtonBuilder.
+                create_button(text='📋 View Tasks', callback_data=
+                'tasks_refresh', button_type=ButtonType.INFO),
+                UnifiedButtonBuilder.create_button(text='❌ Cancel',
+                callback_data='cancel_action', button_type=ButtonType.INFO)]])
+            await safe_edit(query.edit_message_text, escaped_message,
+                reply_markup=keyboard, parse_mode='MarkdownV2')
 
     async def _handle_help_quick(self, query, context: ContextTypes.DEFAULT_TYPE
         ) ->None:
