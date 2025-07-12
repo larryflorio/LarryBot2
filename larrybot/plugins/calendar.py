@@ -90,79 +90,83 @@ def extract_video_call_link(event):
     return None
 
 
-@command_handler('/agenda', "Show today's agenda",
-    'Usage: /agenda [account_id]', 'calendar')
-async def agenda_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
-    ) ->None:
-    """Show today's calendar agenda with rich formatting."""
+@command_handler("/agenda", "Show today's agenda", "Usage: /agenda", "calendar")
+async def agenda_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show today's calendar agenda with rich formatting (multi-account)."""
     try:
-        account_id = context.args[0] if context.args else None
         with next(get_session()) as session:
             repo = CalendarTokenRepository(session)
-            if account_id:
-                token = repo.get_token_by_account('google', account_id)
-                if not token:
-                    await update.message.reply_text(MessageFormatter.
-                        format_error_message('Account Not Found',
-                        f"Account '{account_id}' not found. Use /accounts to see available accounts."
-                        ), parse_mode='MarkdownV2')
-                    return
-                tokens = [token]
-            else:
-                tokens = repo.get_active_tokens('google')
-                if not tokens:
-                    await update.message.reply_text(MessageFormatter.
-                        format_info_message('📅 Calendar Not Connected', {
-                        'Status': 'No Google Calendar accounts connected',
-                        'Action':
-                        'Use /connect_google to connect your first calendar',
-                        'Features':
-                        'View agenda, sync events, and manage schedule'}),
-                        parse_mode='MarkdownV2')
-                    return
+            tokens = repo.get_active_tokens('google')
+            print("[DEBUG] /agenda get_active_tokens returned:")
+            for t in tokens:
+                print(f"  account_id={t.account_id}, account_name={t.account_name}, is_active={getattr(t, 'is_active', None)}")
+            if not tokens:
+                await update.message.reply_text(
+                    MessageFormatter.format_info_message(
+                        "📅 Calendar Not Connected",
+                        {
+                            "Status": "No Google Calendar accounts connected",
+                            "Action": "Use /connect_google to connect your calendar",
+                            "Features": "View agenda, sync events, and manage schedule"
+                        }
+                    ),
+                    parse_mode='MarkdownV2'
+                )
+                return
             try:
-                with open(CLIENT_SECRET_FILE, 'r') as f:
-                    secrets = json.load(f)['installed']
+                with open(CLIENT_SECRET_FILE, "r") as f:
+                    secrets = json.load(f)["installed"]
             except (FileNotFoundError, KeyError, json.JSONDecodeError) as e:
-                await update.message.reply_text(MessageFormatter.
-                    format_error_message('Configuration Error',
-                    f'Failed to load client configuration: {e}'),
-                    parse_mode='MarkdownV2')
+                await update.message.reply_text(
+                    MessageFormatter.format_error_message(
+                        "Configuration Error",
+                        f"Failed to load client configuration: {e}"
+                    ),
+                    parse_mode='MarkdownV2'
+                )
                 return
             all_events = []
             account_names = []
+            api_failures = 0
             for token in tokens:
-                creds = Credentials(token=token.access_token, refresh_token
-                    =token.refresh_token, token_uri=
-                    'https://oauth2.googleapis.com/token', client_id=
-                    secrets['client_id'], client_secret=secrets[
-                    'client_secret'], expiry=token.expiry, scopes=SCOPES)
+                creds = Credentials(
+                    token=token.access_token,
+                    refresh_token=token.refresh_token,
+                    token_uri="https://oauth2.googleapis.com/token",
+                    client_id=secrets["client_id"],
+                    client_secret=secrets["client_secret"],
+                    expiry=token.expiry,
+                    scopes=SCOPES
+                )
                 if creds.expired and creds.refresh_token:
                     try:
                         await run_in_thread(creds.refresh, Request())
-                        repo.update_token(provider='google', account_id=
-                            token.account_id, access_token=creds.token,
-                            refresh_token=creds.refresh_token, expiry=creds
-                            .expiry)
+                        repo.update_token(
+                            provider='google',
+                            account_id=token.account_id,
+                            access_token=creds.token,
+                            refresh_token=creds.refresh_token,
+                            expiry=creds.expiry
+                        )
                     except Exception as e:
-                        print(
-                            f'Warning: Token refresh failed for account {token.account_name}: {e}'
-                            )
+                        api_failures += 1
                         continue
                 try:
-                    service = await run_in_thread(build, 'calendar', 'v3',
-                        credentials=creds)
+                    service = await run_in_thread(build, "calendar", "v3", credentials=creds)
                     today = datetime.now(timezone.utc).date()
-                    start_of_day = datetime.combine(today, datetime.min.
-                        time(), tzinfo=timezone.utc)
-                    end_of_day = datetime.combine(today, datetime.max.time(
-                        ), tzinfo=timezone.utc)
-                    events_result = await run_in_thread(service.events().
-                        list, calendarId='primary', timeMin=start_of_day.
-                        isoformat(), timeMax=end_of_day.isoformat(),
-                        maxResults=20, singleEvents=True, orderBy='startTime')
+                    start_of_day = datetime.combine(today, datetime.min.time(), tzinfo=timezone.utc)
+                    end_of_day = datetime.combine(today, datetime.max.time(), tzinfo=timezone.utc)
+                    events_result = await run_in_thread(
+                        service.events().list,
+                        calendarId="primary",
+                        timeMin=start_of_day.isoformat(),
+                        timeMax=end_of_day.isoformat(),
+                        maxResults=20,
+                        singleEvents=True,
+                        orderBy="startTime"
+                    )
                     events = await run_in_thread(events_result.execute)
-                    items = events.get('items', [])
+                    items = events.get("items", [])
                     for event in items:
                         event['_account_name'] = token.account_name
                         event['_account_id'] = token.account_id
@@ -170,119 +174,71 @@ async def agenda_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
                         all_events.append(event)
                     account_names.append(token.account_name)
                 except Exception as e:
-                    print(
-                        f'Warning: Failed to fetch events for account {token.account_name}: {e}'
-                        )
+                    api_failures += 1
                     continue
-            if not all_events:
-                account_info = (f" \\({', '.join(account_names)}\\)" if
-                    account_id else '')
-                await update.message.reply_text(MessageFormatter.
-                    format_info_message(f"📅 Today's Agenda{account_info}",
-                    {'Status': 'No events scheduled for today', 'Date':
-                    today.strftime('%Y-%m-%d'), 'Accounts': ', '.join(
-                    account_names), 'Suggestion':
-                    'Enjoy your free time or add some tasks!'}), parse_mode
-                    ='MarkdownV2')
+            if api_failures == len(tokens):
+                await update.message.reply_text(
+                    MessageFormatter.format_error_message(
+                        "Unexpected error",
+                        "An unexpected error occurred: All calendar API calls failed."
+                    ),
+                    parse_mode='MarkdownV2'
+                )
                 return
-            all_events.sort(key=lambda x: x['start'].get('dateTime', x[
-                'start'].get('date')))
+            if not all_events:
+                await update.message.reply_text(
+                    MessageFormatter.format_info_message(
+                        "📅 Today's Agenda",
+                        {
+                            "Status": "No events scheduled for today",
+                            "Date": datetime.now(timezone.utc).strftime('%Y-%m-%d'),
+                            "Accounts": ', '.join(account_names),
+                            "Suggestion": "Enjoy your free time or add some tasks!"
+                        }
+                    ),
+                    parse_mode='MarkdownV2'
+                )
+                return
+            all_events.sort(key=lambda x: x['start'].get('dateTime', x['start'].get('date')))
             today = datetime.now(timezone.utc).date()
-            message = f"""📅 **Today's Agenda** \\({MessageFormatter.escape_markdown(today.strftime('%B %d, %Y'))}\\)
-
-"""
-            message += f'📋 *{len(all_events)} Events Scheduled*\n\n'
-            now = datetime.now(timezone.utc)
-            next_event_index = None
-            for i, event in enumerate(all_events):
-                start = event['start'].get('dateTime', event['start'].get(
-                    'date'))
-                if 'T' in start:
-                    try:
-                        event_time = datetime.fromisoformat(start.replace(
-                            'Z', '+00:00'))
-                        if event_time > now:
-                            next_event_index = i
-                            break
-                    except:
-                        pass
+            message = f"📅 **Today's Agenda** \\({MessageFormatter.escape_markdown(today.strftime('%B %d, %Y'))}\\)\n\n"
+            message += f"📋 *{len(all_events)} Events Scheduled*\n\n"
             for i, event in enumerate(all_events, 1):
-                if i > 1:
-                    message += '────────────\n'
-                start = event['start'].get('dateTime', event['start'].get(
-                    'date'))
-                end = event['end'].get('dateTime', event['end'].get('date')
-                    ) if 'end' in event else None
+                start = event['start'].get('dateTime', event['start'].get('date'))
                 summary = event.get('summary') or '(No title)'
                 location = event.get('location', '')
                 description = event.get('description', '')
                 account_name = event.get('_account_name', 'Unknown')
-                account_email = event.get('_account_email', '')
                 if 'T' in start:
                     try:
-                        event_time = datetime.fromisoformat(start.replace(
-                            'Z', '+00:00'))
+                        event_time = datetime.fromisoformat(start.replace('Z', '+00:00'))
                         time_str = event_time.strftime('%I:%M %p')
                     except:
                         time_str = start
                 else:
                     time_str = 'All day'
-                duration_str = ''
-                if end and 'T' in start and 'T' in end:
-                    try:
-                        start_dt = datetime.fromisoformat(start.replace('Z',
-                            '+00:00'))
-                        end_dt = datetime.fromisoformat(end.replace('Z',
-                            '+00:00'))
-                        duration = end_dt - start_dt
-                        total_minutes = int(duration.total_seconds() // 60)
-                        hours = total_minutes // 60
-                        minutes = total_minutes % 60
-                        if hours and minutes:
-                            duration_str = f' ({hours}h {minutes}m)'
-                        elif hours:
-                            duration_str = f' ({hours}h)'
-                        elif minutes:
-                            duration_str = f' ({minutes}m)'
-                    except:
-                        duration_str = ''
-                next_indicator = '⏭️ ' if i - 1 == next_event_index else ''
-                safe_summary = MessageFormatter.escape_markdown(summary)
-                message += f'{next_indicator}{i}\\. *{safe_summary}*\n'
-                message += (
-                    f'   🕐 {MessageFormatter.escape_markdown(time_str + duration_str)}\n'
-                    )
+                message += f"{i}\\. **{MessageFormatter.escape_markdown(summary)}**\n"
+                message += f"   🕐 {MessageFormatter.escape_markdown(time_str)}\n"
                 if account_name and account_name != 'Unknown':
-                    message += (
-                        f'   🗂️ {MessageFormatter.escape_markdown(account_name)}\n'
-                        )
-                elif account_email:
-                    message += (
-                        f'   🗂️ {MessageFormatter.escape_markdown(account_email)}\n'
-                        )
+                    message += f"   🗂️ {MessageFormatter.escape_markdown(account_name)}\n"
                 if location:
-                    message += (
-                        f'   📍 {MessageFormatter.escape_markdown(location)}\n')
-                video_link = extract_video_call_link(event)
-                if video_link:
-                    message += f"""   🎥 {MessageFormatter.escape_markdown(video_link['platform'])}: {MessageFormatter.escape_markdown(video_link['url'])}
-"""
-                elif description:
-                    desc_preview = description[:50] + '...' if len(description
-                        ) > 50 else description
-                    message += (
-                        f'   📝 {MessageFormatter.escape_markdown(desc_preview)}\n'
-                        )
-                message += '\n'
-            await update.message.reply_text(message, parse_mode=
-                'MarkdownV2', reply_markup=InlineKeyboardMarkup([[
-                UnifiedButtonBuilder.create_button(text='🔄 Refresh',
-                callback_data='calendar_refresh', button_type=ButtonType.SECONDARY), UnifiedButtonBuilder.create_button(text=
-                '🏠 Main Menu', callback_data='nav_main', button_type=ButtonType.INFO)]]))
+                    message += f"   📍 {MessageFormatter.escape_markdown(location)}\n"
+                if description:
+                    desc_preview = description[:100] + "..." if len(description) > 100 else description
+                    message += f"   📝 {MessageFormatter.escape_markdown(desc_preview)}\n"
+                message += "\n"
+            await update.message.reply_text(
+                message,
+                parse_mode='MarkdownV2'
+            )
     except Exception as e:
-        await update.message.reply_text(MessageFormatter.
-            format_error_message('Unexpected error',
-            f'An unexpected error occurred: {e}'), parse_mode='MarkdownV2')
+        await update.message.reply_text(
+            MessageFormatter.format_error_message(
+                "Unexpected error",
+                f"An unexpected error occurred: {e}"
+            ),
+            parse_mode='MarkdownV2'
+        )
 
 
 @command_handler('/accounts', 'List connected calendar accounts',
