@@ -2878,7 +2878,7 @@ Choose what you'd like to learn about:"""
                 overdue_result = await task_service.get_tasks_with_filters(
                     overdue_only=True)
                 due_today_result = await task_service.get_tasks_with_filters(
-                    due_after=start_of_today, due_before=end_of_today)
+                    due_after=start_of_today, due_before=end_of_today, done=False)
                 overdue_tasks = overdue_result['data'] if overdue_result[
                     'success'] else []
                 due_today_tasks = due_today_result['data'] if due_today_result[
