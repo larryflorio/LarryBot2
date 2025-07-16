@@ -80,11 +80,9 @@ class CalendarService:
                                 continue
                         service = await run_in_thread(build, 'calendar',
                             'v3', credentials=creds)
-                        today = get_current_datetime().date()
-                        start_of_day = datetime.combine(today, datetime.min
-                            .time(), tzinfo=timezone.utc)
-                        end_of_day = datetime.combine(today, datetime.max.
-                            time(), tzinfo=timezone.utc)
+                        from larrybot.services.datetime_service import DateTimeService
+                        start_of_day = DateTimeService.get_start_of_day()
+                        end_of_day = DateTimeService.get_end_of_day()
                         events_result = await run_in_thread(service.events(
                             ).list, calendarId='primary', timeMin=
                             start_of_day.isoformat(), timeMax=end_of_day.

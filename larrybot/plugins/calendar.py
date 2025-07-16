@@ -153,9 +153,9 @@ async def agenda_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                         continue
                 try:
                     service = await run_in_thread(build, "calendar", "v3", credentials=creds)
-                    today = datetime.now(timezone.utc).date()
-                    start_of_day = datetime.combine(today, datetime.min.time(), tzinfo=timezone.utc)
-                    end_of_day = datetime.combine(today, datetime.max.time(), tzinfo=timezone.utc)
+                    from larrybot.services.datetime_service import DateTimeService
+                    start_of_day = DateTimeService.get_start_of_day()
+                    end_of_day = DateTimeService.get_end_of_day()
                     events_result = await run_in_thread(
                         service.events().list,
                         calendarId="primary",
@@ -200,7 +200,8 @@ async def agenda_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 )
                 return
             all_events.sort(key=lambda x: x['start'].get('dateTime', x['start'].get('date')))
-            today = datetime.now(timezone.utc).date()
+            from larrybot.services.datetime_service import DateTimeService
+            today = DateTimeService.get_start_of_day().date()
             message = f"📅 **Today's Agenda** \\({MessageFormatter.escape_markdown(today.strftime('%B %d, %Y'))}\\)\n\n"
             message += f"📋 *{len(all_events)} Events Scheduled*\n\n"
             for i, event in enumerate(all_events, 1):

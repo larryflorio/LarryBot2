@@ -1277,11 +1277,11 @@ Are you sure you want to delete this habit?"""
                     message += f'   📅 {status_text}\n'
                     if habit.last_completed:
                         message += (
-                            f"   🕐 Last: {habit.last_completed.strftime('%Y-%m-%d')}\n"
+                            f"   🕐 Last: {MessageFormatter.escape_markdown(habit.last_completed.strftime('%Y-%m-%d'))}\n"
                             )
                     if habit.created_at:
                         message += (
-                            f"   📅 Created: {habit.created_at.strftime('%Y-%m-%d')}\n"
+                            f"   📅 Created: {MessageFormatter.escape_markdown(habit.created_at.strftime('%Y-%m-%d'))}\n"
                             )
                     message += '\n'
                     habit_buttons = []
