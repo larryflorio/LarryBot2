@@ -6,6 +6,7 @@ for integration with daily reports and other features.
 """
 import json
 import asyncio
+import logging
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 from google.auth.transport.requests import Request
@@ -17,6 +18,8 @@ from larrybot.utils.datetime_utils import get_current_datetime
 SCOPES = ['https://www.googleapis.com/auth/calendar.readonly',
     'https://www.googleapis.com/auth/userinfo.email', 'openid']
 CLIENT_SECRET_FILE = 'client_secret.json'
+
+logger = logging.getLogger(__name__)
 
 
 async def run_in_thread(func, *args, **kwargs):
@@ -83,6 +86,7 @@ class CalendarService:
                         from larrybot.services.datetime_service import DateTimeService
                         start_of_day = DateTimeService.get_start_of_day()
                         end_of_day = DateTimeService.get_end_of_day()
+                        logger.debug(f"Fetching events from {start_of_day} to {end_of_day}")
                         events_result = await run_in_thread(service.events(
                             ).list, calendarId='primary', timeMin=
                             start_of_day.isoformat(), timeMax=end_of_day.

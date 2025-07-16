@@ -269,11 +269,14 @@ class DateTimeService:
         """
         Get start of day (00:00:00) for the given datetime or today.
         
+        For calendar operations, this returns the start of the local day.
+        For general use, this respects the input timezone.
+        
         Args:
             dt: Datetime to get start of day for, or None for today
             
         Returns:
-            Start of day datetime in local timezone
+            Start of day datetime in the same timezone as input
         """
         if dt is None:
             dt = get_current_datetime()
@@ -282,20 +285,38 @@ class DateTimeService:
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
         
-        start_of_day = dt.replace(hour=0, minute=0, second=0, microsecond=0)
-        logger.debug(f"Start of day for {dt}: {start_of_day}")
-        return start_of_day
-    
+        # Use TimeZoneService for proper timezone handling
+        from larrybot.core.timezone import get_timezone_service
+        tz_service = get_timezone_service()
+        
+        # Convert to local timezone for day boundary calculation
+        local_dt = tz_service.to_local(dt)
+        local_start_of_day = local_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        # Convert back to the original timezone
+        if dt.tzinfo == timezone.utc:
+            # For UTC input, return the local start of day converted to UTC
+            result = tz_service.to_utc(local_start_of_day)
+        else:
+            # For other timezones, convert local start of day to that timezone
+            result = local_start_of_day.astimezone(dt.tzinfo)
+        
+        logger.debug(f"Start of day for {dt}: {result}")
+        return result
+
     @staticmethod
     def get_end_of_day(dt: Optional[datetime] = None) -> datetime:
         """
         Get end of day (23:59:59) for the given datetime or today.
         
+        For calendar operations, this returns the end of the local day.
+        For general use, this respects the input timezone.
+        
         Args:
             dt: Datetime to get end of day for, or None for today
             
         Returns:
-            End of day datetime in local timezone
+            End of day datetime in the same timezone as input
         """
         if dt is None:
             dt = get_current_datetime()
@@ -304,9 +325,24 @@ class DateTimeService:
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
         
-        end_of_day = dt.replace(hour=23, minute=59, second=59, microsecond=999999)
-        logger.debug(f"End of day for {dt}: {end_of_day}")
-        return end_of_day
+        # Use TimeZoneService for proper timezone handling
+        from larrybot.core.timezone import get_timezone_service
+        tz_service = get_timezone_service()
+        
+        # Convert to local timezone for day boundary calculation
+        local_dt = tz_service.to_local(dt)
+        local_end_of_day = local_dt.replace(hour=23, minute=59, second=59, microsecond=999999)
+        
+        # Convert back to the original timezone
+        if dt.tzinfo == timezone.utc:
+            # For UTC input, return the local end of day converted to UTC
+            result = tz_service.to_utc(local_end_of_day)
+        else:
+            # For other timezones, convert local end of day to that timezone
+            result = local_end_of_day.astimezone(dt.tzinfo)
+        
+        logger.debug(f"End of day for {dt}: {result}")
+        return result
     
     @staticmethod
     def is_today(dt: datetime) -> bool:
