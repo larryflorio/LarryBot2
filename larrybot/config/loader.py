@@ -25,6 +25,11 @@ class Config:
         self.TIMEZONE: str = os.getenv('TIMEZONE', '')
         self.TIMEZONE_AUTO_DETECT: bool = os.getenv('TIMEZONE_AUTO_DETECT',
             'true').lower() == 'true'
+        
+        # Google API Client Configuration
+        self.GOOGLE_API_CACHE_DISCOVERY: bool = os.getenv('GOOGLE_API_CACHE_DISCOVERY', 'false').lower() == 'true'
+        self.GOOGLE_API_STATIC_DISCOVERY: bool = os.getenv('GOOGLE_API_STATIC_DISCOVERY', 'false').lower() == 'true'
+        self.GOOGLE_API_SUPPRESS_WARNINGS: bool = os.getenv('GOOGLE_API_SUPPRESS_WARNINGS', 'true').lower() == 'true'
 
     def validate(self) ->None:
         """Validate required configuration values."""

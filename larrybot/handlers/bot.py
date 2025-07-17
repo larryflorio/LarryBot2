@@ -40,6 +40,11 @@ class TelegramBotHandler:
     def __init__(self, config: Config, command_registry: CommandRegistry):
         self.config = config
         self.command_registry = command_registry
+        
+        # Configure Google API logging to suppress deprecated warnings
+        from larrybot.utils.telegram_safe import configure_google_api_logging
+        configure_google_api_logging(self.config)
+        
         request = HTTPXRequest(connection_pool_size=8, connect_timeout=10.0,
             read_timeout=20.0, write_timeout=20.0, pool_timeout=5.0)
         self.application = Application.builder().token(self.config.
@@ -2893,7 +2898,7 @@ Choose what you'd like to learn about:"""
                     if last_completed != today_date:
                         habits_due.append(habit)
             from larrybot.services.calendar_service import CalendarService
-            calendar_service = CalendarService()
+            calendar_service = CalendarService(config=self.config)
             calendar_events = await calendar_service.get_todays_events()
             events = []
             for event in calendar_events:

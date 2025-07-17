@@ -15,6 +15,7 @@ from googleapiclient.discovery import build
 from larrybot.storage.db import get_session
 from larrybot.storage.calendar_token_repository import CalendarTokenRepository
 from larrybot.utils.datetime_utils import get_current_datetime
+
 SCOPES = ['https://www.googleapis.com/auth/calendar.readonly',
     'https://www.googleapis.com/auth/userinfo.email', 'openid']
 CLIENT_SECRET_FILE = 'client_secret.json'
@@ -31,8 +32,9 @@ async def run_in_thread(func, *args, **kwargs):
 class CalendarService:
     """Service for fetching calendar events from all connected accounts."""
 
-    def __init__(self):
+    def __init__(self, config=None):
         self.client_secrets = None
+        self.config = config
         self._load_client_secrets()
 
     def _load_client_secrets(self):
@@ -41,8 +43,31 @@ class CalendarService:
             with open(CLIENT_SECRET_FILE, 'r') as f:
                 self.client_secrets = json.load(f)['installed']
         except (FileNotFoundError, KeyError, json.JSONDecodeError) as e:
-            print(f'Warning: Failed to load client secrets: {e}')
+            logger.warning(f'Failed to load client secrets: {e}')
             self.client_secrets = None
+
+    def _build_calendar_service(self, credentials: Credentials):
+        """
+        Build Google Calendar service with modern configuration.
+        
+        Args:
+            credentials: Google OAuth credentials
+            
+        Returns:
+            Google Calendar service instance
+        """
+        # Use configuration-based settings or defaults
+        cache_discovery = getattr(self.config, 'GOOGLE_API_CACHE_DISCOVERY', False) if self.config else False
+        static_discovery = getattr(self.config, 'GOOGLE_API_STATIC_DISCOVERY', False) if self.config else False
+        
+        # Use modern configuration to avoid deprecated file cache warnings
+        return build(
+            'calendar', 
+            'v3', 
+            credentials=credentials,
+            cache_discovery=cache_discovery,  # Use config or disable deprecated file cache
+            static_discovery=static_discovery  # Use config or dynamic discovery for better compatibility
+        )
 
     async def get_todays_events(self) ->List[Dict[str, Any]]:
         """
@@ -77,12 +102,14 @@ class CalendarService:
                                     access_token=creds.token, refresh_token
                                     =creds.refresh_token, expiry=creds.expiry)
                             except Exception as e:
-                                print(
-                                    f'Warning: Token refresh failed for account {token.account_name}: {e}'
+                                logger.warning(
+                                    f'Token refresh failed for account {token.account_name}: {e}'
                                     )
                                 continue
-                        service = await run_in_thread(build, 'calendar',
-                            'v3', credentials=creds)
+                        
+                        # Use the new service builder method
+                        service = await run_in_thread(self._build_calendar_service, creds)
+                        
                         from larrybot.services.datetime_service import DateTimeService
                         start_of_day = DateTimeService.get_start_of_day()
                         end_of_day = DateTimeService.get_end_of_day()
@@ -100,15 +127,15 @@ class CalendarService:
                             event['_account_email'] = token.account_email
                             all_events.append(event)
                     except Exception as e:
-                        print(
-                            f'Warning: Failed to fetch events for account {token.account_name}: {e}'
+                        logger.warning(
+                            f'Failed to fetch events for account {token.account_name}: {e}'
                             )
                         continue
                 all_events.sort(key=lambda x: x['start'].get('dateTime', x[
                     'start'].get('date')))
                 return all_events
         except Exception as e:
-            print(f'Error fetching calendar events: {e}')
+            logger.error(f'Error fetching calendar events: {e}')
             return []
 
     def format_event_for_daily_report(self, event: Dict[str, Any]) ->Dict[

@@ -152,7 +152,16 @@ async def agenda_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                         api_failures += 1
                         continue
                 try:
-                    service = await run_in_thread(build, "calendar", "v3", credentials=creds)
+                    # Use modern configuration to avoid deprecated file cache warnings
+                    service = await run_in_thread(
+                        lambda: build(
+                            "calendar", 
+                            "v3", 
+                            credentials=creds,
+                            cache_discovery=False,  # Disable deprecated file cache
+                            static_discovery=False  # Use dynamic discovery for better compatibility
+                        )
+                    )
                     from larrybot.services.datetime_service import DateTimeService
                     start_of_day = DateTimeService.get_start_of_day()
                     end_of_day = DateTimeService.get_end_of_day()
@@ -329,8 +338,16 @@ async def connect_google_handler(update: Update, context: ContextTypes.
             account_id = str(uuid.uuid4())[:8]
             account_email = None
             try:
-                service = await run_in_thread(build, 'oauth2', 'v2',
-                    credentials=creds)
+                # Use modern configuration to avoid deprecated file cache warnings
+                service = await run_in_thread(
+                    lambda: build(
+                        'oauth2', 
+                        'v2',
+                        credentials=creds,
+                        cache_discovery=False,  # Disable deprecated file cache
+                        static_discovery=False  # Use dynamic discovery for better compatibility
+                    )
+                )
                 user_info = await run_in_thread(service.userinfo().get().
                     execute)
                 account_email = user_info.get('email')
@@ -338,7 +355,9 @@ async def connect_google_handler(update: Update, context: ContextTypes.
                     str):
                     account_email = str(account_email)
             except Exception as e:
-                print(f'Warning: Could not retrieve user email: {e}')
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f'Could not retrieve user email: {e}')
                 account_email = None
             with next(get_session()) as session:
                 repo = CalendarTokenRepository(session)
