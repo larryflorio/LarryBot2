@@ -210,6 +210,10 @@ async def agenda_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 location = event.get('location', '')
                 description = event.get('description', '')
                 account_name = event.get('_account_name', 'Unknown')
+                
+                # Extract video call link
+                video_link = extract_video_call_link(event)
+                
                 if 'T' in start:
                     try:
                         event_time = datetime.fromisoformat(start.replace('Z', '+00:00'))
@@ -224,6 +228,8 @@ async def agenda_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     message += f"   🗂️ {MessageFormatter.escape_markdown(account_name)}\n"
                 if location:
                     message += f"   📍 {MessageFormatter.escape_markdown(location)}\n"
+                if video_link:
+                    message += f"   🎥 [{video_link['platform']}]({video_link['url']})\n"
                 if description:
                     desc_preview = description[:100] + "..." if len(description) > 100 else description
                     message += f"   📝 {MessageFormatter.escape_markdown(desc_preview)}\n"
