@@ -1064,7 +1064,7 @@ class ProgressiveDisclosureBuilder:
         # Custom actions: Attach File, Add Note, View Attachments
         custom_actions = [
             UnifiedButtonBuilder.create_button(
-                text='📎 Attach File',
+                text='📎 Attach',
                 callback_data=f'task_attach_file:{task_id}',
                 button_type=ButtonType.SECONDARY,
                 custom_emoji='📎'
