@@ -372,7 +372,7 @@ async def clientanalytics_handler(update: Update, context: ContextTypes.
             if overall_rate < 50:
                 message += f'• ⚠️ **Overall performance is below 50%**\n'
             elif overall_rate >= 80:
-                message += f'• 🎉 **Excellent overall performance!**\n'
+                message += f'• 🎉 **Excellent overall performance\\!**\n'
         await update.message.reply_text(message, parse_mode='MarkdownV2')
 
 

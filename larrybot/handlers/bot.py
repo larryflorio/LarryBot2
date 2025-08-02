@@ -626,7 +626,7 @@ Please try again or use the command interface."""
                         ['High', 'Critical'])
                     details = {'Task': completed_task.description, 'Status':
                         'Completed', 'Message':
-                        '🎉 Great work! Keep up the momentum!'}
+                        '🎉 Great work\\! Keep up the momentum\\!'}
                     print(
                         f'[DEBUG] About to call format_success_message with details type: {type(details)}, value: {details}'
                         )
@@ -648,7 +648,7 @@ Please try again or use the command interface."""
                                 '• Use filters to organize tasks')
                     else:
                         suggestions.append(
-                            '🎉 **All tasks complete!** Time to celebrate!')
+                            '🎉 **All tasks complete\\!** Time to celebrate\\!')
                         suggestions.append('💡 **Suggestions:**')
                         suggestions.append('• Add new tasks to stay productive'
                             )
@@ -1629,7 +1629,7 @@ Ready to boost your productivity? Here's what you can do:"""
         from larrybot.plugins.tasks import list_tasks
         from larrybot.plugins.tasks import search_tasks
         from larrybot.plugins.reminder import add_reminder
-        from larrybot.plugins.analytics import show_analytics
+        # Removed incorrect import - analytics functionality is handled by advanced_tasks plugin
         command = processed_input.suggested_command
         params = processed_input.suggested_parameters
         try:
@@ -1652,7 +1652,12 @@ Ready to boost your productivity? Here's what you can do:"""
                 due_date = params.get('due_date')
                 await add_reminder(update, context, task_name, due_date)
             elif command == '/analytics':
-                await show_analytics(update, context)
+                # Analytics functionality is handled by the advanced_tasks plugin
+                # The user should use /analytics command directly
+                await update.message.reply_text(
+                    "📊 Use the /analytics command to view task analytics.",
+                    parse_mode='MarkdownV2'
+                )
         except Exception as e:
             logger.error(f'Error executing suggested command {command}: {e}')
             await update.message.reply_text(
