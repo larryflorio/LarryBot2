@@ -3351,18 +3351,38 @@ Track time spent on this task to monitor productivity\\.
     async def _handle_task_analytics(self, query, context: ContextTypes.DEFAULT_TYPE, task_id: int) -> None:
         """Handle task analytics button press."""
         try:
-            from larrybot.plugins.advanced_tasks.analytics import analytics_handler
+            from larrybot.plugins.advanced_tasks import get_task_service
+            from larrybot.utils.ux_helpers import MessageFormatter
             
-            # Create a mock update object for the analytics handler
-            mock_update = type('MockUpdate', (), {
-                'message': query.message,
-                'effective_user': query.from_user
-            })()
+            # Get the task service
+            task_service = get_task_service()
             
-            # Set context args to focus on the specific task
-            context.args = [str(task_id)]
+            # Get analytics data for the past 30 days
+            result = await task_service.get_advanced_task_analytics(30)
             
-            await analytics_handler(mock_update, context)
+            if result['success']:
+                analytics_data = result['data']
+                
+                # Use the proper analytics formatter
+                formatted_message = MessageFormatter.format_task_analytics(analytics_data)
+                
+                # Add back to task button
+                from larrybot.utils.enhanced_ux_helpers import UnifiedButtonBuilder, ButtonType
+                keyboard = InlineKeyboardMarkup([[
+                    UnifiedButtonBuilder.create_button(
+                        text='🔙 Back to Task', 
+                        callback_data=f'task_view:{task_id}', 
+                        button_type=ButtonType.SECONDARY
+                    )
+                ]])
+                
+                await safe_edit(query.edit_message_text, formatted_message, 
+                    reply_markup=keyboard, parse_mode='MarkdownV2')
+            else:
+                await safe_edit(query.edit_message_text, MessageFormatter.
+                    format_error_message('Failed to load analytics',
+                    result.get('message', 'Unable to generate analytics.')), 
+                    parse_mode='MarkdownV2')
             
         except Exception as e:
             logger.error(f'Error showing analytics for task {task_id}: {e}')
@@ -3374,18 +3394,51 @@ Track time spent on this task to monitor productivity\\.
     async def _handle_task_dependencies(self, query, context: ContextTypes.DEFAULT_TYPE, task_id: int) -> None:
         """Handle task dependencies button press."""
         try:
-            from larrybot.plugins.advanced_tasks.subtasks_dependencies import dependency_handler
+            from larrybot.plugins.advanced_tasks import get_task_service
+            from larrybot.utils.ux_helpers import MessageFormatter
             
-            # Create a mock update object for the dependencies handler  
-            mock_update = type('MockUpdate', (), {
-                'message': query.message,
-                'effective_user': query.from_user
-            })()
+            # Get the task service
+            task_service = get_task_service()
             
-            # Set context args to focus on the specific task
-            context.args = [str(task_id)]
+            # Get task dependencies
+            result = await task_service.get_task_dependencies(task_id)
             
-            await dependency_handler(mock_update, context)
+            if result['success']:
+                dependencies_data = result['data']
+                dependencies = dependencies_data.get('dependencies', [])
+                
+                # Format dependencies message
+                if dependencies:
+                    message = f"🔗 **Task Dependencies**\n\n"
+                    message += f"**Task \\#{task_id} depends on:**\n"
+                    for i, dep in enumerate(dependencies, 1):
+                        status_emoji = "✅" if dep.get('done', False) else "⏳"
+                        message += f"{i}. {status_emoji} **{MessageFormatter.escape_markdown(dep.get('description', 'Unknown task'))}**\n"
+                        message += f"   ID: {dep.get('id', 'N/A')} | Priority: {dep.get('priority', 'Medium')}\n"
+                    
+                    if any(not dep.get('done', False) for dep in dependencies):
+                        message += f"\n⚠️ **Note**: Complete the pending dependencies before starting this task\\."
+                else:
+                    message = f"🔗 **Task Dependencies**\n\n"
+                    message += f"Task \\#{task_id} has no dependencies\\. You can start working on it anytime\\!"
+                
+                # Add back to task button
+                from larrybot.utils.enhanced_ux_helpers import UnifiedButtonBuilder, ButtonType
+                keyboard = InlineKeyboardMarkup([[
+                    UnifiedButtonBuilder.create_button(
+                        text='🔙 Back to Task', 
+                        callback_data=f'task_view:{task_id}', 
+                        button_type=ButtonType.SECONDARY
+                    )
+                ]])
+                
+                await safe_edit(query.edit_message_text, message, 
+                    reply_markup=keyboard, parse_mode='MarkdownV2')
+            else:
+                await safe_edit(query.edit_message_text, MessageFormatter.
+                    format_error_message('Failed to load dependencies',
+                    result.get('message', 'Unable to get task dependencies.')), 
+                    parse_mode='MarkdownV2')
             
         except Exception as e:
             logger.error(f'Error showing dependencies for task {task_id}: {e}')
