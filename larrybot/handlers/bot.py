@@ -3254,7 +3254,7 @@ You can also use `/comment {task_id} <your note>` command.""",
                     keyboard = InlineKeyboardMarkup(buttons)
                     message = f"""⏱️ *Time Tracking Active \\- Task \\#{task_id}*
 
-Time tracking is currently running for this task.
+Time tracking is currently running for this task\\.
 
 *Task:* {MessageFormatter.escape_markdown(task.description)}"""
                 else:
@@ -3276,7 +3276,7 @@ Time tracking is currently running for this task.
                     keyboard = InlineKeyboardMarkup(buttons)
                     message = f"""⏱️ *Time Tracking \\- Task \\#{task_id}*
 
-Track time spent on this task to monitor productivity.
+Track time spent on this task to monitor productivity\\.
 
 *Task:* {MessageFormatter.escape_markdown(task.description)}"""
                 
