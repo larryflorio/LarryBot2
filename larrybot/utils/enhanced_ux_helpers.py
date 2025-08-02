@@ -765,12 +765,14 @@ class UnifiedButtonBuilder:
         text = custom_text or template['text']
         style = template['style']
         emoji = template['emoji']
+        # Include emoji in the text
+        button_text = f'{emoji} {text}'
         if entity_type == 'task' and action_type == ActionType.COMPLETE:
             callback_data = f'task_done:{entity_id}'
         else:
             callback_data = f'{entity_type}_{action_type.value}:{entity_id}'
-        return UnifiedButtonBuilder.create_button(text=text, callback_data=
-            callback_data, button_type=style, custom_emoji=emoji)
+        return UnifiedButtonBuilder.create_button(text=button_text, callback_data=
+            callback_data, button_type=style)
 
     @staticmethod
     def build_entity_keyboard(entity_id: int, entity_type: str,
