@@ -1095,7 +1095,7 @@ class ProgressiveDisclosureBuilder:
         # Time Tracking button on its own row
         buttons.append([
             UnifiedButtonBuilder.create_button(
-                text='Time Tracking',
+                text='⏱️ Time Tracking',
                 callback_data=f'task_time_menu:{task_id}',
                 button_type=ButtonType.INFO,
                 custom_emoji='⏱️'
@@ -1106,7 +1106,7 @@ class ProgressiveDisclosureBuilder:
         if disclosure_level < 3:
             buttons.append([
                 UnifiedButtonBuilder.create_button(
-                    text='More Options',
+                    text='⚙️ More Options',
                     callback_data=f'task_disclose:{task_id}:{disclosure_level + 1}',
                     button_type=ButtonType.SECONDARY,
                     custom_emoji='➕'
