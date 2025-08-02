@@ -3364,8 +3364,8 @@ Track time spent on this task to monitor productivity\\.
                 analytics_data = result['data']
                 
                 # Use the proper analytics formatter  
-                from larrybot.utils.ux_helpers import MessageFormatter as UXMessageFormatter
-                formatted_message = UXMessageFormatter.format_task_analytics(analytics_data)
+                from larrybot.utils.ux_helpers import AnalyticsFormatter
+                formatted_message = AnalyticsFormatter.format_task_analytics(analytics_data)
                 
                 # Add back to task button
                 from larrybot.utils.enhanced_ux_helpers import UnifiedButtonBuilder, ButtonType
