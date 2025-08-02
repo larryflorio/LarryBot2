@@ -3406,8 +3406,7 @@ Track time spent on this task to monitor productivity\\.
             result = await task_service.get_task_dependencies(task_id)
             
             if result['success']:
-                dependencies_data = result['data']
-                dependencies = dependencies_data.get('dependencies', [])
+                dependencies = result['data']  # data is already the list of dependencies
                 
                 # Format dependencies message
                 if dependencies:
