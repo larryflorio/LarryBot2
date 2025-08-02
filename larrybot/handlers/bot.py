@@ -3215,8 +3215,7 @@ You can also use `/comment {task_id} <your note>` command.""",
                 format_error_message('Error starting note addition',
                 'Please try again or use /comment command.'), parse_mode='MarkdownV2')
 
-    async def _handle_task_time_menu(self, query, context: ContextTypes.
-        DEFAULT_TYPE, task_id: int) ->None:
+    async def _handle_task_time_menu(self, query, context: ContextTypes.DEFAULT_TYPE, task_id: int) -> None:
         """Handle task time tracking menu via callback."""
         from larrybot.utils.ux_helpers import MessageFormatter
         from larrybot.utils.enhanced_ux_helpers import UnifiedButtonBuilder, ButtonType
@@ -3234,45 +3233,52 @@ You can also use `/comment {task_id} <your note>` command.""",
                         ), parse_mode='MarkdownV2')
                     return
                 
-                # Check if time tracking is active
                 is_tracking = getattr(task, 'started_at', None) is not None
                 
                 if is_tracking:
-                    # Show stop tracking option
-                    keyboard = InlineKeyboardMarkup([
-                        [UnifiedButtonBuilder.create_button(text='⏹️ Stop Tracking', 
-                            callback_data=f'task_stop_time:{task_id}', 
-                            button_type=ButtonType.DANGER)],
-                        [UnifiedButtonBuilder.create_button(text='📊 View Time', 
-                            callback_data=f'task_time_stats:{task_id}', 
-                            button_type=ButtonType.INFO)],
-                        [UnifiedButtonBuilder.create_button(text='🔙 Back to Task', 
-                            callback_data=f'task_view:{task_id}', 
-                            button_type=ButtonType.SECONDARY)]
-                    ])
-                    message = f"""⏱️ **Time Tracking Active - Task #{task_id}**
+                    buttons = [
+                        [
+                            UnifiedButtonBuilder.create_button(text='⏹️ Stop Tracking', 
+                                callback_data=f'task_stop_time:{task_id}', 
+                                button_type=ButtonType.DANGER),
+                            UnifiedButtonBuilder.create_button(text='📊 View Time', 
+                                callback_data=f'task_time_stats:{task_id}', 
+                                button_type=ButtonType.INFO)
+                        ],
+                        [
+                            UnifiedButtonBuilder.create_button(text='🔙 Back to Task', 
+                                callback_data=f'task_view:{task_id}', 
+                                button_type=ButtonType.SECONDARY)
+                        ]
+                    ]
+                    keyboard = InlineKeyboardMarkup(buttons)
+                    message = f"""⏱️ *Time Tracking Active \\- Task #{task_id}*
 
 Time tracking is currently running for this task.
 
-**Task:** {MessageFormatter.escape_markdown(task.description)}"""
+*Task:* {MessageFormatter.escape_markdown(task.description)}"""
                 else:
-                    # Show start tracking option
-                    keyboard = InlineKeyboardMarkup([
-                        [UnifiedButtonBuilder.create_button(text='▶️ Start Tracking', 
-                            callback_data=f'task_start_time:{task_id}', 
-                            button_type=ButtonType.SUCCESS)],
-                        [UnifiedButtonBuilder.create_button(text='📊 View Time', 
-                            callback_data=f'task_time_stats:{task_id}', 
-                            button_type=ButtonType.INFO)],
-                        [UnifiedButtonBuilder.create_button(text='🔙 Back to Task', 
-                            callback_data=f'task_view:{task_id}', 
-                            button_type=ButtonType.SECONDARY)]
-                    ])
-                    message = f"""⏱️ **Time Tracking - Task #{task_id}**
+                    buttons = [
+                        [
+                            UnifiedButtonBuilder.create_button(text='▶️ Start Tracking', 
+                                callback_data=f'task_start_time:{task_id}', 
+                                button_type=ButtonType.SUCCESS),
+                            UnifiedButtonBuilder.create_button(text='📊 View Time', 
+                                callback_data=f'task_time_stats:{task_id}', 
+                                button_type=ButtonType.INFO)
+                        ],
+                        [
+                            UnifiedButtonBuilder.create_button(text='🔙 Back to Task', 
+                                callback_data=f'task_view:{task_id}', 
+                                button_type=ButtonType.SECONDARY)
+                        ]
+                    ]
+                    keyboard = InlineKeyboardMarkup(buttons)
+                    message = f"""⏱️ *Time Tracking \\- Task #{task_id}*
 
 Track time spent on this task to monitor productivity.
 
-**Task:** {MessageFormatter.escape_markdown(task.description)}"""
+*Task:* {MessageFormatter.escape_markdown(task.description)}"""
                 
                 await safe_edit(query.edit_message_text, message, 
                     reply_markup=keyboard, parse_mode='MarkdownV2')
@@ -3280,7 +3286,7 @@ Track time spent on this task to monitor productivity.
             logger.error(f'Error showing time tracking menu for task {task_id}: {e}')
             await safe_edit(query.edit_message_text, MessageFormatter.
                 format_error_message('Error showing time tracking menu',
-                'Please try again or use /start_time_tracking command.'), parse_mode='MarkdownV2')
+                'Please try again or use /start\\_time\\_tracking command\\.'), parse_mode='MarkdownV2')
 
     async def _handle_task_start_time(self, query, context: ContextTypes.
         DEFAULT_TYPE, task_id: int) ->None:
