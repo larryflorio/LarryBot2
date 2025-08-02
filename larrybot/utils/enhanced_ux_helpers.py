@@ -1064,13 +1064,13 @@ class ProgressiveDisclosureBuilder:
         # Custom actions: Attach File, Add Note, View Attachments
         custom_actions = [
             UnifiedButtonBuilder.create_button(
-                text='Attach File',
+                text='📎 Attach File',
                 callback_data=f'task_attach_file:{task_id}',
                 button_type=ButtonType.SECONDARY,
                 custom_emoji='📎'
             ),
             UnifiedButtonBuilder.create_button(
-                text='Add Note',
+                text='📝 Add Note',
                 callback_data=f'task_add_note:{task_id}',
                 button_type=ButtonType.SECONDARY,
                 custom_emoji='📝'
@@ -1078,16 +1078,19 @@ class ProgressiveDisclosureBuilder:
         ]
         if attachment_count > 0:
             custom_actions.append(UnifiedButtonBuilder.create_button(
-                text=f'View Attachments ({attachment_count})',
+                text=f'📄 Files ({attachment_count})',
                 callback_data=f'attachment_list:{task_id}',
                 button_type=ButtonType.INFO,
                 custom_emoji='📄'
             ))
 
-        # Group into rows of max 3
-        all_main = main_actions + custom_actions
-        for i in range(0, len(all_main), 3):
-            buttons.append(all_main[i:i+3])
+        # Group into rows of max 3, but distribute more evenly
+        # First row: Done, Edit, Delete
+        buttons.append(main_actions)
+        
+        # Second row: Attach File, Add Note, Files (if any)
+        if len(custom_actions) > 0:
+            buttons.append(custom_actions)
         
         # Time Tracking button on its own row
         buttons.append([
