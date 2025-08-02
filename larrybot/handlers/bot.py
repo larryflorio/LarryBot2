@@ -267,6 +267,12 @@ class TelegramBotHandler:
         elif callback_data.startswith('task_time_stats:'):
             task_id = int(callback_data.split(':')[1])
             await self._handle_task_time_stats(query, context, task_id)
+        elif callback_data.startswith('task_analytics:'):
+            task_id = int(callback_data.split(':')[1])
+            await self._handle_task_analytics(query, context, task_id)
+        elif callback_data.startswith('task_dependencies:'):
+            task_id = int(callback_data.split(':')[1])
+            await self._handle_task_dependencies(query, context, task_id)
         elif callback_data == 'task_edit_cancel':
             await self._handle_task_edit_cancel(query, context)
         elif callback_data == 'tasks_list':
@@ -3340,6 +3346,52 @@ Track time spent on this task to monitor productivity\\.
             await safe_edit(query.edit_message_text, MessageFormatter.
                 format_error_message('Failed to load time statistics',
                 'Please try again or use /time_summary command.'), parse_mode=
+                'MarkdownV2')
+
+    async def _handle_task_analytics(self, query, context: ContextTypes.DEFAULT_TYPE, task_id: int) -> None:
+        """Handle task analytics button press."""
+        try:
+            from larrybot.plugins.advanced_tasks.analytics import analytics_handler
+            
+            # Create a mock update object for the analytics handler
+            mock_update = type('MockUpdate', (), {
+                'message': query.message,
+                'effective_user': query.from_user
+            })()
+            
+            # Set context args to focus on the specific task
+            context.args = [str(task_id)]
+            
+            await analytics_handler(mock_update, context)
+            
+        except Exception as e:
+            logger.error(f'Error showing analytics for task {task_id}: {e}')
+            await safe_edit(query.edit_message_text, MessageFormatter.
+                format_error_message('Failed to load task analytics',
+                'Please try again or use /analytics command.'), parse_mode=
+                'MarkdownV2')
+
+    async def _handle_task_dependencies(self, query, context: ContextTypes.DEFAULT_TYPE, task_id: int) -> None:
+        """Handle task dependencies button press."""
+        try:
+            from larrybot.plugins.advanced_tasks.subtasks_dependencies import dependency_handler
+            
+            # Create a mock update object for the dependencies handler  
+            mock_update = type('MockUpdate', (), {
+                'message': query.message,
+                'effective_user': query.from_user
+            })()
+            
+            # Set context args to focus on the specific task
+            context.args = [str(task_id)]
+            
+            await dependency_handler(mock_update, context)
+            
+        except Exception as e:
+            logger.error(f'Error showing dependencies for task {task_id}: {e}')
+            await safe_edit(query.edit_message_text, MessageFormatter.
+                format_error_message('Failed to load task dependencies',
+                'Please try again or use /dependency command.'), parse_mode=
                 'MarkdownV2')
 
     async def _handle_tasks_list(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
