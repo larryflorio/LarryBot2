@@ -3377,8 +3377,9 @@ Track time spent on this task to monitor productivity\\.
                     )
                 ]])
                 
+                # Use Markdown instead of MarkdownV2 to avoid parsing issues
                 await safe_edit(query.edit_message_text, formatted_message, 
-                    reply_markup=keyboard, parse_mode='MarkdownV2')
+                    reply_markup=keyboard, parse_mode='Markdown')
             else:
                 await safe_edit(query.edit_message_text, MessageFormatter.
                     format_error_message('Failed to load analytics',
