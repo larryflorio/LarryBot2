@@ -16,8 +16,6 @@ class TaskAttachmentService(BaseService):
         self.task_attachment_repository = task_attachment_repository
         self.task_repository = task_repository
         self.max_file_size = 10 * 1024 * 1024
-        self.allowed_extensions = {'.pdf', '.doc', '.docx', '.txt', '.jpg',
-            '.jpeg', '.png', '.gif', '.zip', '.rar'}
 
     async def execute(self, operation: str, *args, **kwargs) ->Any:
         """Execute attachment operations."""
@@ -50,11 +48,6 @@ class TaskAttachmentService(BaseService):
                     ))
             if not original_filename or len(original_filename) > 255:
                 return self._handle_error(ValueError('Invalid filename'))
-            file_extension = os.path.splitext(original_filename)[1].lower()
-            if file_extension not in self.allowed_extensions:
-                return self._handle_error(ValueError(
-                    f"File type not allowed: {file_extension}. Allowed: {', '.join(self.allowed_extensions)}"
-                    ))
             attachment = self.task_attachment_repository.add_attachment(task_id
                 =task_id, file_data=file_data, original_filename=
                 original_filename, description=description, is_public=is_public

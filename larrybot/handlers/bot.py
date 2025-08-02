@@ -78,6 +78,8 @@ class TelegramBotHandler:
             _handle_callback_query))
         self.application.add_handler(MessageHandler(filters.TEXT & ~filters
             .COMMAND, self._handle_text_message))
+        self.application.add_handler(MessageHandler(filters.ATTACHMENT,
+            self._handle_file_upload))
         if hasattr(self.command_registry, '_commands') and isinstance(self.
             command_registry._commands, dict):
             for command, handler in self.command_registry._commands.items():
@@ -751,6 +753,19 @@ Please reply with the new description for this task\\."""
 
 Task editing was cancelled. No changes were made."""
             , parse_mode='MarkdownV2')
+
+    async def _handle_file_upload(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handle an incoming file and attach it to a task if in the correct state."""
+        if 'attaching_file_to_task' not in context.user_data:
+            return
+
+        task_id = context.user_data.pop('attaching_file_to_task')
+
+        from larrybot.plugins.file_attachments import attach_file_handler
+        
+        context.args = [str(task_id)]
+        
+        await attach_file_handler(update, context)
 
     async def _handle_task_delete(self, query, context: ContextTypes.
         DEFAULT_TYPE, task_id: int) ->None:
@@ -1829,6 +1844,8 @@ Ready to boost your productivity? Here's what you can do:"""
         """Show detailed view of a task with progressive disclosure and smart suggestions."""
         from larrybot.storage.db import get_optimized_session
         from larrybot.storage.task_repository import TaskRepository
+        from larrybot.services.task_attachment_service import TaskAttachmentService
+        from larrybot.storage.task_attachment_repository import TaskAttachmentRepository
         from larrybot.utils.ux_helpers import MessageFormatter
         from larrybot.utils.enhanced_ux_helpers import ProgressiveDisclosureBuilder, ContextAwareButtonBuilder
         try:
@@ -1842,12 +1859,18 @@ Ready to boost your productivity? Here's what you can do:"""
                         "The task may have already been deleted or doesn't exist."
                         ), parse_mode='MarkdownV2')
                     return
+
+                attachment_service = TaskAttachmentService(TaskAttachmentRepository(session), repo)
+                attachments_result = await attachment_service.get_task_attachments(task_id)
+                attachment_count = len(attachments_result['data']['attachments']) if attachments_result['success'] else 0
+
                 task_data = {'id': task.id, 'description': task.description,
                     'status': getattr(task, 'status', 'Todo'), 'priority':
                     getattr(task, 'priority', 'Medium'), 'due_date':
                     getattr(task, 'due_date', None), 'category': getattr(
                     task, 'category', None), 'tags': getattr(task, 'tags',
-                    None), 'created_at': getattr(task, 'created_at', None)}
+                    None), 'created_at': getattr(task, 'created_at', None),
+                    'attachment_count': attachment_count}
                 details = {k: v for k, v in task_data.items() if v is not
                     None and k != 'id'}
                 suggestions = []
@@ -1873,7 +1896,8 @@ Ready to boost your productivity? Here's what you can do:"""
                     f'task_disclosure_{task_id}', 1)
                 keyboard = (ProgressiveDisclosureBuilder.
                     build_progressive_task_keyboard(task_id=task_id,
-                    task_data=task_data, disclosure_level=disclosure_level))
+                    task_data=task_data, disclosure_level=disclosure_level,
+                    attachment_count=attachment_count))
                 await safe_edit(query.edit_message_text, message,
                     reply_markup=keyboard, parse_mode='MarkdownV2')
         except Exception as e:
@@ -2203,7 +2227,13 @@ Choose what you'd like to learn about:"""
         ContextTypes.DEFAULT_TYPE) ->None:
         """Handle attachment-related callback queries."""
         callback_data = query.data
-        if callback_data.startswith('attachment_edit_desc:'):
+        if callback_data.startswith('attachment_list:'):
+            task_id = int(callback_data.split(':')[1])
+            await self._list_task_attachments(query, context, task_id)
+        elif callback_data.startswith('attachment_download:'):
+            attachment_id = int(callback_data.split(':')[1])
+            await self._handle_attachment_download(query, context, attachment_id)
+        elif callback_data.startswith('attachment_edit_desc:'):
             attachment_id = int(callback_data.split(':')[1])
             await self._handle_attachment_edit_desc(query, context,
                 attachment_id)
@@ -2226,14 +2256,111 @@ Choose what you'd like to learn about:"""
         elif callback_data.startswith('attachment_export:'):
             task_id = int(callback_data.split(':')[1])
             await self._handle_attachment_export(query, context, task_id)
-        elif callback_data.startswith('attachment_add:'):
-            task_id = int(callback_data.split(':')[1])
-            await self._handle_attachment_add(query, context, task_id)
+
+    async def _list_task_attachments(self, query, context: ContextTypes.
+        DEFAULT_TYPE, task_id: int) ->None:
+        """List attachments for a given task."""
+        from larrybot.services.task_attachment_service import TaskAttachmentService
+        from larrybot.storage.db import get_session
+        from larrybot.storage.task_attachment_repository import TaskAttachmentRepository
+        from larrybot.storage.task_repository import TaskRepository
+        from larrybot.utils.ux_helpers import MessageFormatter
+        from larrybot.utils.enhanced_ux_helpers import UnifiedButtonBuilder, ButtonType
+        from telegram import InlineKeyboardMarkup
+
+        session = next(get_session())
+        attachment_service = TaskAttachmentService(TaskAttachmentRepository(session), TaskRepository(session))
+        result = await attachment_service.get_task_attachments(task_id)
+
+        if result['success'] and result['data']['attachments']:
+            attachments = result['data']['attachments']
+            message = f"📎 **Attachments for Task #{task_id}**\n\n"
+            for att in attachments:
+                message += f"📄 {MessageFormatter.escape_markdown(att['filename'])} ({att['size'] // 1024} KB)\n"
+            
+            # Build keyboard with download buttons for each attachment
+            buttons = []
+            for attachment in attachments:
+                button = UnifiedButtonBuilder.create_button(
+                    text=f"📥 {attachment['filename']}",
+                    callback_data=f"attachment_download:{attachment['id']}",
+                    button_type=ButtonType.INFO
+                )
+                buttons.append([button])
+            
+            # Add back button
+            back_button = UnifiedButtonBuilder.create_button(
+                text="🔙 Back to Task",
+                callback_data=f"task_view:{task_id}",
+                button_type=ButtonType.SECONDARY
+            )
+            buttons.append([back_button])
+            
+            keyboard = InlineKeyboardMarkup(buttons)
+            await safe_edit(query.edit_message_text, MessageFormatter.escape_markdown(message), reply_markup=keyboard, parse_mode='MarkdownV2')
         else:
-            await safe_edit(query.edit_message_text, MessageFormatter.
-                format_error_message('Unknown attachment action',
-                'Please use the file attachment commands for now.'),
-                parse_mode='MarkdownV2')
+            # No attachments found
+            message = f"📎 **No Attachments Found**\n\nTask #{task_id} has no attachments."
+            back_button = UnifiedButtonBuilder.create_button(
+                text="🔙 Back to Task",
+                callback_data=f"task_view:{task_id}",
+                button_type=ButtonType.SECONDARY
+            )
+            keyboard = InlineKeyboardMarkup([[back_button]])
+            await safe_edit(query.edit_message_text, MessageFormatter.escape_markdown(message), reply_markup=keyboard, parse_mode='MarkdownV2')
+
+    async def _handle_attachment_download(self, query, context: ContextTypes.DEFAULT_TYPE, attachment_id: int) -> None:
+        """Handle attachment download."""
+        from larrybot.services.task_attachment_service import TaskAttachmentService
+        from larrybot.storage.db import get_session
+        from larrybot.storage.task_attachment_repository import TaskAttachmentRepository
+        from larrybot.storage.task_repository import TaskRepository
+        import io
+        import os
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.info(f"Starting attachment download for ID: {attachment_id}")
+
+        try:
+            session = next(get_session())
+            attachment_repository = TaskAttachmentRepository(session)
+            attachment_service = TaskAttachmentService(attachment_repository, TaskRepository(session))
+            result = await attachment_service.get_attachment_by_id(attachment_id)
+
+            logger.info(f"Service result: {result}")
+
+            if result['success']:
+                attachment = attachment_repository.get_attachment_by_id(attachment_id)
+                logger.info(f"Retrieved attachment: {attachment}")
+                
+                if attachment and os.path.exists(attachment.file_path):
+                    logger.info(f"File exists at path: {attachment.file_path}")
+                    try:
+                        with open(attachment.file_path, 'rb') as f:
+                            file_data = f.read()
+                        
+                        logger.info(f"Read file data, size: {len(file_data)} bytes")
+                        
+                        await context.bot.send_document(
+                            chat_id=query.message.chat.id,
+                            document=io.BytesIO(file_data),
+                            filename=attachment.original_filename
+                        )
+                        logger.info("File sent successfully")
+                        await query.answer("File sent successfully!")
+                    except Exception as e:
+                        logger.error(f"Error reading/sending file: {e}")
+                        await query.answer(f"Error reading file: {str(e)}", show_alert=True)
+                else:
+                    logger.error(f"File not found. Attachment: {attachment}, Path exists: {os.path.exists(attachment.file_path) if attachment else 'No attachment'}")
+                    await query.answer("File not found on disk.", show_alert=True)
+            else:
+                logger.error(f"Service call failed: {result}")
+                await query.answer("Could not retrieve attachment.", show_alert=True)
+        except Exception as e:
+            logger.error(f"Unexpected error in attachment download: {e}")
+            await query.answer(f"Unexpected error: {str(e)}", show_alert=True)
 
     async def _handle_calendar_callback(self, query, context: ContextTypes.
         DEFAULT_TYPE) ->None:
@@ -2570,21 +2697,7 @@ Choose what you'd like to learn about:"""
                 'Please try again or use /export_attachments command.'),
                 parse_mode='MarkdownV2')
 
-    async def _handle_attachment_add(self, query, context: ContextTypes.
-        DEFAULT_TYPE, task_id: int) ->None:
-        """Handle attachment addition."""
-        try:
-            from larrybot.plugins.file_attachments import add_attachment_handler
-            mock_update = type('MockUpdate', (), {'message': query.message,
-                'effective_user': query.from_user})()
-            context.args = [str(task_id), 'test_file.txt']
-            await add_attachment_handler(mock_update, context)
-        except Exception as e:
-            logger.error(f'Error adding attachment: {e}')
-            await safe_edit(query.edit_message_text, MessageFormatter.
-                format_error_message('Failed to add attachment',
-                'Please try again or use /add_attachment command.'),
-                parse_mode='MarkdownV2')
+
 
     async def _handle_calendar_today(self, query, context: ContextTypes.
         DEFAULT_TYPE) ->None:
@@ -3051,28 +3164,20 @@ Choose what you'd like to learn about:"""
         DEFAULT_TYPE, task_id: int) ->None:
         """Handle task file attachment via callback."""
         from larrybot.utils.ux_helpers import MessageFormatter
-        from larrybot.utils.enhanced_ux_helpers import UnifiedButtonBuilder, ButtonType
+        from larrybot.utils.telegram_safe import escape_markdown_v2
         try:
             # Set context for file attachment mode
             context.user_data['attaching_file_to_task'] = task_id
-            keyboard = InlineKeyboardMarkup([
-                [UnifiedButtonBuilder.create_button(text='📎 Upload File', 
-                    callback_data=f'attachment_add:{task_id}', 
-                    button_type=ButtonType.PRIMARY)],
-                [UnifiedButtonBuilder.create_button(text='❌ Cancel', 
-                    callback_data=f'task_view:{task_id}', 
-                    button_type=ButtonType.SECONDARY)]
-            ])
-            await safe_edit(query.edit_message_text,
-                f"""📎 **Attach File to Task #{task_id}**
+            
+            message_text = f"""📎 **Attach File to Task #{task_id}**
 
 Please send the file you want to attach to this task.
 
 **Supported formats:** Documents, images, PDFs, etc.
-**Max size:** 20MB
-
-Or use the button below to upload a file.""", 
-                reply_markup=keyboard, parse_mode='MarkdownV2')
+**Max size:** 20MB"""
+            await safe_edit(query.edit_message_text,
+                escape_markdown_v2(message_text), 
+                parse_mode='MarkdownV2')
         except Exception as e:
             logger.error(f'Error starting file attachment for task {task_id}: {e}')
             await safe_edit(query.edit_message_text, MessageFormatter.

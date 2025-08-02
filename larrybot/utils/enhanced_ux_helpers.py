@@ -1047,7 +1047,7 @@ class ProgressiveDisclosureBuilder:
 
     @staticmethod
     def build_progressive_task_keyboard(task_id: int, task_data: Dict[str,
-        Any], disclosure_level: int=1) ->InlineKeyboardMarkup:
+        Any], disclosure_level: int=1, attachment_count: int=0) ->InlineKeyboardMarkup:
         """
         Build a progressive disclosure keyboard for tasks.
         Ensures no more than 3 buttons per row.
@@ -1060,7 +1060,8 @@ class ProgressiveDisclosureBuilder:
             main_actions.append(UnifiedButtonBuilder.create_action_button(ActionType.COMPLETE, task_id, 'task'))
         main_actions.append(UnifiedButtonBuilder.create_action_button(ActionType.EDIT, task_id, 'task'))
         main_actions.append(UnifiedButtonBuilder.create_action_button(ActionType.DELETE, task_id, 'task'))
-        # Custom actions: Attach File, Add Note
+        
+        # Custom actions: Attach File, Add Note, View Attachments
         custom_actions = [
             UnifiedButtonBuilder.create_button(
                 text='Attach File',
@@ -1075,10 +1076,19 @@ class ProgressiveDisclosureBuilder:
                 custom_emoji='📝'
             )
         ]
+        if attachment_count > 0:
+            custom_actions.append(UnifiedButtonBuilder.create_button(
+                text=f'View Attachments ({attachment_count})',
+                callback_data=f'attachment_list:{task_id}',
+                button_type=ButtonType.INFO,
+                custom_emoji='📄'
+            ))
+
         # Group into rows of max 3
         all_main = main_actions + custom_actions
         for i in range(0, len(all_main), 3):
             buttons.append(all_main[i:i+3])
+        
         # Time Tracking button on its own row
         buttons.append([
             UnifiedButtonBuilder.create_button(
@@ -1088,6 +1098,7 @@ class ProgressiveDisclosureBuilder:
                 custom_emoji='⏱️'
             )
         ])
+        
         # More Options (advanced actions)
         if disclosure_level < 3:
             buttons.append([
@@ -1098,6 +1109,7 @@ class ProgressiveDisclosureBuilder:
                     custom_emoji='➕'
                 )
             ])
+        
         if disclosure_level >= 3:
             # Advanced actions (Analytics, Dependencies, etc.)
             adv_row = []
@@ -1114,6 +1126,7 @@ class ProgressiveDisclosureBuilder:
                 custom_emoji='🔗'
             ))
             buttons.append(adv_row)
+            
         return InlineKeyboardMarkup(buttons)
 
     @staticmethod

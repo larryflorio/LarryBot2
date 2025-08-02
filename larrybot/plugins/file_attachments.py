@@ -48,7 +48,7 @@ async def attach_file_handler(update: Update, context: ContextTypes.
                 'Usage':
                 'Send a file, then reply with: /attach <task_id> [description]'
                 , 'Supported Formats':
-                'PDF, DOC, DOCX, TXT, JPG, PNG, GIF, ZIP, RAR', 'Max Size':
+                'All file types are supported', 'Max Size':
                 '10MB'}), parse_mode='MarkdownV2')
             return
         if not context.args or not context.args[0].isdigit():
