@@ -3501,7 +3501,10 @@ Track time spent on this task to monitor productivity\\.
                     for i, comment in enumerate(comments, 1):
                         # Format the creation date and escape it
                         if comment.created_at:
-                            created_at = comment.created_at.strftime('%Y-%m-%d %H:%M')
+                            # Convert UTC to local time before formatting
+                            from larrybot.core.timezone import to_local
+                            local_time = to_local(comment.created_at)
+                            created_at = local_time.strftime('%Y-%m-%d %H:%M')
                             created_at = MessageFormatter.escape_markdown(created_at)
                         else:
                             created_at = 'Unknown date'
