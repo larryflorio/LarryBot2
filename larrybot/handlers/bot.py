@@ -273,6 +273,16 @@ class TelegramBotHandler:
         elif callback_data.startswith('task_notes_list:'):
             task_id = int(callback_data.split(':')[1])
             await self._handle_task_notes_list(query, context, task_id)
+        elif callback_data.startswith('task_edit_field:'):
+            parts = callback_data.split(':')
+            field_name = parts[1]
+            task_id = int(parts[2])
+            await self._handle_task_edit_field(query, context, task_id, field_name)
+        elif callback_data.startswith('task_set_priority:'):
+            parts = callback_data.split(':')
+            priority = parts[1]
+            task_id = int(parts[2])
+            await self._handle_task_set_priority(query, context, task_id, priority)
         elif callback_data == 'task_edit_cancel':
             await self._handle_task_edit_cancel(query, context)
         elif callback_data == 'tasks_list':
@@ -730,17 +740,55 @@ Please try again or use the command interface."""
                         'Completed tasks cannot be edited. Use /edit command to unmark and edit.'
                         ), parse_mode='MarkdownV2')
                     return
-                context.user_data['editing_task_id'] = task_id
-                keyboard = InlineKeyboardMarkup([[UnifiedButtonBuilder.
-                    create_button(text='❌ Cancel', callback_data=
-                    'task_edit_cancel', button_type=ButtonType.INFO)]])
+                # Show edit menu with field options
+                from larrybot.utils.enhanced_ux_helpers import UnifiedButtonBuilder, ButtonType
+                
+                # Create buttons for each editable field
+                buttons = [
+                    [UnifiedButtonBuilder.create_button(
+                        text='📝 Description',
+                        callback_data=f'task_edit_field:description:{task_id}',
+                        button_type=ButtonType.PRIMARY
+                    )],
+                    [UnifiedButtonBuilder.create_button(
+                        text='⏰ Due Date',
+                        callback_data=f'task_edit_field:due_date:{task_id}',
+                        button_type=ButtonType.INFO
+                    )],
+                    [UnifiedButtonBuilder.create_button(
+                        text='🔥 Priority',
+                        callback_data=f'task_edit_field:priority:{task_id}',
+                        button_type=ButtonType.WARNING
+                    )],
+                    [UnifiedButtonBuilder.create_button(
+                        text='🏷️ Category',
+                        callback_data=f'task_edit_field:category:{task_id}',
+                        button_type=ButtonType.SECONDARY
+                    )],
+                    [UnifiedButtonBuilder.create_button(
+                        text='🔙 Back to Task',
+                        callback_data=f'task_view:{task_id}',
+                        button_type=ButtonType.SECONDARY
+                    )]
+                ]
+                
+                keyboard = InlineKeyboardMarkup(buttons)
+                
+                # Format current task info for display
+                due_date_str = task.due_date.strftime('%Y-%m-%d') if task.due_date else 'Not set'
+                priority_str = getattr(task, 'priority', 'Medium')
+                category_str = getattr(task, 'category', 'Not set')
+                
                 await safe_edit(query.edit_message_text,
-                    f"""✏️ **Edit Task**
+                    f"""✏️ **Edit Task \\#{task_id}**
 
-**Current**: {MessageFormatter.escape_markdown(task.description)}
-**ID**: {task_id}
+**Current Information:**
+📝 **Description**: {MessageFormatter.escape_markdown(task.description)}
+⏰ **Due Date**: {MessageFormatter.escape_markdown(due_date_str)}
+🔥 **Priority**: {MessageFormatter.escape_markdown(priority_str)}
+🏷️ **Category**: {MessageFormatter.escape_markdown(category_str)}
 
-Please reply with the new description for this task\\."""
+**Select which field you want to edit:**"""
                     , reply_markup=keyboard, parse_mode='MarkdownV2')
         except Exception as e:
             logger.error(f'Error starting task edit for task {task_id}: {e}')
@@ -749,11 +797,154 @@ Please reply with the new description for this task\\."""
                 'Please try again or use /edit command.'), parse_mode=
                 'MarkdownV2')
 
+    async def _handle_task_edit_field(self, query, context: ContextTypes.DEFAULT_TYPE, task_id: int, field_name: str) -> None:
+        """Handle editing a specific field of a task."""
+        from larrybot.utils.ux_helpers import MessageFormatter
+        from larrybot.utils.enhanced_ux_helpers import UnifiedButtonBuilder, ButtonType
+        
+        try:
+            # Set context for field editing
+            context.user_data['editing_task_id'] = task_id
+            context.user_data['editing_field'] = field_name
+            
+            # Create cancel button
+            keyboard = InlineKeyboardMarkup([[
+                UnifiedButtonBuilder.create_button(
+                    text='❌ Cancel', 
+                    callback_data='task_edit_cancel', 
+                    button_type=ButtonType.SECONDARY
+                )
+            ]])
+            
+            if field_name == 'description':
+                message = f"""✏️ **Edit Task Description**
+
+**Task ID**: {task_id}
+
+Please reply with the new description for this task\\."""
+                
+            elif field_name == 'due_date':
+                message = f"""⏰ **Edit Due Date**
+
+**Task ID**: {task_id}
+
+Please reply with the new due date\\. You can use formats like:
+• `2025\\-08\\-15`
+• `Tomorrow`
+• `Next Monday`
+• `In 3 days`
+• `Clear` \\(to remove due date\\)"""
+                
+            elif field_name == 'priority':
+                # For priority, show buttons instead of text input
+                priority_buttons = [
+                    [UnifiedButtonBuilder.create_button(
+                        text='🔥 Critical',
+                        callback_data=f'task_set_priority:Critical:{task_id}',
+                        button_type=ButtonType.DANGER
+                    )],
+                    [UnifiedButtonBuilder.create_button(
+                        text='⚠️ High',
+                        callback_data=f'task_set_priority:High:{task_id}',
+                        button_type=ButtonType.WARNING
+                    )],
+                    [UnifiedButtonBuilder.create_button(
+                        text='📝 Medium',
+                        callback_data=f'task_set_priority:Medium:{task_id}',
+                        button_type=ButtonType.INFO
+                    )],
+                    [UnifiedButtonBuilder.create_button(
+                        text='📋 Low',
+                        callback_data=f'task_set_priority:Low:{task_id}',
+                        button_type=ButtonType.SECONDARY
+                    )],
+                    [UnifiedButtonBuilder.create_button(
+                        text='❌ Cancel',
+                        callback_data='task_edit_cancel',
+                        button_type=ButtonType.SECONDARY
+                    )]
+                ]
+                keyboard = InlineKeyboardMarkup(priority_buttons)
+                message = f"""🔥 **Edit Priority**
+
+**Task ID**: {task_id}
+
+**Select the new priority level:**"""
+                
+            elif field_name == 'category':
+                message = f"""🏷️ **Edit Category**
+
+**Task ID**: {task_id}
+
+Please reply with the new category for this task\\. 
+Examples: `Work`, `Personal`, `Shopping`, `Health`
+
+You can also reply with `Clear` to remove the category\\."""
+                
+            else:
+                message = f"❌ **Unknown Field**\n\nField '{field_name}' is not supported for editing\\."
+            
+            await safe_edit(query.edit_message_text, message, 
+                reply_markup=keyboard, parse_mode='MarkdownV2')
+                
+        except Exception as e:
+            logger.error(f'Error starting field edit for task {task_id}, field {field_name}: {e}')
+            await safe_edit(query.edit_message_text, MessageFormatter.
+                format_error_message('Error starting field edit',
+                'Please try again or use /edit command.'), parse_mode='MarkdownV2')
+
+    async def _handle_task_set_priority(self, query, context: ContextTypes.DEFAULT_TYPE, task_id: int, priority: str) -> None:
+        """Handle setting task priority via callback."""
+        from larrybot.storage.db import get_optimized_session
+        from larrybot.storage.task_repository import TaskRepository
+        from larrybot.utils.ux_helpers import MessageFormatter
+        
+        try:
+            with get_optimized_session() as session:
+                repo = TaskRepository(session)
+                task = repo.get_task_by_id(task_id)
+                
+                if not task:
+                    await safe_edit(query.edit_message_text,
+                        MessageFormatter.format_error_message('Task not found',
+                        f'Task {task_id} not found.'), parse_mode='MarkdownV2')
+                    return
+                
+                # Update priority
+                repo.update_task_priority(task_id, priority)
+                session.commit()
+                
+                # Clear editing context
+                if 'editing_task_id' in context.user_data:
+                    del context.user_data['editing_task_id']
+                if 'editing_field' in context.user_data:
+                    del context.user_data['editing_field']
+                
+                # Show success and return to task view
+                success_message = MessageFormatter.format_success_message(
+                    'Priority updated successfully', 
+                    {'task_id': task_id, 'new_priority': priority}
+                )
+                await query.edit_message_text(success_message, parse_mode='MarkdownV2')
+                
+                # After a short delay, show the updated task view
+                import asyncio
+                await asyncio.sleep(1.5)
+                await self._handle_task_view(query, context, task_id)
+                
+        except Exception as e:
+            logger.error(f'Error setting priority for task {task_id}: {e}')
+            await safe_edit(query.edit_message_text, MessageFormatter.
+                format_error_message('Error updating priority',
+                'Please try again or use /edit command.'), parse_mode='MarkdownV2')
+
     async def _handle_task_edit_cancel(self, query, context: ContextTypes.
         DEFAULT_TYPE) ->None:
         """Handle cancellation of task editing."""
         if 'editing_task_id' in context.user_data:
             del context.user_data['editing_task_id']
+        if 'editing_field' in context.user_data:
+            del context.user_data['editing_field']
         await safe_edit(query.edit_message_text,
             """❌ **Edit Cancelled**
 
@@ -1591,15 +1782,28 @@ Ready to boost your productivity? Here's what you can do:"""
     async def _handle_task_edit_mode(self, update: Update, context:
         ContextTypes.DEFAULT_TYPE, user_message: str) ->None:
         """Handle text input when user is in task editing mode."""
+        from larrybot.utils.ux_helpers import MessageFormatter
+        
         task_id = context.user_data['editing_task_id']
-        new_description = user_message
-        if not new_description:
+        field_name = context.user_data.get('editing_field', 'description')  # Default to description for backwards compatibility
+        
+        if not user_message.strip():
             await update.message.reply_text(MessageFormatter.
-                format_error_message('Description cannot be empty',
-                'Please provide a valid task description.'))
+                format_error_message('Input cannot be empty',
+                'Please provide a valid value for the field.'))
             return
-        await self._process_task_edit(update, context, task_id, new_description
-            )
+            
+        if field_name == 'description':
+            await self._process_task_edit(update, context, task_id, user_message)
+        elif field_name == 'due_date':
+            await self._process_task_due_date_edit(update, context, task_id, user_message)
+        elif field_name == 'category':
+            await self._process_task_category_edit(update, context, task_id, user_message)
+        else:
+            await update.message.reply_text(MessageFormatter.
+                format_error_message('Unsupported field',
+                f'Field "{field_name}" editing is not supported via text input.'))
+            return
 
     async def _handle_note_addition_mode(self, update: Update, context:
         ContextTypes.DEFAULT_TYPE, user_message: str) ->None:
@@ -1808,6 +2012,124 @@ Ready to boost your productivity? Here's what you can do:"""
                 format_error_message('Error updating task',
                 'Please try again or use /edit command.'), parse_mode=
                 'MarkdownV2')
+
+    async def _process_task_due_date_edit(self, update: Update, context: ContextTypes.DEFAULT_TYPE, task_id: int, date_input: str) -> None:
+        """Process editing the due date of a task."""
+        from larrybot.storage.db import get_optimized_session
+        from larrybot.storage.task_repository import TaskRepository
+        from larrybot.utils.ux_helpers import MessageFormatter
+        from larrybot.services.datetime_service import DateTimeService
+        
+        try:
+            # Handle "clear" to remove due date
+            if date_input.lower() in ['clear', 'remove', 'none']:
+                with get_optimized_session() as session:
+                    repo = TaskRepository(session)
+                    task = repo.get_task_by_id(task_id)
+                    if task:
+                        task.due_date = None
+                        session.commit()
+                        
+                        # Clear editing context
+                        if 'editing_task_id' in context.user_data:
+                            del context.user_data['editing_task_id']
+                        if 'editing_field' in context.user_data:
+                            del context.user_data['editing_field']
+                        
+                        await update.message.reply_text(MessageFormatter.
+                            format_success_message('Due date cleared successfully', 
+                            {'task_id': task_id, 'action': 'due_date_cleared'}), 
+                            parse_mode='MarkdownV2')
+                    else:
+                        await update.message.reply_text(MessageFormatter.
+                            format_error_message('Task not found', 
+                            f'Task {task_id} not found.'), parse_mode='MarkdownV2')
+                return
+            
+            # Parse the date
+            datetime_service = DateTimeService()
+            parsed_date = datetime_service.parse_natural_date(date_input)
+            
+            if not parsed_date:
+                await update.message.reply_text(MessageFormatter.
+                    format_error_message('Invalid date format', 
+                    'Please use a valid date format like "2025-08-15", "Tomorrow", or "Next Monday".'), 
+                    parse_mode='MarkdownV2')
+                return
+            
+            # Update the task
+            with get_optimized_session() as session:
+                repo = TaskRepository(session)
+                task = repo.get_task_by_id(task_id)
+                if task:
+                    task.due_date = parsed_date.date() if hasattr(parsed_date, 'date') else parsed_date
+                    session.commit()
+                    
+                    # Clear editing context
+                    if 'editing_task_id' in context.user_data:
+                        del context.user_data['editing_task_id']
+                    if 'editing_field' in context.user_data:
+                        del context.user_data['editing_field']
+                    
+                    formatted_date = task.due_date.strftime('%Y-%m-%d') if task.due_date else 'None'
+                    await update.message.reply_text(MessageFormatter.
+                        format_success_message('Due date updated successfully', 
+                        {'task_id': task_id, 'new_due_date': formatted_date}), 
+                        parse_mode='MarkdownV2')
+                else:
+                    await update.message.reply_text(MessageFormatter.
+                        format_error_message('Task not found', 
+                        f'Task {task_id} not found.'), parse_mode='MarkdownV2')
+                    
+        except Exception as e:
+            logger.error(f'Error updating due date for task {task_id}: {e}')
+            await update.message.reply_text(MessageFormatter.
+                format_error_message('Error updating due date', 
+                'Please try again or use /edit command.'), parse_mode='MarkdownV2')
+
+    async def _process_task_category_edit(self, update: Update, context: ContextTypes.DEFAULT_TYPE, task_id: int, category_input: str) -> None:
+        """Process editing the category of a task."""
+        from larrybot.storage.db import get_optimized_session
+        from larrybot.storage.task_repository import TaskRepository
+        from larrybot.utils.ux_helpers import MessageFormatter
+        
+        try:
+            # Handle "clear" to remove category
+            if category_input.lower() in ['clear', 'remove', 'none']:
+                category_value = None
+                success_msg = 'Category cleared successfully'
+            else:
+                category_value = category_input.strip()
+                success_msg = 'Category updated successfully'
+            
+            # Update the task
+            with get_optimized_session() as session:
+                repo = TaskRepository(session)
+                task = repo.get_task_by_id(task_id)
+                if task:
+                    task.category = category_value
+                    session.commit()
+                    
+                    # Clear editing context
+                    if 'editing_task_id' in context.user_data:
+                        del context.user_data['editing_task_id']
+                    if 'editing_field' in context.user_data:
+                        del context.user_data['editing_field']
+                    
+                    await update.message.reply_text(MessageFormatter.
+                        format_success_message(success_msg, 
+                        {'task_id': task_id, 'new_category': category_value or 'None'}), 
+                        parse_mode='MarkdownV2')
+                else:
+                    await update.message.reply_text(MessageFormatter.
+                        format_error_message('Task not found', 
+                        f'Task {task_id} not found.'), parse_mode='MarkdownV2')
+                    
+        except Exception as e:
+            logger.error(f'Error updating category for task {task_id}: {e}')
+            await update.message.reply_text(MessageFormatter.
+                format_error_message('Error updating category', 
+                'Please try again or use /edit command.'), parse_mode='MarkdownV2')
 
     async def _handle_tasks_refresh(self, query, context: ContextTypes.
         DEFAULT_TYPE) ->None:
