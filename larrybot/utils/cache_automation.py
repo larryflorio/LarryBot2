@@ -91,7 +91,7 @@ class AutomatedCacheManager:
             'Invalidate client-related caches when task assignment changes'))
         self.add_rule(CacheInvalidationRule(operation_type=OperationType.
             TASK_DUE_DATE_CHANGE, cache_patterns=['get_task_by_id',
-            'get_overdue_tasks', 'get_tasks_due_between'], description=
+            'get_overdue_tasks', 'get_tasks_due_between', 'get_tasks_with_filters'], description=
             'Invalidate date-related caches when task due date changes'))
         self.add_rule(CacheInvalidationRule(operation_type=OperationType.
             BULK_OPERATION, cache_patterns=['get_tasks_by_status',
