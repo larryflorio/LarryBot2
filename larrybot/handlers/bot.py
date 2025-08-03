@@ -1618,7 +1618,10 @@ Ready to boost your productivity? Here's what you can do:"""
             task_service = get_task_service()
             result = await task_service.add_comment(task_id, note_content)
             
-            if result['success']:
+            # Debug: Check result type
+            logger.info(f"add_comment result type: {type(result)}, value: {result}")
+            
+            if isinstance(result, dict) and result.get('success'):
                 # Clear the note addition state
                 del context.user_data['adding_note_to_task']
                 
@@ -1645,9 +1648,14 @@ Ready to boost your productivity? Here's what you can do:"""
                         
                         await update.message.reply_text(message, reply_markup=keyboard, parse_mode='MarkdownV2')
             else:
+                error_message = 'Please try again or use /comment command.'
+                if isinstance(result, dict):
+                    error_message = result.get('message', error_message)
+                elif isinstance(result, str):
+                    error_message = result
+                    
                 await update.message.reply_text(MessageFormatter.
-                    format_error_message('Failed to add note', 
-                    result.get('message', 'Please try again or use /comment command.')),
+                    format_error_message('Failed to add note', error_message),
                     parse_mode='MarkdownV2')
                     
         except Exception as e:
