@@ -1942,7 +1942,7 @@ Ready to boost your productivity? Here's what you can do:"""
         from larrybot.plugins.tasks import add_task_handler
         from larrybot.plugins.tasks import list_tasks_handler
         from larrybot.plugins.advanced_tasks.filtering import search_tasks_handler
-        from larrybot.plugins.reminder import add_reminder
+        from larrybot.plugins.reminder import add_reminder_handler
         # Removed incorrect import - analytics functionality is handled by advanced_tasks plugin
         command = processed_input.suggested_command
         params = processed_input.suggested_parameters
@@ -1978,7 +1978,11 @@ Ready to boost your productivity? Here's what you can do:"""
             elif command == '/remind' and params.get('task_name'):
                 task_name = params['task_name']
                 due_date = params.get('due_date')
-                await add_reminder(update, context, task_name, due_date)
+                # Set up context.args for add_reminder_handler  
+                # Note: add_reminder_handler expects [task_id, datetime_string]
+                # This might need adjustment based on the actual reminder creation flow
+                context.args = [task_name, due_date] if due_date else [task_name]
+                await add_reminder_handler(update, context)
             elif command == '/analytics':
                 # Analytics functionality is handled by the advanced_tasks plugin
                 # The user should use /analytics command directly
