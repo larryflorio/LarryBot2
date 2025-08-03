@@ -1940,8 +1940,8 @@ Ready to boost your productivity? Here's what you can do:"""
         ContextTypes.DEFAULT_TYPE, processed_input) ->None:
         """Execute the suggested command with extracted parameters."""
         from larrybot.plugins.tasks import add_task_handler
-        from larrybot.plugins.tasks import list_tasks
-        from larrybot.plugins.tasks import search_tasks
+        from larrybot.plugins.tasks import list_tasks_handler
+        from larrybot.plugins.advanced_tasks.filtering import search_tasks_handler
         from larrybot.plugins.reminder import add_reminder
         # Removed incorrect import - analytics functionality is handled by advanced_tasks plugin
         command = processed_input.suggested_command
@@ -1967,10 +1967,14 @@ Ready to boost your productivity? Here's what you can do:"""
             elif command == '/list':
                 priority = params.get('priority')
                 category = params.get('category')
-                await list_tasks(update, context, priority, category)
+                # Set up context.args for list_tasks_handler if needed
+                context.args = []
+                await list_tasks_handler(update, context)
             elif command == '/search' and params.get('query'):
                 query = params['query']
-                await search_tasks(update, context, query)
+                # Set up context.args for search_tasks_handler
+                context.args = [query]
+                await search_tasks_handler(update, context)
             elif command == '/remind' and params.get('task_name'):
                 task_name = params['task_name']
                 due_date = params.get('due_date')
