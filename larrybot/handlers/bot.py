@@ -1772,6 +1772,13 @@ Ready to boost your productivity? Here's what you can do:"""
         context.user_data['nlp_intent'] = processed_input.intent.value
         context.user_data['nlp_entities'] = processed_input.entities
         context.user_data['nlp_sentiment'] = processed_input.context.sentiment
+        
+        # DEBUG: Log the confidence decision
+        logger.error(f"DEBUG: Processing input: {repr(user_message)}")
+        logger.error(f"DEBUG: Processed confidence: {processed_input.confidence}")
+        logger.error(f"DEBUG: Intent: {processed_input.intent}")
+        logger.error(f"DEBUG: Will take {'NARRATIVE' if processed_input.confidence > 0.5 else 'LOW CONFIDENCE'} path")
+        
         if processed_input.confidence > 0.5:
             await self._handle_narrative_intent(update, context,
                 processed_input)
@@ -1895,6 +1902,13 @@ Ready to boost your productivity? Here's what you can do:"""
         ContextTypes.DEFAULT_TYPE, processed_input) ->None:
         """Handle narrative input based on detected intent."""
         from larrybot.nlp.enhanced_narrative_processor import IntentType
+        
+        # DEBUG: Log the exact message content being sent
+        logger.error(f"DEBUG: About to send narrative response with MarkdownV2")
+        logger.error(f"DEBUG: Intent: {processed_input.intent}")
+        logger.error(f"DEBUG: Confidence: {processed_input.confidence}")
+        logger.error(f"DEBUG: Response message content: {repr(processed_input.response_message)}")
+        
         await update.message.reply_text(processed_input.response_message,
             parse_mode='MarkdownV2')
         if processed_input.suggested_command:
@@ -1904,6 +1918,11 @@ Ready to boost your productivity? Here's what you can do:"""
     async def _handle_low_confidence_input(self, update: Update, context:
         ContextTypes.DEFAULT_TYPE, processed_input) ->None:
         """Handle input with low confidence - show help and context-aware command suggestions."""
+        # DEBUG: Log that we're taking the low confidence path
+        logger.error(f"DEBUG: Taking low confidence path")
+        logger.error(f"DEBUG: Intent: {processed_input.intent}")
+        logger.error(f"DEBUG: Confidence: {processed_input.confidence}")
+        
         suggestions = []
         user_context = context.user_data
         if 'editing_task_id' in user_context:
