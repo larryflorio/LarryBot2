@@ -444,13 +444,13 @@ class ErrorRecoveryHelper:
             help_text += (
                 '**Example**: `/add Complete quarterly report by Friday`\n')
             help_text += (
-                '**Example**: `/add Review code changes priority:High`\n')
+                '**Example**: `/add Review code changes priority\\:High`\n')
         elif action == 'edit_task':
             help_text += (
-                '**Example**: `/edit 123 New description priority:High`\n')
+                '**Example**: `/edit 123 New description priority\\:High`\n')
         elif action == 'search':
             help_text += '**Example**: `/search urgent tasks`\n'
-            help_text += '**Example**: `/search priority:High status:Todo`\n'
+            help_text += '**Example**: `/search priority\\:High status\\:Todo`\n'
         if user_level == 'beginner':
             help_text += (
                 '\n💡 **Tip**: Start with simple commands and add complexity gradually\\.'
@@ -1802,10 +1802,19 @@ class EnhancedUXSystem:
         Returns:
             Tuple of (error_message, recovery_keyboard)
         """
-        formatted_error = f"❌ **Error**: {escape_markdown(error_message)}"
+        # Ensure the error message is properly escaped
+        escaped_error_message = escape_markdown(str(error_message))
+        formatted_error = f"❌ **Error**: {escaped_error_message}"
+        
+        # Get help message and ensure it's properly escaped too
         help_message = self.error_recovery_helper.provide_contextual_help({
             'type': error_type, 'message': error_message})
-        full_message = formatted_error + '\n\n' + help_message
+        
+        # Double-check that the help message is escaped by applying escape_markdown to the entire result
+        # This ensures any unescaped content in static help text gets properly escaped
+        escaped_help_message = escape_markdown(help_message) if help_message else ""
+        
+        full_message = formatted_error + '\n\n' + escaped_help_message
         keyboard = self.error_recovery_helper.build_error_recovery_keyboard(
             error_type, context)
         return full_message, keyboard
