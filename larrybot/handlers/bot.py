@@ -1565,6 +1565,9 @@ Ready to boost your productivity? Here's what you can do:"""
         if 'editing_task_id' in context.user_data:
             await self._handle_task_edit_mode(update, context, user_message)
             return
+        if 'adding_note_to_task' in context.user_data:
+            await self._handle_note_addition_mode(update, context, user_message)
+            return
         if 'task_creation_state' in context.user_data:
             from larrybot.plugins.tasks import handle_narrative_task_creation
             await handle_narrative_task_creation(update, context, user_message)
@@ -1594,6 +1597,64 @@ Ready to boost your productivity? Here's what you can do:"""
             return
         await self._process_task_edit(update, context, task_id, new_description
             )
+
+    async def _handle_note_addition_mode(self, update: Update, context:
+        ContextTypes.DEFAULT_TYPE, user_message: str) ->None:
+        """Handle text input when user is in note addition mode."""
+        from larrybot.utils.ux_helpers import MessageFormatter
+        from larrybot.plugins.advanced_tasks import get_task_service
+        
+        task_id = context.user_data['adding_note_to_task']
+        note_content = user_message.strip()
+        
+        if not note_content:
+            await update.message.reply_text(MessageFormatter.
+                format_error_message('Note cannot be empty',
+                'Please provide a valid note or comment.'))
+            return
+            
+        try:
+            # Get the task service and add the comment
+            task_service = get_task_service()
+            result = await task_service.add_comment(task_id, note_content)
+            
+            if result['success']:
+                # Clear the note addition state
+                del context.user_data['adding_note_to_task']
+                
+                # Send success message and return to task view
+                success_message = MessageFormatter.format_success_message(
+                    'Note added successfully', f'Added note to task {task_id}')
+                await update.message.reply_text(success_message, parse_mode='MarkdownV2')
+                
+                # Show the updated task view
+                from larrybot.utils.enhanced_ux_helpers import ProgressiveDisclosureBuilder
+                from larrybot.storage.db import get_optimized_session
+                from larrybot.storage.task_repository import TaskRepository
+                
+                with get_optimized_session() as session:
+                    repository = TaskRepository(session)
+                    task = repository.get_task_by_id(task_id)
+                    if task:
+                        task_data = repository.get_task_details_for_view(task_id)
+                        attachment_count = repository.get_task_attachment_count(task_id)
+                        
+                        message = MessageFormatter.format_task_details_for_view(task_data)
+                        keyboard = ProgressiveDisclosureBuilder.build_progressive_task_keyboard(
+                            task_id=task_id, task_data=task_data, attachment_count=attachment_count)
+                        
+                        await update.message.reply_text(message, reply_markup=keyboard, parse_mode='MarkdownV2')
+            else:
+                await update.message.reply_text(MessageFormatter.
+                    format_error_message('Failed to add note', 
+                    result.get('message', 'Please try again or use /comment command.')),
+                    parse_mode='MarkdownV2')
+                    
+        except Exception as e:
+            logger.error(f'Error adding note to task {task_id}: {e}')
+            await update.message.reply_text(MessageFormatter.
+                format_error_message('Error adding note',
+                'Please try again or use /comment command.'), parse_mode='MarkdownV2')
 
     async def _handle_narrative_intent(self, update: Update, context:
         ContextTypes.DEFAULT_TYPE, processed_input) ->None:
