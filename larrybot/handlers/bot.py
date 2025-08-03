@@ -2066,7 +2066,7 @@ Ready to boost your productivity? Here's what you can do:"""
             
             # Parse the date
             datetime_service = DateTimeService()
-            parsed_date = datetime_service.parse_natural_date(date_input)
+            parsed_date = datetime_service.parse_user_date(date_input)
             
             if not parsed_date:
                 await update.message.reply_text(MessageFormatter.
