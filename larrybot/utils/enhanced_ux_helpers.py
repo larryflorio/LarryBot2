@@ -15,15 +15,17 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+# Import Telegram's official escape helper directly to avoid circular imports
+from telegram.helpers import escape_markdown as _tg_escape_md
+
 def escape_markdown(text: str) -> str:
-    """Escape markdown characters to prevent formatting issues."""
-    if not text:
-        return text
-    # Escape special characters for MarkdownV2
-    escape_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
-    for char in escape_chars:
-        text = text.replace(char, f'\\{char}')
-    return text
+    """Escape markdown characters to prevent formatting issues.
+    
+    Uses Telegram's official helper, same as MessageFormatter.escape_markdown.
+    """
+    if text is None:
+        return None
+    return _tg_escape_md(str(text), version=2)
 
 
 class ButtonType(Enum):
