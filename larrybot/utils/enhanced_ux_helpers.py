@@ -1098,9 +1098,12 @@ class ProgressiveDisclosureBuilder:
         # First row: Done, Edit, Delete
         buttons.append(main_actions)
         
-        # Second row: Attach File, Add Note, Files (if any)
+        # Distribute custom actions across multiple rows (max 3 per row)
         if len(custom_actions) > 0:
-            buttons.append(custom_actions)
+            # Split custom actions into groups of max 3
+            for i in range(0, len(custom_actions), 3):
+                row = custom_actions[i:i+3]
+                buttons.append(row)
         
         # Time Tracking and Dependencies on their own rows
         buttons.append([
