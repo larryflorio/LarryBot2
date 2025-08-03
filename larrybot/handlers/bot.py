@@ -1939,7 +1939,7 @@ Ready to boost your productivity? Here's what you can do:"""
     async def _execute_suggested_command(self, update: Update, context:
         ContextTypes.DEFAULT_TYPE, processed_input) ->None:
         """Execute the suggested command with extracted parameters."""
-        from larrybot.plugins.tasks import add_task
+        from larrybot.plugins.tasks import add_task_handler
         from larrybot.plugins.tasks import list_tasks
         from larrybot.plugins.tasks import search_tasks
         from larrybot.plugins.reminder import add_reminder
@@ -1952,8 +1952,18 @@ Ready to boost your productivity? Here's what you can do:"""
                 priority = params.get('priority', 'Medium')
                 category = params.get('category')
                 due_date = params.get('due_date')
-                await add_task(update, context, description, priority,
-                    category, due_date)
+                
+                # Set up context.args for add_task_handler
+                args = [description]
+                if priority != 'Medium':
+                    args.append(priority)
+                if due_date:
+                    args.append(due_date)
+                if category:
+                    args.append(category)
+                context.args = args
+                
+                await add_task_handler(update, context)
             elif command == '/list':
                 priority = params.get('priority')
                 category = params.get('category')
