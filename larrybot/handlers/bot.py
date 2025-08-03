@@ -206,6 +206,10 @@ class TelegramBotHandler:
             await self._handle_tasks_list(query, context)
         elif callback_data == 'tasks_refresh':
             await self._handle_tasks_refresh(query, context)
+        elif callback_data == 'reminders_list':
+            await self._handle_reminders_list(query, context)
+        elif callback_data == 'reminders_refresh':
+            await self._handle_reminders_refresh(query, context)
         elif callback_data.startswith('reminder_'):
             await self._handle_reminder_callback(query, context)
         elif callback_data.startswith('attachment_'):
@@ -396,15 +400,8 @@ Use commands:
 
     async def _show_reminder_menu(self, query, context: ContextTypes.
         DEFAULT_TYPE) ->None:
-        """Show reminder management menu."""
-        await safe_edit(query.edit_message_text,
-            """⏰ **Reminder Management**
-
-Use commands:
-• /reminders \- List all reminders
-• /addreminder \- Add new reminder
-• /delreminder \- Delete reminder"""
-            , parse_mode='MarkdownV2')
+        """Show interactive reminder list (like /reminders command)."""
+        await self._handle_reminders_list(query, context)
 
     async def _show_analytics_menu(self, query, context: ContextTypes.
         DEFAULT_TYPE) ->None:
@@ -3885,3 +3882,92 @@ Track time spent on this task to monitor productivity\\.
                 self.message = query.message
         dummy_update = DummyUpdate(query)
         await _list_incomplete_tasks_default(dummy_update)
+
+    async def _handle_reminders_list(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handle reminders list view (callback version of /reminders command)."""
+        from larrybot.storage.db import get_session
+        from larrybot.storage.reminder_repository import ReminderRepository
+        from larrybot.storage.task_repository import TaskRepository
+        from larrybot.utils.ux_helpers import KeyboardBuilder, MessageFormatter
+        from larrybot.utils.datetime_utils import get_current_datetime, format_datetime_for_display, safe_datetime_arithmetic
+        from larrybot.utils.telegram_safe import safe_edit
+        
+        try:
+            with next(get_session()) as session:
+                repo = ReminderRepository(session)
+                reminders = repo.list_reminders()
+                
+                if not reminders:
+                    await safe_edit(query.edit_message_text, 
+                        MessageFormatter.format_error_message('No reminders found',
+                            'Use /addreminder to create your first reminder'),
+                        parse_mode='MarkdownV2')
+                    return
+                
+                # Sort reminders by reminder time
+                reminders.sort(key=lambda r: r.remind_at)
+                
+                # Build the message with enhanced formatting
+                message = f'⏰ **All Reminders** \\({len(reminders)} active\\)\n\n'
+                now = get_current_datetime()
+                
+                for i, reminder in enumerate(reminders, 1):
+                    task_repo = TaskRepository(session)
+                    task = task_repo.get_task_by_id(reminder.task_id)
+                    task_description = task.description if task else f'Task {reminder.task_id}'
+                    
+                    time_until = safe_datetime_arithmetic(reminder.remind_at, now)
+                    
+                    # Status indicators with color coding
+                    if time_until.total_seconds() <= 0:
+                        status_emoji = '🔴'
+                        status_text = 'Overdue'
+                    elif time_until.total_seconds() <= 3600:  # 1 hour
+                        status_emoji = '🟠'
+                        status_text = 'Due soon'
+                    elif time_until.total_seconds() <= 86400:  # 1 day
+                        status_emoji = '🟡'
+                        status_text = 'Due today'
+                    else:
+                        status_emoji = '🟢'
+                        status_text = 'Future'
+                    
+                    # Format time until due
+                    if time_until.total_seconds() <= 0:
+                        time_text = 'Overdue'
+                    else:
+                        hours = int(time_until.total_seconds() // 3600)
+                        minutes = int(time_until.total_seconds() % 3600 // 60)
+                        if hours > 24:
+                            days = hours // 24
+                            hours = hours % 24
+                            time_text = f'{days}d {hours}h'
+                        elif hours > 0:
+                            time_text = f'{hours}h {minutes}m'
+                        else:
+                            time_text = f'{minutes}m'
+                    
+                    # Add reminder to message
+                    message += f"""{i}\\. {status_emoji} **{MessageFormatter.escape_markdown(task_description)}**
+   🕐 {format_datetime_for_display(reminder.remind_at, '%Y-%m-%d %H:%M')}
+   ⏰ {time_text} \\({status_text}\\)
+   📋 Task ID: {reminder.task_id}
+   🆔 Reminder ID: {reminder.id}
+
+"""
+                
+                # Build enhanced keyboard with navigation and actions
+                keyboard = KeyboardBuilder.build_reminder_list_keyboard()
+                await safe_edit(query.edit_message_text, message, 
+                    reply_markup=keyboard, parse_mode='MarkdownV2')
+                    
+        except Exception as e:
+            logger.error(f'Error showing reminders list: {e}')
+            await safe_edit(query.edit_message_text, 
+                MessageFormatter.format_error_message('Failed to load reminders',
+                    'Please try again or use /reminders command.'), 
+                parse_mode='MarkdownV2')
+
+    async def _handle_reminders_refresh(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handle reminders list refresh."""
+        await self._handle_reminders_list(query, context)

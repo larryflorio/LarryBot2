@@ -380,16 +380,16 @@ class KeyboardBuilder:
     @staticmethod
     def build_reminder_list_keyboard() ->InlineKeyboardMarkup:
         """
-        Build keyboard for reminder list actions.
+        Build enhanced keyboard for reminder list actions with navigation.
         
         Returns:
-            InlineKeyboardMarkup for reminder list actions
+            InlineKeyboardMarkup for reminder list actions and navigation
         """
         keyboard = [[UnifiedButtonBuilder.create_button(text=
             '➕ Add Reminder', callback_data='reminder_add', button_type=ButtonType.PRIMARY), UnifiedButtonBuilder.create_button(text=
             '📊 Statistics', callback_data='reminder_stats', button_type=ButtonType.SECONDARY)], [UnifiedButtonBuilder.create_button(text=
-            '🔄 Refresh', callback_data='reminder_refresh', button_type=ButtonType.SECONDARY), UnifiedButtonBuilder.create_button(text=
-            '⬅️ Back', callback_data='nav_main', button_type=ButtonType.INFO)]]
+            '🔄 Refresh', callback_data='reminders_refresh', button_type=ButtonType.SECONDARY), UnifiedButtonBuilder.create_button(text=
+            '🏠 Main Menu', callback_data='nav_main', button_type=ButtonType.INFO)]]
         return InlineKeyboardMarkup(keyboard)
 
     @staticmethod

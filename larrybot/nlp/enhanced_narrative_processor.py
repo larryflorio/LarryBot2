@@ -402,16 +402,16 @@ class EnhancedNarrativeProcessor:
                 escaped_due = MessageFormatter.escape_markdown(str(due))
                 response += f' on {escaped_due}'
             response += (
-                '.\n\n💡 **Suggested command:**\n`/remind {escaped_reminder}`')
+                '\.\n\n💡 **Suggested command:**\n`/remind {escaped_reminder}`')
             return response
         elif intent == IntentType.GET_ANALYTICS:
-            return """📊 I'll show you your analytics and stats.
+            return """📊 I'll show you your analytics and stats\.
 
 💡 **Suggested command:**
 `/analytics`"""
         elif intent == IntentType.UNKNOWN:
             return self._generate_unknown_response()
-        return 'I understand you want to work with tasks. How can I help you?'
+        return 'I understand you want to work with tasks\. How can I help you?'
 
     def _generate_task_creation_response(self, entities: Dict[str, Any],
         suggested_parameters: Dict[str, Any]) ->str:
@@ -447,7 +447,7 @@ class EnhancedNarrativeProcessor:
         from larrybot.utils.ux_helpers import MessageFormatter
         task_name = entities.get('task_name', 'this task')
         escaped_task_name = MessageFormatter.escape_markdown(task_name)
-        return f"""✅ I'll mark '{escaped_task_name}' as complete.
+        return f"""✅ I'll mark '{escaped_task_name}' as complete\.
 
 💡 **Suggested command:**
 `/done <task_id>`"""
@@ -468,7 +468,7 @@ class EnhancedNarrativeProcessor:
                     'suggested_category']))
                 filters.append(f'category: {category}')
             response += f" filtered by {', '.join(filters)}"
-        response += '.\n\n💡 **Suggested command:**\n`/list`'
+        response += '\.\n\n💡 **Suggested command:**\n`/list`'
         return response
 
     def _generate_task_search_response(self, entities: Dict[str, Any]) ->str:
@@ -476,7 +476,7 @@ class EnhancedNarrativeProcessor:
         from larrybot.utils.ux_helpers import MessageFormatter
         search_term = entities.get('task_name', 'your search')
         escaped_search_term = MessageFormatter.escape_markdown(search_term)
-        return f"""🔍 I'll search for tasks related to '{escaped_search_term}'.
+        return f"""🔍 I'll search for tasks related to '{escaped_search_term}'\.
 
 💡 **Suggested command:**
 `/search {escaped_search_term}`"""
@@ -487,7 +487,7 @@ class EnhancedNarrativeProcessor:
         from larrybot.utils.ux_helpers import MessageFormatter
         habit_name = entities.get('task_name', 'this habit')
         escaped_habit_name = MessageFormatter.escape_markdown(habit_name)
-        return f"""🔄 I'll create a habit for '{escaped_habit_name}'.
+        return f"""🔄 I'll create a habit for '{escaped_habit_name}'\.
 
 💡 **Suggested command:**
 `/habit_add {escaped_habit_name}`"""
