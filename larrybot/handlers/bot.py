@@ -1934,7 +1934,7 @@ Ready to boost your productivity? Here's what you can do:"""
 
 """
              + '\n'.join(f'• {s}' for s in suggestions))
-        await update.message.reply_text(help_message)
+        await update.message.reply_text(help_message, parse_mode=None)
 
     async def _execute_suggested_command(self, update: Update, context:
         ContextTypes.DEFAULT_TYPE, processed_input) ->None:
