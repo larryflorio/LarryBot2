@@ -494,14 +494,19 @@ class EnhancedNarrativeProcessor:
 
     def _generate_unknown_response(self) ->str:
         """Generate response for unknown intent."""
-        return """🤔 I'm not sure what you'd like to do. Here are some examples:
+        from larrybot.utils.ux_helpers import MessageFormatter
+        
+        # Content with proper escaping for MarkdownV2
+        content = """🤔 I'm not sure what you'd like to do\\. Here are some examples:
 
 • "Add a task to review the quarterly report"
-• "Remind me to call the client tomorrow"
+• "Remind me to call the client tomorrow"  
 • "Show me my high priority tasks"
 • "Mark the project review as done"
 
-💡 You can also use commands like `/add`, `/list`, `/search`, etc."""
+💡 You can also use commands like `/add`, `/list`, `/search`, etc\\."""
+        
+        return content
 
     def _update_conversation_context(self, user_id: int, intent: IntentType,
         entities: Dict[str, Any], sentiment: str, context: NarrativeContext
