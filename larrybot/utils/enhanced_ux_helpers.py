@@ -1806,15 +1806,12 @@ class EnhancedUXSystem:
         escaped_error_message = escape_markdown(str(error_message))
         formatted_error = f"❌ **Error**: {escaped_error_message}"
         
-        # Get help message and ensure it's properly escaped too
+        # Get help message - this already returns properly escaped content
         help_message = self.error_recovery_helper.provide_contextual_help({
             'type': error_type, 'message': error_message})
         
-        # Double-check that the help message is escaped by applying escape_markdown to the entire result
-        # This ensures any unescaped content in static help text gets properly escaped
-        escaped_help_message = escape_markdown(help_message) if help_message else ""
-        
-        full_message = formatted_error + '\n\n' + escaped_help_message
+        # The help message is already escaped by provide_contextual_help, so use it directly
+        full_message = formatted_error + '\n\n' + (help_message if help_message else "")
         keyboard = self.error_recovery_helper.build_error_recovery_keyboard(
             error_type, context)
         return full_message, keyboard
