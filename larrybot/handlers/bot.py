@@ -377,9 +377,9 @@ class TelegramBotHandler:
             """👥 **Client Management**
 
 Use commands:
-• /allclients - List all clients
-• /addclient - Add new client
-• /client - View client details"""
+• /allclients \- List all clients
+• /addclient \- Add new client
+• /client \- View client details"""
             , parse_mode='MarkdownV2')
 
     async def _show_habit_menu(self, query, context: ContextTypes.DEFAULT_TYPE
@@ -389,9 +389,9 @@ Use commands:
             """🔄 **Habit Management**
 
 Use commands:
-• /habit_list - List all habits
-• /habit_add - Add new habit
-• /habit_done - Mark habit complete"""
+• /habit_list \- List all habits
+• /habit_add \- Add new habit
+• /habit_done \- Mark habit complete"""
             , parse_mode='MarkdownV2')
 
     async def _show_reminder_menu(self, query, context: ContextTypes.
@@ -401,9 +401,9 @@ Use commands:
             """⏰ **Reminder Management**
 
 Use commands:
-• /reminders - List all reminders
-• /addreminder - Add new reminder
-• /delreminder - Delete reminder"""
+• /reminders \- List all reminders
+• /addreminder \- Add new reminder
+• /delreminder \- Delete reminder"""
             , parse_mode='MarkdownV2')
 
     async def _show_analytics_menu(self, query, context: ContextTypes.
@@ -413,9 +413,9 @@ Use commands:
             """📊 **Analytics**
 
 Use commands:
-• /analytics - Task analytics
-• /clientanalytics - Client analytics
-• /productivity_report - Detailed report"""
+• /analytics \- Task analytics
+• /clientanalytics \- Client analytics
+• /productivity_report \- Detailed report"""
             , parse_mode='MarkdownV2')
 
     async def _show_bulk_status_menu(self, query, context: ContextTypes.
