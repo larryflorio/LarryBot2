@@ -3174,16 +3174,16 @@ Please send the file you want to attach to this task.
                     button_type=ButtonType.SECONDARY)]
             ])
             await safe_edit(query.edit_message_text,
-                f"""📝 **Add Note to Task #{task_id}**
+                f"""📝 **Add Note to Task \\#{task_id}**
 
-Please reply with the note or comment you want to add to this task.
+Please reply with the note or comment you want to add to this task\\.
 
 **Examples:**
 • "Started working on this task"
 • "Waiting for client feedback"
 • "Blocked by dependency X"
 
-You can also use `/comment {task_id} <your note>` command.""", 
+You can also use `/comment {task_id} <your note>` command\\.""", 
                 reply_markup=keyboard, parse_mode='MarkdownV2')
         except Exception as e:
             logger.error(f'Error starting note addition for task {task_id}: {e}')
