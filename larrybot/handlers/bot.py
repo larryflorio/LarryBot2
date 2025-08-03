@@ -3367,8 +3367,7 @@ Choose what you'd like to learn about:"""
                     'system_error',
                     '⚠️ System temporarily unavailable. Please try again in a moment.'
                     , error_context))
-                await update.effective_message.reply_text(
-                    MessageFormatter.escape_markdown(error_message),
+                await update.effective_message.reply_text(error_message,
                     reply_markup=recovery_keyboard, parse_mode='MarkdownV2')
             except Exception as e:
                 logger.error(
