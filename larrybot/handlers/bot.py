@@ -967,12 +967,12 @@ Task editing was cancelled. No changes were made."""
     async def _handle_task_delete(self, query, context: ContextTypes.
         DEFAULT_TYPE, task_id: int) ->None:
         """Handle task deletion via callback."""
-        from larrybot.utils.ux_helpers import KeyboardBuilder
-        await safe_edit(query.edit_message_text,
-            f"""🗑️ **Confirm Task Deletion**
+        from larrybot.utils.ux_helpers import KeyboardBuilder, MessageFormatter
+        message = f"""🗑️ **Confirm Task Deletion**
 
-Are you sure you want to delete Task #{task_id}?"""
-            , reply_markup=KeyboardBuilder.build_confirmation_keyboard(
+Are you sure you want to delete Task \\#{task_id}?"""
+        await safe_edit(query.edit_message_text, message,
+            reply_markup=KeyboardBuilder.build_confirmation_keyboard(
             'task_delete', task_id), parse_mode='MarkdownV2')
 
     async def _confirm_task_delete(self, query, context: ContextTypes.
