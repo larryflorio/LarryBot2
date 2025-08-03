@@ -2346,9 +2346,10 @@ Choose what you'd like to learn about:"""
 
         if result['success'] and result['data']['attachments']:
             attachments = result['data']['attachments']
-            message = f"📎 **Attachments for Task #{task_id}**\n\n"
+            message = f"📎 **Attachments for Task \\#{task_id}**\n\n"
             for att in attachments:
-                message += f"📄 {MessageFormatter.escape_markdown(att['filename'])} ({att['size'] // 1024} KB)\n"
+                # Don't escape the filename - display it as plain text
+                message += f"📄 {att['filename']} ({att['size'] // 1024} KB)\n"
             
             # Build keyboard with download buttons for each attachment
             buttons = []
