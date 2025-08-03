@@ -187,8 +187,7 @@ class TelegramBotHandler:
             await self._handle_navigation_main(query, context)
         elif callback_data == 'cancel_action':
             await self._handle_cancel_action(query, context)
-        elif callback_data.startswith('task_disclose:'):
-            await self._handle_task_disclosure(query, context)
+
         elif callback_data.startswith('task_'):
             await self._handle_task_callback(query, context)
         elif callback_data.startswith('client_'):
@@ -267,9 +266,7 @@ class TelegramBotHandler:
         elif callback_data.startswith('task_time_stats:'):
             task_id = int(callback_data.split(':')[1])
             await self._handle_task_time_stats(query, context, task_id)
-        elif callback_data.startswith('task_analytics:'):
-            task_id = int(callback_data.split(':')[1])
-            await self._handle_task_analytics(query, context, task_id)
+
         elif callback_data.startswith('task_dependencies:'):
             task_id = int(callback_data.split(':')[1])
             await self._handle_task_dependencies(query, context, task_id)
@@ -1685,31 +1682,7 @@ Ready to boost your productivity? Here's what you can do:"""
                 "❌ Sorry, I couldn't execute that command automatically. Please try using the command directly."
                 )
 
-    async def _handle_task_disclosure(self, query, context: ContextTypes.
-        DEFAULT_TYPE) ->None:
-        """Handle progressive disclosure for task views."""
-        try:
-            await query.answer()
-            parts = query.data.split(':')
-            if len(parts) >= 3:
-                task_id = int(parts[1])
-                disclosure_level = int(parts[2])
-                context.user_data[f'task_disclosure_{task_id}'
-                    ] = disclosure_level
-                await self._handle_task_view(query, context, task_id)
-            else:
-                logger.error(
-                    f'Invalid task disclosure callback data: {query.data}')
-                await safe_edit(query.edit_message_text, MessageFormatter.
-                    format_error_message('Invalid disclosure data',
-                    'Please try again or use a different action.'),
-                    parse_mode='MarkdownV2')
-        except (ValueError, IndexError) as e:
-            logger.error(f'Error parsing task disclosure callback: {e}')
-            await safe_edit(query.edit_message_text, MessageFormatter.
-                format_error_message('Error processing request',
-                'Please try again or use a different action.'), parse_mode=
-                'MarkdownV2')
+
 
     async def _process_task_edit(self, update: Update, context:
         ContextTypes.DEFAULT_TYPE, task_id: int, new_description: str) ->None:
@@ -1898,12 +1871,9 @@ Ready to boost your productivity? Here's what you can do:"""
                 if suggestions:
                     escaped_suggestions = [MessageFormatter.escape_markdown(suggestion) for suggestion in suggestions]
                     message += '\n\n' + '\n'.join(escaped_suggestions)
-                disclosure_level = context.user_data.get(
-                    f'task_disclosure_{task_id}', 1)
                 keyboard = (ProgressiveDisclosureBuilder.
                     build_progressive_task_keyboard(task_id=task_id,
-                    task_data=task_data, disclosure_level=disclosure_level,
-                    attachment_count=attachment_count))
+                    task_data=task_data, attachment_count=attachment_count))
                 await safe_edit(query.edit_message_text, message,
                     reply_markup=keyboard, parse_mode='MarkdownV2')
         except Exception as e:
@@ -3348,50 +3318,7 @@ Track time spent on this task to monitor productivity\\.
                 'Please try again or use /time_summary command.'), parse_mode=
                 'MarkdownV2')
 
-    async def _handle_task_analytics(self, query, context: ContextTypes.DEFAULT_TYPE, task_id: int) -> None:
-        """Handle task analytics button press."""
-        try:
-            from larrybot.plugins.advanced_tasks import get_task_service
-            from larrybot.utils.ux_helpers import MessageFormatter
-            
-            # Get the task service
-            task_service = get_task_service()
-            
-            # Get analytics data for the past 30 days
-            result = await task_service.get_advanced_task_analytics(30)
-            
-            if result['success']:
-                analytics_data = result['data']
-                
-                # Use the proper analytics formatter  
-                from larrybot.utils.ux_helpers import AnalyticsFormatter
-                formatted_message = AnalyticsFormatter.format_task_analytics(analytics_data)
-                
-                # Add back to task button
-                from larrybot.utils.enhanced_ux_helpers import UnifiedButtonBuilder, ButtonType
-                keyboard = InlineKeyboardMarkup([[
-                    UnifiedButtonBuilder.create_button(
-                        text='🔙 Back to Task', 
-                        callback_data=f'task_view:{task_id}', 
-                        button_type=ButtonType.SECONDARY
-                    )
-                ]])
-                
-                # Use Markdown instead of MarkdownV2 to avoid parsing issues
-                await safe_edit(query.edit_message_text, formatted_message, 
-                    reply_markup=keyboard, parse_mode='Markdown')
-            else:
-                await safe_edit(query.edit_message_text, MessageFormatter.
-                    format_error_message('Failed to load analytics',
-                    result.get('message', 'Unable to generate analytics.')), 
-                    parse_mode='MarkdownV2')
-            
-        except Exception as e:
-            logger.error(f'Error showing analytics for task {task_id}: {e}')
-            await safe_edit(query.edit_message_text, MessageFormatter.
-                format_error_message('Failed to load task analytics',
-                'Please try again or use /analytics command.'), parse_mode=
-                'MarkdownV2')
+
 
     async def _handle_task_dependencies(self, query, context: ContextTypes.DEFAULT_TYPE, task_id: int) -> None:
         """Handle task dependencies button press."""

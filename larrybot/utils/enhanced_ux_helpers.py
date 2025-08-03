@@ -1049,7 +1049,7 @@ class ProgressiveDisclosureBuilder:
 
     @staticmethod
     def build_progressive_task_keyboard(task_id: int, task_data: Dict[str,
-        Any], disclosure_level: int=1, attachment_count: int=0) ->InlineKeyboardMarkup:
+        Any], attachment_count: int=0) ->InlineKeyboardMarkup:
         """
         Build a progressive disclosure keyboard for tasks.
         Ensures no more than 3 buttons per row.
@@ -1094,7 +1094,7 @@ class ProgressiveDisclosureBuilder:
         if len(custom_actions) > 0:
             buttons.append(custom_actions)
         
-        # Time Tracking button on its own row
+        # Time Tracking and Dependencies on their own rows
         buttons.append([
             UnifiedButtonBuilder.create_button(
                 text='⏱️ Time Tracking',
@@ -1104,33 +1104,14 @@ class ProgressiveDisclosureBuilder:
             )
         ])
         
-        # More Options (advanced actions)
-        if disclosure_level < 3:
-            buttons.append([
-                UnifiedButtonBuilder.create_button(
-                    text='⚙️ More Options',
-                    callback_data=f'task_disclose:{task_id}:{disclosure_level + 1}',
-                    button_type=ButtonType.SECONDARY,
-                    custom_emoji='➕'
-                )
-            ])
-        
-        if disclosure_level >= 3:
-            # Advanced actions (Analytics, Dependencies, etc.)
-            adv_row = []
-            adv_row.append(UnifiedButtonBuilder.create_button(
-                text='Analytics',
-                callback_data=f'task_analytics:{task_id}',
-                button_type=ButtonType.SECONDARY,
-                custom_emoji='📊'
-            ))
-            adv_row.append(UnifiedButtonBuilder.create_button(
-                text='Dependencies',
+        buttons.append([
+            UnifiedButtonBuilder.create_button(
+                text='🔗 Dependencies',
                 callback_data=f'task_dependencies:{task_id}',
                 button_type=ButtonType.SECONDARY,
                 custom_emoji='🔗'
-            ))
-            buttons.append(adv_row)
+            )
+        ])
             
         return InlineKeyboardMarkup(buttons)
 
