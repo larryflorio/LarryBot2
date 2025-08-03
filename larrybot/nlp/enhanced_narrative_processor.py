@@ -435,7 +435,7 @@ class EnhancedNarrativeProcessor:
             suggestions.append(f'due: {date}')
         if suggestions:
             response += f" with {', '.join(suggestions)}"
-        response += '.\n\n💡 **Suggested command:**\n'
+        response += '\\.\n\n💡 **Suggested command:**\n'
         escaped_description = MessageFormatter.escape_markdown(str(
             suggested_parameters.get('description', task_name)))
         response += f'`{escaped_description}`'
