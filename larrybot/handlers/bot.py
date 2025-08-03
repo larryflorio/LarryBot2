@@ -1618,9 +1618,6 @@ Ready to boost your productivity? Here's what you can do:"""
             task_service = get_task_service()
             result = await task_service.add_comment(task_id, note_content)
             
-            # Debug: Check result type
-            logger.info(f"add_comment result type: {type(result)}, value: {result}")
-            
             if isinstance(result, dict) and result.get('success'):
                 # Clear the note addition state
                 del context.user_data['adding_note_to_task']
@@ -1636,13 +1633,32 @@ Ready to boost your productivity? Here's what you can do:"""
                 from larrybot.storage.task_repository import TaskRepository
                 
                 with get_optimized_session() as session:
+                    from larrybot.services.task_attachment_service import TaskAttachmentService
+                    from larrybot.storage.task_attachment_repository import TaskAttachmentRepository
+                    
                     repository = TaskRepository(session)
                     task = repository.get_task_by_id(task_id)
                     if task:
-                        task_data = repository.get_task_details_for_view(task_id)
-                        attachment_count = repository.get_task_attachment_count(task_id)
+                        # Get attachment count using the service
+                        attachment_service = TaskAttachmentService(TaskAttachmentRepository(session), repository)
+                        attachments_result = await attachment_service.get_task_attachments(task_id)
+                        attachment_count = len(attachments_result['data']['attachments']) if attachments_result['success'] else 0
                         
-                        message = MessageFormatter.format_task_details_for_view(task_data)
+                        # Construct task_data manually like in _handle_task_view
+                        task_data = {
+                            'id': task.id, 
+                            'description': task.description,
+                            'status': getattr(task, 'status', 'Todo'), 
+                            'priority': getattr(task, 'priority', 'Medium'), 
+                            'due_date': getattr(task, 'due_date', None), 
+                            'category': getattr(task, 'category', None), 
+                            'tags': getattr(task, 'tags', None), 
+                            'created_at': getattr(task, 'created_at', None),
+                            'attachment_count': attachment_count
+                        }
+                        details = {k: v for k, v in task_data.items() if v is not None and k != 'id'}
+                        
+                        message = MessageFormatter.format_task_details_for_view(details)
                         keyboard = ProgressiveDisclosureBuilder.build_progressive_task_keyboard(
                             task_id=task_id, task_data=task_data, attachment_count=attachment_count)
                         
