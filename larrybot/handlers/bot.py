@@ -1617,41 +1617,31 @@ Ready to boost your productivity? Here's what you can do:"""
             # Get the task service and add the comment
             task_service = get_task_service()
             result = await task_service.add_comment(task_id, note_content)
-            logger.info(f"Step 1: add_comment result: {type(result)}")
             
             if isinstance(result, dict) and result.get('success'):
                 # Clear the note addition state
                 del context.user_data['adding_note_to_task']
                 
                 # Send success message and return to task view
-                logger.info(f"Step 2: About to format success message")
                 success_message = MessageFormatter.format_success_message(
-                    'Note added successfully', f'Added note to task {task_id}')
-                logger.info(f"Step 3: Success message formatted")
+                    'Note added successfully', {'task_id': task_id, 'action': 'note_added'})
                 await update.message.reply_text(success_message, parse_mode='MarkdownV2')
-                logger.info(f"Step 4: Success message sent")
                 
                 # Show the updated task view
-                logger.info(f"Step 5: About to show updated task view")
                 from larrybot.utils.enhanced_ux_helpers import ProgressiveDisclosureBuilder
                 from larrybot.storage.db import get_optimized_session
                 from larrybot.storage.task_repository import TaskRepository
                 
-                logger.info(f"Step 6: About to get session")
                 with get_optimized_session() as session:
                     from larrybot.services.task_attachment_service import TaskAttachmentService
                     from larrybot.storage.task_attachment_repository import TaskAttachmentRepository
                     
-                    logger.info(f"Step 7: Got session, creating repository")
                     repository = TaskRepository(session)
                     task = repository.get_task_by_id(task_id)
-                    logger.info(f"Step 8: Got task: {task}")
                     if task:
                         # Get attachment count using the service
-                        logger.info(f"Step 9: About to get attachments")
                         attachment_service = TaskAttachmentService(TaskAttachmentRepository(session), repository)
                         attachments_result = await attachment_service.get_task_attachments(task_id)
-                        logger.info(f"Step 10: Got attachments result: {type(attachments_result)}")
                         attachment_count = len(attachments_result['data']['attachments']) if attachments_result['success'] else 0
                         
                         # Construct task_data manually like in _handle_task_view
