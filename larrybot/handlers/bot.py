@@ -393,9 +393,9 @@ Use commands:
             """🔄 **Habit Management**
 
 Use commands:
-• /habit_list \- List all habits
-• /habit_add \- Add new habit
-• /habit_done \- Mark habit complete"""
+• /habit\_list \- List all habits
+• /habit\_add \- Add new habit
+• /habit\_done \- Mark habit complete"""
             , parse_mode='MarkdownV2')
 
     async def _show_reminder_menu(self, query, context: ContextTypes.

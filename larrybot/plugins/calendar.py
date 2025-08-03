@@ -293,14 +293,14 @@ async def accounts_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
                 '• `/agenda [account_id]` \\- Show agenda for specific account\n'
                 )
             message += (
-                '• `/account_primary [account_id]` \\- Set account as primary\n'
+                '• `/account\_primary [account_id]` \\- Set account as primary\n'
                 )
             message += (
-                '• `/account_rename [account_id] [name]` \\- Rename account\n')
+                '• `/account\_rename [account_id] [name]` \\- Rename account\n')
             message += (
-                '• `/account_deactivate [account_id]` \\- Deactivate account\n'
+                '• `/account\_deactivate [account_id]` \\- Deactivate account\n'
                 )
-            message += '• `/account_delete [account_id]` \\- Delete account\n'
+            message += '• `/account\_delete [account_id]` \\- Delete account\n'
             await update.message.reply_text(message, parse_mode='MarkdownV2')
     except Exception as e:
         await update.message.reply_text(MessageFormatter.
