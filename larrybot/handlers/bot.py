@@ -3377,7 +3377,7 @@ Choose what you'd like to learn about:"""
                     await update.effective_message.reply_text(MessageFormatter
                         .format_error_message(
                         '⚠️ System temporarily unavailable',
-                        'Please try again in a moment\\. If the issue persists, check your network connection\\.'
+                        'Please try again in a moment. If the issue persists, check your network connection.'
                         ), parse_mode='MarkdownV2')
                 except Exception as fallback_e:
                     logger.error(
