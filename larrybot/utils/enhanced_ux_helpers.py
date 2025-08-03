@@ -1049,7 +1049,7 @@ class ProgressiveDisclosureBuilder:
 
     @staticmethod
     def build_progressive_task_keyboard(task_id: int, task_data: Dict[str,
-        Any], attachment_count: int=0) ->InlineKeyboardMarkup:
+        Any], attachment_count: int=0, comment_count: int=0) ->InlineKeyboardMarkup:
         """
         Build a progressive disclosure keyboard for tasks.
         Ensures no more than 3 buttons per row.
@@ -1084,6 +1084,14 @@ class ProgressiveDisclosureBuilder:
                 callback_data=f'attachment_list:{task_id}',
                 button_type=ButtonType.INFO,
                 custom_emoji='📄'
+            ))
+        
+        if comment_count > 0:
+            custom_actions.append(UnifiedButtonBuilder.create_button(
+                text=f'💬 Notes ({comment_count})',
+                callback_data=f'task_notes_list:{task_id}',
+                button_type=ButtonType.INFO,
+                custom_emoji='💬'
             ))
 
         # Group into rows of max 3, but distribute more evenly

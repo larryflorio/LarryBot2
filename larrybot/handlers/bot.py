@@ -270,6 +270,9 @@ class TelegramBotHandler:
         elif callback_data.startswith('task_dependencies:'):
             task_id = int(callback_data.split(':')[1])
             await self._handle_task_dependencies(query, context, task_id)
+        elif callback_data.startswith('task_notes_list:'):
+            task_id = int(callback_data.split(':')[1])
+            await self._handle_task_notes_list(query, context, task_id)
         elif callback_data == 'task_edit_cancel':
             await self._handle_task_edit_cancel(query, context)
         elif callback_data == 'tasks_list':
@@ -1644,6 +1647,10 @@ Ready to boost your productivity? Here's what you can do:"""
                         attachments_result = await attachment_service.get_task_attachments(task_id)
                         attachment_count = len(attachments_result['data']['attachments']) if attachments_result['success'] else 0
                         
+                        # Get comment count
+                        comments = repository.get_comments(task_id)
+                        comment_count = len(comments)
+                        
                         # Construct task_data manually like in _handle_task_view
                         task_data = {
                             'id': task.id, 
@@ -1660,7 +1667,7 @@ Ready to boost your productivity? Here's what you can do:"""
                         
                         message = MessageFormatter.format_task_details_for_view(details)
                         keyboard = ProgressiveDisclosureBuilder.build_progressive_task_keyboard(
-                            task_id=task_id, task_data=task_data, attachment_count=attachment_count)
+                            task_id=task_id, task_data=task_data, attachment_count=attachment_count, comment_count=comment_count)
                         
                         await update.message.reply_text(message, reply_markup=keyboard, parse_mode='MarkdownV2')
             else:
@@ -1927,6 +1934,10 @@ Ready to boost your productivity? Here's what you can do:"""
                 attachment_service = TaskAttachmentService(TaskAttachmentRepository(session), repo)
                 attachments_result = await attachment_service.get_task_attachments(task_id)
                 attachment_count = len(attachments_result['data']['attachments']) if attachments_result['success'] else 0
+                
+                # Get comment count
+                comments = repo.get_comments(task_id)
+                comment_count = len(comments)
 
                 task_data = {'id': task.id, 'description': task.description,
                     'status': getattr(task, 'status', 'Todo'), 'priority':
@@ -1958,7 +1969,7 @@ Ready to boost your productivity? Here's what you can do:"""
                     message += '\n\n' + '\n'.join(escaped_suggestions)
                 keyboard = (ProgressiveDisclosureBuilder.
                     build_progressive_task_keyboard(task_id=task_id,
-                    task_data=task_data, attachment_count=attachment_count))
+                    task_data=task_data, attachment_count=attachment_count, comment_count=comment_count))
                 await safe_edit(query.edit_message_text, message,
                     reply_markup=keyboard, parse_mode='MarkdownV2')
         except Exception as e:
@@ -3459,6 +3470,64 @@ Track time spent on this task to monitor productivity\\.
                 format_error_message('Failed to load task dependencies',
                 'Please try again or use /dependency command.'), parse_mode=
                 'MarkdownV2')
+
+    async def _handle_task_notes_list(self, query, context: ContextTypes.DEFAULT_TYPE, task_id: int) -> None:
+        """Handle task notes/comments list button press."""
+        try:
+            from larrybot.storage.db import get_optimized_session
+            from larrybot.storage.task_repository import TaskRepository
+            from larrybot.utils.ux_helpers import MessageFormatter
+            from larrybot.utils.enhanced_ux_helpers import UnifiedButtonBuilder, ButtonType
+            from datetime import datetime
+            
+            with get_optimized_session() as session:
+                repository = TaskRepository(session)
+                
+                # Get task to verify it exists
+                task = repository.get_task_by_id(task_id)
+                if not task:
+                    await safe_edit(query.edit_message_text, MessageFormatter.
+                        format_error_message('Task not found',
+                        f'Task {task_id} not found.'), parse_mode='MarkdownV2')
+                    return
+                
+                # Get comments for the task
+                comments = repository.get_comments(task_id)
+                
+                if comments:
+                    message = f"💬 **Task Notes & Comments**\n\n"
+                    message += f"**Task \\#{task_id}**: {MessageFormatter.escape_markdown(task.description)}\n\n"
+                    
+                    for i, comment in enumerate(comments, 1):
+                        # Format the creation date
+                        created_at = comment.created_at.strftime('%Y-%m-%d %H:%M') if comment.created_at else 'Unknown date'
+                        
+                        message += f"**{i}\\.**\n"
+                        message += f"📝 {MessageFormatter.escape_markdown(comment.comment)}\n"
+                        message += f"🕒 *{created_at}*\n\n"
+                else:
+                    message = f"💬 **Task Notes & Comments**\n\n"
+                    message += f"**Task \\#{task_id}**: {MessageFormatter.escape_markdown(task.description)}\n\n"
+                    message += f"No notes or comments have been added to this task yet\\.\n\n"
+                    message += f"💡 **Tip**: Use the '📝 Add Note' button to add your first note\\!"
+                
+                # Add back to task button
+                keyboard = InlineKeyboardMarkup([[
+                    UnifiedButtonBuilder.create_button(
+                        text='🔙 Back to Task', 
+                        callback_data=f'task_view:{task_id}', 
+                        button_type=ButtonType.SECONDARY
+                    )
+                ]])
+                
+                await safe_edit(query.edit_message_text, message, 
+                    reply_markup=keyboard, parse_mode='MarkdownV2')
+                
+        except Exception as e:
+            logger.error(f'Error showing notes for task {task_id}: {e}')
+            await safe_edit(query.edit_message_text, MessageFormatter.
+                format_error_message('Failed to load task notes',
+                'Please try again or use /comment command.'), parse_mode='MarkdownV2')
 
     async def _handle_tasks_list(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Unified task list view for all entry points (callback version of /list)."""
