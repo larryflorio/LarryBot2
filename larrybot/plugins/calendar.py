@@ -211,6 +211,30 @@ async def agenda_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     try:
                         event_time = datetime.fromisoformat(start.replace('Z', '+00:00'))
                         time_str = event_time.strftime('%I:%M %p')
+                        
+                        # Calculate and add duration
+                        end = event.get('end', {}).get('dateTime', event.get('end', {}).get('date'))
+                        if end and 'T' in end:
+                            try:
+                                end_time = datetime.fromisoformat(end.replace('Z', '+00:00'))
+                                duration = end_time - event_time
+                                duration_minutes = int(duration.total_seconds() / 60)
+                                
+                                # Format duration as "30m" or "1h 30m"
+                                if duration_minutes < 60:
+                                    duration_str = f"({duration_minutes}m)"
+                                else:
+                                    hours = duration_minutes // 60
+                                    minutes = duration_minutes % 60
+                                    if minutes == 0:
+                                        duration_str = f"({hours}h)"
+                                    else:
+                                        duration_str = f"({hours}h {minutes}m)"
+                                
+                                time_str += f" {duration_str}"
+                            except:
+                                # If duration calculation fails, just show time without duration
+                                pass
                     except:
                         time_str = start
                 else:
