@@ -151,9 +151,12 @@ class TaskRepository:
     @cached(ttl=180.0)
     def get_overdue_tasks(self) ->List[Task]:
         """Get all overdue tasks with optimized client loading."""
-        now = get_utc_now()
+        # Use date-based comparison: overdue only if due date is before today
+        from larrybot.services.datetime_service import DateTimeService
+        start_of_today = DateTimeService.get_start_of_day()
+        
         return self.session.query(Task).options(joinedload(Task.client)
-            ).filter(Task.due_date < now, Task.done == False).order_by(Task
+            ).filter(Task.due_date < start_of_today, Task.done == False).order_by(Task
             .due_date.asc()).all()
 
     @cached(ttl=300.0)
@@ -442,11 +445,12 @@ class TaskRepository:
             due_after_aware = ensure_timezone_aware(due_after)
             filters.append(Task.due_date >= due_after_aware)
         if overdue_only:
-            from larrybot.utils.basic_datetime import get_utc_now
-            now = get_utc_now()
-            # For overdue tasks, we need to handle both naive and timezone-aware due dates
-            # Compare with current time, ensuring proper timezone handling
-            filters.append(Task.due_date < now)
+            # Use date-based comparison: overdue only if due date is before today
+            # A task is overdue if its due date is before start of today (local time)
+            from larrybot.services.datetime_service import DateTimeService
+            start_of_today = DateTimeService.get_start_of_day()
+            
+            filters.append(Task.due_date < start_of_today)
             filters.append(Task.done == False)
         if client_id:
             filters.append(Task.client_id == client_id)
@@ -513,7 +517,11 @@ class TaskRepository:
         if due_after:
             filters.append(Task.due_date >= due_after)
         if overdue_only:
-            filters.append(Task.due_date < get_utc_now())
+            # Use date-based comparison: overdue only if due date is before today
+            from larrybot.services.datetime_service import DateTimeService
+            start_of_today = DateTimeService.get_start_of_day()
+            
+            filters.append(Task.due_date < start_of_today)
             filters.append(Task.done == False)
         if client_id:
             filters.append(Task.client_id == client_id)
