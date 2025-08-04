@@ -125,75 +125,26 @@ async def agenda_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     parse_mode='MarkdownV2'
                 )
                 return
-            all_events = []
-            account_names = []
-            api_failures = 0
-            for token in tokens:
-                creds = Credentials(
-                    token=token.access_token,
-                    refresh_token=token.refresh_token,
-                    token_uri="https://oauth2.googleapis.com/token",
-                    client_id=secrets["client_id"],
-                    client_secret=secrets["client_secret"],
-                    expiry=token.expiry,
-                    scopes=SCOPES
-                )
-                if creds.expired and creds.refresh_token:
-                    try:
-                        await run_in_thread(creds.refresh, Request())
-                        repo.update_token(
-                            provider='google',
-                            account_id=token.account_id,
-                            access_token=creds.token,
-                            refresh_token=creds.refresh_token,
-                            expiry=creds.expiry
-                        )
-                    except Exception as e:
-                        api_failures += 1
-                        continue
-                try:
-                    # Use modern configuration to avoid deprecated file cache warnings
-                    service = await run_in_thread(
-                        lambda: build(
-                            "calendar", 
-                            "v3", 
-                            credentials=creds,
-                            cache_discovery=False,  # Disable deprecated file cache
-                            static_discovery=False  # Use dynamic discovery for better compatibility
-                        )
+            # Use CalendarService to get consolidated events
+            from larrybot.services.calendar_service import CalendarService
+            calendar_service = CalendarService()
+            all_events = await calendar_service.get_todays_events()
+            
+            if not all_events:
+                # Check if we have valid tokens but no events
+                if not tokens:
+                    await update.message.reply_text(
+                        MessageFormatter.format_info_message(
+                            "📅 Calendar Not Connected",
+                            {
+                                "Status": "No Google Calendar accounts connected",
+                                "Action": "Use /connect_google to connect your calendar"
+                            }
+                        ),
+                        parse_mode='MarkdownV2'
                     )
-                    from larrybot.services.datetime_service import DateTimeService
-                    start_of_day = DateTimeService.get_start_of_day()
-                    end_of_day = DateTimeService.get_end_of_day()
-                    events_result = await run_in_thread(
-                        service.events().list,
-                        calendarId="primary",
-                        timeMin=start_of_day.isoformat(),
-                        timeMax=end_of_day.isoformat(),
-                        maxResults=20,
-                        singleEvents=True,
-                        orderBy="startTime"
-                    )
-                    events = await run_in_thread(events_result.execute)
-                    items = events.get("items", [])
-                    for event in items:
-                        event['_account_name'] = token.account_name
-                        event['_account_id'] = token.account_id
-                        event['_account_email'] = token.account_email
-                        all_events.append(event)
-                    account_names.append(token.account_name)
-                except Exception as e:
-                    api_failures += 1
-                    continue
-            if api_failures == len(tokens):
-                await update.message.reply_text(
-                    MessageFormatter.format_error_message(
-                        "Unexpected error",
-                        "An unexpected error occurred: All calendar API calls failed."
-                    ),
-                    parse_mode='MarkdownV2'
-                )
-                return
+                    return
+            # Handle case where we have tokens but no events
             if not all_events:
                 await update.message.reply_text(
                     MessageFormatter.format_info_message(
@@ -201,14 +152,12 @@ async def agenda_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                         {
                             "Status": "No events scheduled for today",
                             "Date": datetime.now(timezone.utc).strftime('%Y-%m-%d'),
-                            "Accounts": ', '.join(account_names),
                             "Suggestion": "Enjoy your free time or add some tasks!"
                         }
                     ),
                     parse_mode='MarkdownV2'
                 )
                 return
-            all_events.sort(key=lambda x: x['start'].get('dateTime', x['start'].get('date')))
             
             from larrybot.services.datetime_service import DateTimeService
             today = DateTimeService.get_start_of_day().date()
