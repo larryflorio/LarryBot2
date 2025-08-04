@@ -370,21 +370,33 @@ class DateTimeService:
         """
         Check if a due date is overdue.
         
+        A task is overdue only if its due date is before today's calendar date.
+        Tasks due today (same calendar date) are NOT considered overdue.
+        
         Args:
             due_date: Due date to check
             
         Returns:
-            True if overdue, False otherwise
+            True if overdue (due date is before today), False otherwise
         """
         if due_date is None:
             return False
         
-        # Ensure timezone-aware
+        # Use timezone service for proper local date comparison
+        from larrybot.core.timezone import get_timezone_service
+        tz_service = get_timezone_service()
+        
+        # Get today's date in local timezone
+        today_local = tz_service.now().date()
+        
+        # Convert due date to local timezone and extract date
         if due_date.tzinfo is None:
             due_date = due_date.replace(tzinfo=timezone.utc)
         
-        now = get_utc_now()
-        return due_date < now
+        due_date_local = tz_service.to_local(due_date).date()
+        
+        # Task is overdue only if due date is before today
+        return due_date_local < today_local
     
     @staticmethod
     def days_until_due(due_date: datetime) -> Optional[int]:
