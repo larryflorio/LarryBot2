@@ -213,6 +213,39 @@ async def agenda_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             today = DateTimeService.get_start_of_day().date()
             message = f"📅 **Today's Agenda** \\({MessageFormatter.escape_markdown(today.strftime('%B %d, %Y'))}\\)\n\n"
             message += f"📋 *{len(all_events)} Events Scheduled*\n\n"
+            
+            # Find the next upcoming event(s) - may be multiple at the same time
+            from larrybot.utils.basic_datetime import get_current_datetime
+            current_time = get_current_datetime()
+            next_event_time = None
+            next_event_indices = set()
+            
+            # First pass: find the next event time
+            for idx, event in enumerate(all_events):
+                start = event['start'].get('dateTime', event['start'].get('date'))
+                if 'T' in start:
+                    try:
+                        event_time = datetime.fromisoformat(start.replace('Z', '+00:00'))
+                        # Find the first event that hasn't started yet
+                        if event_time > current_time:
+                            next_event_time = event_time
+                            break
+                    except:
+                        continue
+            
+            # Second pass: find all events at that next time
+            if next_event_time:
+                for idx, event in enumerate(all_events):
+                    start = event['start'].get('dateTime', event['start'].get('date'))
+                    if 'T' in start:
+                        try:
+                            event_time = datetime.fromisoformat(start.replace('Z', '+00:00'))
+                            # Mark all events that start at the next upcoming time
+                            if event_time == next_event_time:
+                                next_event_indices.add(idx)
+                        except:
+                            continue
+            
             for i, event in enumerate(all_events, 1):
                 start = event['start'].get('dateTime', event['start'].get('date'))
                 summary = event.get('summary') or '(No title)'
@@ -231,7 +264,13 @@ async def agenda_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                         time_str = start
                 else:
                     time_str = 'All day'
-                message += f"{i}\\. **{MessageFormatter.escape_markdown(summary)}**\n"
+                
+                # Add "NEXT" indicator for the next upcoming event(s)
+                next_indicator = ""
+                if (i - 1) in next_event_indices:
+                    next_indicator = " ▶️ *NEXT*"
+                
+                message += f"{i}\\. **{MessageFormatter.escape_markdown(summary)}**{next_indicator}\n"
                 message += f"   🕐 {MessageFormatter.escape_markdown(time_str)}\n"
                 if account_name and account_name != 'Unknown':
                     message += f"   🗂️ {MessageFormatter.escape_markdown(account_name)}\n"
