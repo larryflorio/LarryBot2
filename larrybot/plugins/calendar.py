@@ -209,9 +209,11 @@ async def agenda_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 )
                 return
             all_events.sort(key=lambda x: x['start'].get('dateTime', x['start'].get('date')))
+            
             from larrybot.services.datetime_service import DateTimeService
             today = DateTimeService.get_start_of_day().date()
             message = f"📅 **Today's Agenda** \\({MessageFormatter.escape_markdown(today.strftime('%B %d, %Y'))}\\)\n\n"
+            
             message += f"📋 *{len(all_events)} Events Scheduled*\n\n"
             
             # Find the next upcoming event(s) - may be multiple at the same time

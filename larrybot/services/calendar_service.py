@@ -133,10 +133,71 @@ class CalendarService:
                         continue
                 all_events.sort(key=lambda x: x['start'].get('dateTime', x[
                     'start'].get('date')))
-                return all_events
+                
+                # Consolidate duplicate events from multiple calendars
+                consolidated_events = self._consolidate_duplicate_events(all_events)
+                return consolidated_events
         except Exception as e:
             logger.error(f'Error fetching calendar events: {e}')
             return []
+
+    def _consolidate_duplicate_events(self, events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Consolidate duplicate events from multiple calendars.
+        
+        Groups events by same title, start time, and end time, then combines
+        the account names for display purposes.
+        
+        Args:
+            events: List of calendar events from all accounts
+            
+        Returns:
+            List of consolidated events with combined account names
+        """
+        consolidated_events = []
+        event_groups = {}
+        
+        for event in events:
+            # Create a key to group identical events (same title, start, end)
+            summary = event.get('summary', '(No title)')
+            start = event['start'].get('dateTime', event['start'].get('date'))
+            end = event['end'].get('dateTime', event['end'].get('date'))
+            
+            # Use summary + start + end as the grouping key
+            group_key = (summary.lower().strip(), start, end)
+            
+            if group_key not in event_groups:
+                event_groups[group_key] = []
+            event_groups[group_key].append(event)
+        
+        # Create consolidated events
+        for group_key, events in event_groups.items():
+            if len(events) == 1:
+                # Single event, no consolidation needed
+                consolidated_events.append(events[0])
+            else:
+                # Multiple identical events - consolidate them
+                primary_event = events[0].copy()
+                
+                # Combine account names
+                account_names = []
+                for event in events:
+                    account_name = event.get('_account_name', 'Unknown')
+                    if account_name not in account_names:
+                        account_names.append(account_name)
+                
+                # Sort account names for consistent display
+                account_names.sort()
+                combined_account_name = ' & '.join(account_names)
+                primary_event['_account_name'] = combined_account_name
+                primary_event['_consolidated_count'] = len(events)
+                
+                consolidated_events.append(primary_event)
+        
+        # Sort consolidated events by start time
+        consolidated_events.sort(key=lambda x: x['start'].get('dateTime', x['start'].get('date')))
+        
+        return consolidated_events
 
     def format_event_for_daily_report(self, event: Dict[str, Any]) ->Dict[
         str, str]:
