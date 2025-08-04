@@ -197,17 +197,21 @@ def is_overdue(due_date: datetime) ->bool:
     """
     Check if a due date is overdue.
     
+    A task is overdue only if its due date is before today's calendar date.
+    Tasks due today (same calendar date) are NOT considered overdue.
+    
     Args:
         due_date: Due date to check
         
     Returns:
-        True if overdue, False otherwise
+        True if overdue (due date is before today), False otherwise
     """
     if due_date is None:
         return False
-    due_date = ensure_local(due_date)
-    from larrybot.utils.basic_datetime import get_current_datetime
-    return get_current_datetime() > due_date
+    
+    # Use DateTimeService for consistent date-based comparison
+    from larrybot.services.datetime_service import DateTimeService
+    return DateTimeService.is_overdue(due_date)
 
 
 def days_until_due(due_date: datetime) ->Optional[int]:
