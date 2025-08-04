@@ -166,8 +166,10 @@ async def agenda_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             message += f"📋 *{len(all_events)} Events Scheduled*\n\n"
             
             # Find the next upcoming event(s) - may be multiple at the same time
-            from larrybot.utils.basic_datetime import get_current_datetime
-            current_time = get_current_datetime()
+            # Use proper timezone service for current time
+            from larrybot.core.timezone import get_timezone_service
+            tz_service = get_timezone_service()
+            current_time = tz_service.utc_now()  # Get current UTC time
             next_event_time = None
             next_event_indices = set()
             
