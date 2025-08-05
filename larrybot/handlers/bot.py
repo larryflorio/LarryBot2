@@ -287,6 +287,16 @@ class TelegramBotHandler:
             priority = parts[1]
             task_id = int(parts[2])
             await self._handle_task_set_priority(query, context, task_id, priority)
+        elif callback_data.startswith('task_set_category:'):
+            parts = callback_data.split(':')
+            category = parts[1]
+            task_id = int(parts[2])
+            await self._handle_task_set_category(query, context, task_id, category)
+        elif callback_data.startswith('task_set_client:'):
+            parts = callback_data.split(':')
+            client_input = parts[1]
+            task_id = int(parts[2])
+            await self._handle_task_set_client(query, context, task_id, client_input)
         elif callback_data == 'task_edit_cancel':
             await self._handle_task_edit_cancel(query, context)
         elif callback_data == 'tasks_list':
@@ -869,14 +879,61 @@ Please reply with the new due date\\. You can use formats like:
 **Select the new priority level:**"""
                 
             elif field_name == 'category':
+                # For category, show buttons instead of text input (like add task flow)
+                from larrybot.storage.db import get_optimized_session
+                from larrybot.storage.task_repository import TaskRepository
+                
+                with get_optimized_session() as session:
+                    task_repo = TaskRepository(session)
+                    available_categories = task_repo.get_all_categories()
+                
+                # Add common categories if not already present
+                common_categories = ['Work', 'Personal', 'Health', 'Learning', 'Finance', 'Home']
+                for cat in common_categories:
+                    if cat not in available_categories:
+                        available_categories.append(cat)
+                
+                # Build category buttons (up to 8 categories, 2 per row)
+                category_buttons = []
+                for i in range(0, min(len(available_categories), 8), 2):
+                    row = []
+                    for j in range(2):
+                        if i + j < len(available_categories):
+                            cat = available_categories[i + j]
+                            row.append(UnifiedButtonBuilder.create_button(
+                                text=f'📂 {cat}',
+                                callback_data=f'task_set_category:{cat}:{task_id}',
+                                button_type=ButtonType.INFO
+                            ))
+                    category_buttons.append(row)
+                
+                # Add utility buttons
+                category_buttons.append([
+                    UnifiedButtonBuilder.create_button(
+                        text='➕ Custom',
+                        callback_data=f'task_set_category:custom:{task_id}',
+                        button_type=ButtonType.PRIMARY
+                    ),
+                    UnifiedButtonBuilder.create_button(
+                        text='🗑️ Clear',
+                        callback_data=f'task_set_category:clear:{task_id}',
+                        button_type=ButtonType.WARNING
+                    )
+                ])
+                category_buttons.append([
+                    UnifiedButtonBuilder.create_button(
+                        text='❌ Cancel',
+                        callback_data='task_edit_cancel',
+                        button_type=ButtonType.SECONDARY
+                    )
+                ])
+                
+                keyboard = InlineKeyboardMarkup(category_buttons)
                 message = f"""🏷️ **Edit Category**
 
 **Task ID**: {task_id}
 
-Please reply with the new category for this task\\. 
-Examples: `Work`, `Personal`, `Shopping`, `Health`
-
-You can also reply with `Clear` to remove the category\\."""
+**Select the new category:**"""
                 
             else:
                 message = f"❌ **Unknown Field**\n\nField '{field_name}' is not supported for editing\\."
@@ -908,7 +965,7 @@ You can also reply with `Clear` to remove the category\\."""
                     return
                 
                 # Update priority
-                repo.update_task_priority(task_id, priority)
+                repo.update_priority(task_id, priority)
                 session.commit()
                 
                 # Clear editing context
@@ -934,6 +991,248 @@ You can also reply with `Clear` to remove the category\\."""
             await safe_edit(query.edit_message_text, MessageFormatter.
                 format_error_message('Error updating priority',
                 'Please try again or use /edit command.'), parse_mode='MarkdownV2')
+
+    async def _handle_task_set_category(self, query, context: ContextTypes.DEFAULT_TYPE, task_id: int, category: str) -> None:
+        """Handle setting task category via callback."""
+        from larrybot.storage.db import get_optimized_session
+        from larrybot.storage.task_repository import TaskRepository
+        from larrybot.utils.ux_helpers import MessageFormatter
+        from larrybot.utils.enhanced_ux_helpers import UnifiedButtonBuilder, ButtonType
+        
+        try:
+            if category == 'custom':
+                # Handle custom category input
+                context.user_data['editing_task_id'] = task_id
+                context.user_data['editing_field'] = 'category_custom'
+                
+                keyboard = InlineKeyboardMarkup([[
+                    UnifiedButtonBuilder.create_button(
+                        text='❌ Cancel', 
+                        callback_data='task_edit_cancel', 
+                        button_type=ButtonType.SECONDARY
+                    )
+                ]])
+                
+                message = f"""🏷️ **Custom Category**
+
+**Task ID**: {task_id}
+
+Please reply with the custom category name\\."""
+                
+                await safe_edit(query.edit_message_text, message, 
+                    reply_markup=keyboard, parse_mode='MarkdownV2')
+                return
+            
+            elif category == 'clear':
+                # Clear the category
+                category = None
+                category_display = 'None'
+            else:
+                category_display = category
+            
+            with get_optimized_session() as session:
+                repo = TaskRepository(session)
+                task = repo.get_task_by_id(task_id)
+                
+                if not task:
+                    await safe_edit(query.edit_message_text,
+                        MessageFormatter.format_error_message('Task not found',
+                        f'Task {task_id} not found.'), parse_mode='MarkdownV2')
+                    return
+                
+                # Update category
+                repo.update_category(task_id, category)
+                session.commit()
+                
+                # Check if category is 'work' - if so, prompt for client
+                if category and category.lower() == 'work':
+                    # Store state for client selection
+                    context.user_data['editing_task_id'] = task_id
+                    context.user_data['editing_field'] = 'client_after_work_category'
+                    
+                    # Show client selection (same as add task flow)
+                    from larrybot.storage.client_repository import ClientRepository
+                    client_repo = ClientRepository(session)
+                    clients = client_repo.get_clients_with_task_counts()
+                    
+                    if not clients:
+                        # No clients available, skip to completion
+                        await self._complete_category_edit(query, context, task_id, category_display)
+                        return
+                    
+                    # Build client selection buttons
+                    client_buttons = []
+                    for i in range(0, min(len(clients), 6), 2):
+                        row = []
+                        for j in range(2):
+                            if i + j < len(clients):
+                                client = clients[i + j]
+                                task_count = client['active_task_count'] or 0
+                                row.append(UnifiedButtonBuilder.create_button(
+                                    text=f'👤 {client["name"]} ({task_count})',
+                                    callback_data=f'task_set_client:{client["id"]}:{task_id}',
+                                    button_type=ButtonType.INFO
+                                ))
+                        client_buttons.append(row)
+                    
+                    # Add utility buttons
+                    client_buttons.append([
+                        UnifiedButtonBuilder.create_button(
+                            text='➕ New Client',
+                            callback_data=f'task_set_client:new:{task_id}',
+                            button_type=ButtonType.PRIMARY
+                        ),
+                        UnifiedButtonBuilder.create_button(
+                            text='⏭️ Skip',
+                            callback_data=f'task_set_client:skip:{task_id}',
+                            button_type=ButtonType.SECONDARY
+                        )
+                    ])
+                    client_buttons.append([
+                        UnifiedButtonBuilder.create_button(
+                            text='❌ Cancel',
+                            callback_data='task_edit_cancel',
+                            button_type=ButtonType.SECONDARY
+                        )
+                    ])
+                    
+                    keyboard = InlineKeyboardMarkup(client_buttons)
+                    message = MessageFormatter.format_info_message(
+                        '💼 Category: Work',
+                        {'Question': 'Which client is this for?'}
+                    )
+                    
+                    await safe_edit(query.edit_message_text, message,
+                        reply_markup=keyboard, parse_mode='MarkdownV2')
+                    return
+                else:
+                    # Complete category edit without client prompt
+                    await self._complete_category_edit(query, context, task_id, category_display)
+                
+        except Exception as e:
+            logger.error(f'Error setting category for task {task_id}: {e}')
+            await safe_edit(query.edit_message_text, MessageFormatter.
+                format_error_message('Error updating category',
+                'Please try again or use /edit command.'), parse_mode='MarkdownV2')
+
+    async def _complete_category_edit(self, query, context: ContextTypes.DEFAULT_TYPE, task_id: int, category_display: str) -> None:
+        """Complete the category editing process."""
+        from larrybot.utils.ux_helpers import MessageFormatter
+        
+        # Clear editing context
+        if 'editing_task_id' in context.user_data:
+            del context.user_data['editing_task_id']
+        if 'editing_field' in context.user_data:
+            del context.user_data['editing_field']
+        
+        # Show success and return to task view
+        success_message = MessageFormatter.format_success_message(
+            'Category updated successfully', 
+            {'task_id': task_id, 'new_category': category_display}
+        )
+        await query.edit_message_text(success_message, parse_mode='MarkdownV2')
+        
+        # After a short delay, show the updated task view
+        import asyncio
+        await asyncio.sleep(1.5)
+        await self._handle_task_view(query, context, task_id)
+
+    async def _handle_task_set_client(self, query, context: ContextTypes.DEFAULT_TYPE, task_id: int, client_input: str) -> None:
+        """Handle setting task client via callback (after work category selection)."""
+        from larrybot.storage.db import get_optimized_session
+        from larrybot.storage.task_repository import TaskRepository
+        from larrybot.storage.client_repository import ClientRepository
+        from larrybot.utils.ux_helpers import MessageFormatter
+        from larrybot.utils.enhanced_ux_helpers import UnifiedButtonBuilder, ButtonType
+        
+        try:
+            if client_input == 'new':
+                # Handle new client creation
+                context.user_data['editing_task_id'] = task_id
+                context.user_data['editing_field'] = 'client_new'
+                
+                keyboard = InlineKeyboardMarkup([[
+                    UnifiedButtonBuilder.create_button(
+                        text='❌ Cancel', 
+                        callback_data='task_edit_cancel', 
+                        button_type=ButtonType.SECONDARY
+                    )
+                ]])
+                
+                message = f"""➕ **New Client**
+
+**Task ID**: {task_id}
+
+Please reply with the client name\\."""
+                
+                await safe_edit(query.edit_message_text, message, 
+                    reply_markup=keyboard, parse_mode='MarkdownV2')
+                return
+            
+            elif client_input == 'skip':
+                client_id = None
+            else:
+                try:
+                    client_id = int(client_input)
+                except (ValueError, TypeError):
+                    client_id = None
+            
+            with get_optimized_session() as session:
+                repo = TaskRepository(session)
+                task = repo.get_task_by_id(task_id)
+                
+                if not task:
+                    await safe_edit(query.edit_message_text,
+                        MessageFormatter.format_error_message('Task not found',
+                        f'Task {task_id} not found.'), parse_mode='MarkdownV2')
+                    return
+                
+                # Update client
+                client_display = 'None'
+                if client_id:
+                    # Get client name for repository method
+                    client_repo = ClientRepository(session)
+                    client = client_repo.get_client_by_id(client_id)
+                    if client:
+                        repo.assign_task_to_client(task_id, client.name)
+                        client_display = client.name
+                    else:
+                        # Client not found, unassign
+                        repo.unassign_task(task_id)
+                else:
+                    # Clear client assignment
+                    repo.unassign_task(task_id)
+                
+                # Complete the edit process
+                await self._complete_client_edit(query, context, task_id, client_display)
+                
+        except Exception as e:
+            logger.error(f'Error setting client for task {task_id}: {e}')
+            await safe_edit(query.edit_message_text, MessageFormatter.
+                format_error_message('Error updating client',
+                'Please try again or use /edit command.'), parse_mode='MarkdownV2')
+
+    async def _complete_client_edit(self, query, context: ContextTypes.DEFAULT_TYPE, task_id: int, client_display: str) -> None:
+        """Complete the client editing process."""
+        from larrybot.utils.ux_helpers import MessageFormatter
+        
+        # Clear editing context
+        if 'editing_task_id' in context.user_data:
+            del context.user_data['editing_task_id']
+        if 'editing_field' in context.user_data:
+            del context.user_data['editing_field']
+        
+        # Show success and return to task view
+        success_message = MessageFormatter.format_success_message(
+            'Client updated successfully', 
+            {'task_id': task_id, 'new_client': client_display}
+        )
+        await query.edit_message_text(success_message, parse_mode='MarkdownV2')
+        
+        # After a short delay, show the updated task view
+        import asyncio
+        await asyncio.sleep(1.5)
+        await self._handle_task_view(query, context, task_id)
 
     async def _handle_task_edit_cancel(self, query, context: ContextTypes.
         DEFAULT_TYPE) ->None:
@@ -1796,6 +2095,10 @@ Ready to boost your productivity? Here's what you can do:"""
             await self._process_task_due_date_edit(update, context, task_id, user_message)
         elif field_name == 'category':
             await self._process_task_category_edit(update, context, task_id, user_message)
+        elif field_name == 'category_custom':
+            await self._process_task_custom_category_edit(update, context, task_id, user_message)
+        elif field_name == 'client_new':
+            await self._process_task_new_client_edit(update, context, task_id, user_message)
         else:
             await update.message.reply_text(MessageFormatter.
                 format_error_message('Unsupported field',
@@ -2144,6 +2447,162 @@ Ready to boost your productivity? Here's what you can do:"""
             logger.error(f'Error updating category for task {task_id}: {e}')
             await update.message.reply_text(MessageFormatter.
                 format_error_message('Error updating category', 
+                'Please try again or use /edit command.'), parse_mode='MarkdownV2')
+
+    async def _process_task_custom_category_edit(self, update: Update, context: ContextTypes.DEFAULT_TYPE, task_id: int, category_input: str) -> None:
+        """Process editing a task with a custom category."""
+        from larrybot.storage.db import get_optimized_session
+        from larrybot.storage.task_repository import TaskRepository
+        from larrybot.storage.client_repository import ClientRepository
+        from larrybot.utils.ux_helpers import MessageFormatter
+        from larrybot.utils.enhanced_ux_helpers import UnifiedButtonBuilder, ButtonType
+        
+        try:
+            category = category_input.strip()
+            
+            with get_optimized_session() as session:
+                repo = TaskRepository(session)
+                task = repo.get_task_by_id(task_id)
+                
+                if not task:
+                    await update.message.reply_text(MessageFormatter.
+                        format_error_message('Task not found', 
+                        f'Task {task_id} not found.'), parse_mode='MarkdownV2')
+                    return
+                
+                # Update category
+                repo.update_category(task_id, category)
+                session.commit()
+                
+                # Check if category is 'work' - if so, prompt for client
+                if category.lower() == 'work':
+                    # Store state for client selection
+                    context.user_data['editing_task_id'] = task_id
+                    context.user_data['editing_field'] = 'client_after_work_category'
+                    
+                    # Show client selection (same as add task flow)
+                    client_repo = ClientRepository(session)
+                    clients = client_repo.get_clients_with_task_counts()
+                    
+                    if not clients:
+                        # No clients available, complete the process
+                        await self._complete_custom_category_edit(update, context, task_id, category)
+                        return
+                    
+                    # Build client selection buttons
+                    client_buttons = []
+                    for i in range(0, min(len(clients), 6), 2):
+                        row = []
+                        for j in range(2):
+                            if i + j < len(clients):
+                                client = clients[i + j]
+                                task_count = client['active_task_count'] or 0
+                                row.append(UnifiedButtonBuilder.create_button(
+                                    text=f'👤 {client["name"]} ({task_count})',
+                                    callback_data=f'task_set_client:{client["id"]}:{task_id}',
+                                    button_type=ButtonType.INFO
+                                ))
+                        client_buttons.append(row)
+                    
+                    # Add utility buttons
+                    client_buttons.append([
+                        UnifiedButtonBuilder.create_button(
+                            text='➕ New Client',
+                            callback_data=f'task_set_client:new:{task_id}',
+                            button_type=ButtonType.PRIMARY
+                        ),
+                        UnifiedButtonBuilder.create_button(
+                            text='⏭️ Skip',
+                            callback_data=f'task_set_client:skip:{task_id}',
+                            button_type=ButtonType.SECONDARY
+                        )
+                    ])
+                    client_buttons.append([
+                        UnifiedButtonBuilder.create_button(
+                            text='❌ Cancel',
+                            callback_data='task_edit_cancel',
+                            button_type=ButtonType.SECONDARY
+                        )
+                    ])
+                    
+                    keyboard = InlineKeyboardMarkup(client_buttons)
+                    message = MessageFormatter.format_info_message(
+                        '💼 Category: Work',
+                        {'Question': 'Which client is this for?'}
+                    )
+                    
+                    await update.message.reply_text(message,
+                        reply_markup=keyboard, parse_mode='MarkdownV2')
+                    return
+                else:
+                    # Complete custom category edit without client prompt
+                    await self._complete_custom_category_edit(update, context, task_id, category)
+                    
+        except Exception as e:
+            logger.error(f'Error updating custom category for task {task_id}: {e}')
+            await update.message.reply_text(MessageFormatter.
+                format_error_message('Error updating category', 
+                'Please try again or use /edit command.'), parse_mode='MarkdownV2')
+
+    async def _complete_custom_category_edit(self, update: Update, context: ContextTypes.DEFAULT_TYPE, task_id: int, category: str) -> None:
+        """Complete the custom category editing process."""
+        from larrybot.utils.ux_helpers import MessageFormatter
+        
+        # Clear editing context
+        if 'editing_task_id' in context.user_data:
+            del context.user_data['editing_task_id']
+        if 'editing_field' in context.user_data:
+            del context.user_data['editing_field']
+        
+        # Show success message
+        await update.message.reply_text(MessageFormatter.
+            format_success_message('Category updated successfully', 
+            {'task_id': task_id, 'new_category': category}), 
+            parse_mode='MarkdownV2')
+
+    async def _process_task_new_client_edit(self, update: Update, context: ContextTypes.DEFAULT_TYPE, task_id: int, client_name_input: str) -> None:
+        """Process creating a new client and assigning it to a task."""
+        from larrybot.storage.db import get_optimized_session
+        from larrybot.storage.task_repository import TaskRepository
+        from larrybot.storage.client_repository import ClientRepository
+        from larrybot.utils.ux_helpers import MessageFormatter
+        
+        try:
+            client_name = client_name_input.strip()
+            
+            with get_optimized_session() as session:
+                repo = TaskRepository(session)
+                task = repo.get_task_by_id(task_id)
+                
+                if not task:
+                    await update.message.reply_text(MessageFormatter.
+                        format_error_message('Task not found', 
+                        f'Task {task_id} not found.'), parse_mode='MarkdownV2')
+                    return
+                
+                # Create new client
+                client_repo = ClientRepository(session)
+                new_client = client_repo.add_client(client_name)
+                
+                # Assign task to new client
+                repo.assign_task_to_client(task_id, new_client.name)
+                
+                # Clear editing context
+                if 'editing_task_id' in context.user_data:
+                    del context.user_data['editing_task_id']
+                if 'editing_field' in context.user_data:
+                    del context.user_data['editing_field']
+                
+                # Show success message
+                await update.message.reply_text(MessageFormatter.
+                    format_success_message('Client created and assigned successfully', 
+                    {'task_id': task_id, 'new_client': client_name}), 
+                    parse_mode='MarkdownV2')
+                    
+        except Exception as e:
+            logger.error(f'Error creating new client for task {task_id}: {e}')
+            await update.message.reply_text(MessageFormatter.
+                format_error_message('Error creating client', 
                 'Please try again or use /edit command.'), parse_mode='MarkdownV2')
 
     async def _handle_tasks_refresh(self, query, context: ContextTypes.
