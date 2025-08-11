@@ -2380,7 +2380,8 @@ Ready to boost your productivity? Here's what you can do:"""
                 repo = TaskRepository(session)
                 task = repo.get_task_by_id(task_id)
                 if task:
-                    task.due_date = parsed_date.date() if hasattr(parsed_date, 'date') else parsed_date
+                    # Store the full timezone-aware datetime, not just the date portion
+                    task.due_date = parsed_date
                     session.commit()
                     
                     # Clear editing context
