@@ -19,10 +19,16 @@ class TestDateTimeService:
         
         assert result is not None
         assert result.tzinfo is not None
-        assert result.date() == datetime(2025, 7, 15).date()
-        assert result.hour == 23
-        assert result.minute == 59
-        assert result.second == 59
+        
+        # Convert back to local timezone to verify the date
+        from larrybot.core.timezone import get_timezone_service
+        tz_service = get_timezone_service()
+        local_result = tz_service.to_local(result)
+        
+        assert local_result.date() == datetime(2025, 7, 15).date()
+        assert local_result.hour == 23
+        assert local_result.minute == 59
+        assert local_result.second == 59
 
     def test_parse_user_date_invalid(self):
         """Test parsing invalid date string."""
@@ -40,7 +46,13 @@ class TestDateTimeService:
         
         assert result is not None
         assert result.tzinfo is not None
-        assert result.date() == datetime(2025, 7, 15).date()
+        
+        # Convert back to local timezone to verify the date
+        from larrybot.core.timezone import get_timezone_service
+        tz_service = get_timezone_service()
+        local_result = tz_service.to_local(result)
+        
+        assert local_result.date() == datetime(2025, 7, 15).date()
 
     def test_parse_user_date_nlp_disabled(self):
         """Test parsing with NLP disabled."""
@@ -147,10 +159,17 @@ class TestDateTimeService:
         
         assert result is not None
         assert result.tzinfo is not None
-        assert result.date() == datetime.now(timezone.utc).date()
-        assert result.hour == 23
-        assert result.minute == 59
-        assert result.second == 59
+        
+        # Convert back to local timezone to verify it's end of today
+        from larrybot.core.timezone import get_timezone_service
+        tz_service = get_timezone_service()
+        local_result = tz_service.to_local(result)
+        today_local = tz_service.now().date()
+        
+        assert local_result.date() == today_local
+        assert local_result.hour == 23
+        assert local_result.minute == 59
+        assert local_result.second == 59
 
     def test_create_due_date_for_tomorrow(self):
         """Test creating due date for tomorrow."""
@@ -158,11 +177,17 @@ class TestDateTimeService:
         
         assert result is not None
         assert result.tzinfo is not None
-        tomorrow = datetime.now(timezone.utc).date() + timedelta(days=1)
-        assert result.date() == tomorrow
-        assert result.hour == 23
-        assert result.minute == 59
-        assert result.second == 59
+        
+        # Convert back to local timezone to verify it's end of tomorrow
+        from larrybot.core.timezone import get_timezone_service
+        tz_service = get_timezone_service()
+        local_result = tz_service.to_local(result)
+        tomorrow_local = tz_service.now().date() + timedelta(days=1)
+        
+        assert local_result.date() == tomorrow_local
+        assert local_result.hour == 23
+        assert local_result.minute == 59
+        assert local_result.second == 59
 
     def test_create_due_date_for_week(self):
         """Test creating due date for end of current week."""
@@ -365,16 +390,28 @@ class TestDateTimeService:
         """Test date parsing around year boundary."""
         result = DateTimeService.parse_user_date("2024-12-31")
         assert result is not None
-        assert result.date() == datetime(2024, 12, 31).date()
-        assert result.hour == 23
-        assert result.minute == 59
-        assert result.second == 59
+        
+        # Convert back to local timezone to verify the date
+        from larrybot.core.timezone import get_timezone_service
+        tz_service = get_timezone_service()
+        local_result = tz_service.to_local(result)
+        
+        assert local_result.date() == datetime(2024, 12, 31).date()
+        assert local_result.hour == 23
+        assert local_result.minute == 59
+        assert local_result.second == 59
 
     def test_edge_case_leap_year(self):
         """Test date parsing for leap year."""
         result = DateTimeService.parse_user_date("2024-02-29")
         assert result is not None
-        assert result.date() == datetime(2024, 2, 29).date()
+        
+        # Convert back to local timezone to verify the date
+        from larrybot.core.timezone import get_timezone_service
+        tz_service = get_timezone_service()
+        local_result = tz_service.to_local(result)
+        
+        assert local_result.date() == datetime(2024, 2, 29).date()
 
     def test_edge_case_invalid_leap_year(self):
         """Test date parsing for invalid leap year date."""

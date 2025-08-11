@@ -43,11 +43,18 @@ class DateTimeService:
         
         # Try structured parsing first (faster for known formats)
         try:
+            # Parse the date string
             local_date = datetime.strptime(date_str, '%Y-%m-%d')
             local_datetime = local_date.replace(hour=23, minute=59, second=59, microsecond=999999)
-            timezone_aware = local_datetime.replace(tzinfo=timezone.utc)
-            logger.debug(f"Parsed structured date '{date_str}' to {timezone_aware}")
-            return timezone_aware
+            
+            # Create timezone-aware datetime in user's local timezone, then convert to UTC
+            from larrybot.core.timezone import get_timezone_service
+            tz_service = get_timezone_service()
+            local_aware = local_datetime.replace(tzinfo=tz_service._timezone)
+            utc_aware = local_aware.astimezone(timezone.utc)
+            
+            logger.debug(f"Parsed structured date '{date_str}' to {utc_aware} (from local {local_aware})")
+            return utc_aware
         except ValueError:
             logger.debug(f"Structured parsing failed for '{date_str}', attempting NLP parsing")
         
@@ -99,30 +106,46 @@ class DateTimeService:
     @staticmethod
     def create_due_date_for_today() -> datetime:
         """
-        Create end-of-day datetime for today.
+        Create end-of-day datetime for today in the user's local timezone.
         
         Returns:
-            Timezone-aware datetime at 23:59:59 today in local timezone
+            Timezone-aware datetime at 23:59:59 today in user's local timezone
         """
-        today = get_current_datetime().date()
-        end_of_day = datetime.combine(today, datetime.max.time())
-        timezone_aware = end_of_day.replace(tzinfo=timezone.utc)
-        logger.debug(f"Created due date for today: {timezone_aware}")
-        return timezone_aware
+        from larrybot.core.timezone import get_timezone_service
+        tz_service = get_timezone_service()
+        
+        # Get today's date in user's local timezone
+        today_local = tz_service.now().date()
+        end_of_day_local = datetime.combine(today_local, datetime.max.time())
+        
+        # Make timezone-aware in user's local timezone, then convert to UTC for storage
+        end_of_day_local_aware = end_of_day_local.replace(tzinfo=tz_service._timezone)
+        end_of_day_utc = end_of_day_local_aware.astimezone(timezone.utc)
+        
+        logger.debug(f"Created due date for today: {end_of_day_utc} (from local {end_of_day_local_aware})")
+        return end_of_day_utc
     
     @staticmethod
     def create_due_date_for_tomorrow() -> datetime:
         """
-        Create end-of-day datetime for tomorrow.
+        Create end-of-day datetime for tomorrow in the user's local timezone.
         
         Returns:
-            Timezone-aware datetime at 23:59:59 tomorrow in local timezone
+            Timezone-aware datetime at 23:59:59 tomorrow in user's local timezone
         """
-        tomorrow = get_current_datetime().date() + timedelta(days=1)
-        end_of_day = datetime.combine(tomorrow, datetime.max.time())
-        timezone_aware = end_of_day.replace(tzinfo=timezone.utc)
-        logger.debug(f"Created due date for tomorrow: {timezone_aware}")
-        return timezone_aware
+        from larrybot.core.timezone import get_timezone_service
+        tz_service = get_timezone_service()
+        
+        # Get tomorrow's date in user's local timezone
+        tomorrow_local = tz_service.now().date() + timedelta(days=1)
+        end_of_day_local = datetime.combine(tomorrow_local, datetime.max.time())
+        
+        # Make timezone-aware in user's local timezone, then convert to UTC for storage
+        end_of_day_local_aware = end_of_day_local.replace(tzinfo=tz_service._timezone)
+        end_of_day_utc = end_of_day_local_aware.astimezone(timezone.utc)
+        
+        logger.debug(f"Created due date for tomorrow: {end_of_day_utc} (from local {end_of_day_local_aware})")
+        return end_of_day_utc
     
     @staticmethod
     def create_due_date_for_week() -> datetime:

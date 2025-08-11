@@ -20,12 +20,12 @@ def get_utc_now() ->datetime:
 
 def get_current_datetime() ->datetime:
     """
-    Get current local datetime with timezone awareness.
+    Get current UTC datetime with timezone awareness.
     
     Returns:
-        datetime: Current local datetime with timezone info
+        datetime: Current UTC datetime with timezone info
     """
-    return datetime.now().replace(tzinfo=timezone.utc)
+    return datetime.now(timezone.utc)
 
 
 def get_local_now() ->datetime:
