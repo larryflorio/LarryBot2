@@ -1982,9 +1982,12 @@ Ready to boost your productivity? Here's what you can do:"""
             print('Main event loop set for reminder handler and scheduler', flush=True)
         except RuntimeError:
             print('Could not set event loop before bot start', flush=True)
-        from larrybot.scheduler import schedule_daily_report
+        from larrybot.scheduler import schedule_daily_report, schedule_end_of_day_reminder
         schedule_daily_report(self, self.config.ALLOWED_TELEGRAM_USER_ID,
             hour=8, minute=30)
+        # Schedule end-of-day reminder for 5:00pm
+        schedule_end_of_day_reminder(self, self.config.ALLOWED_TELEGRAM_USER_ID, hour=17, minute=0)
+        print('📅 End-of-day reminder scheduled for 5:00 PM', flush=True)
         self.application.run_polling()
 
     async def run_async(self) ->None:
@@ -2003,9 +2006,13 @@ Ready to boost your productivity? Here's what you can do:"""
             logger.warning(f'Could not set event loop: {e}')
         
         # Schedule daily report for 8:30am
-        from larrybot.scheduler import schedule_daily_report
+        from larrybot.scheduler import schedule_daily_report, schedule_end_of_day_reminder
         schedule_daily_report(self, self.config.ALLOWED_TELEGRAM_USER_ID, hour=8, minute=30)
         logger.info('📅 Daily report scheduled for 8:30 AM')
+        
+        # Schedule end-of-day reminder for 5:00pm
+        schedule_end_of_day_reminder(self, self.config.ALLOWED_TELEGRAM_USER_ID, hour=17, minute=0)
+        logger.info('📅 End-of-day reminder scheduled for 5:00 PM')
         
         from larrybot.core.task_manager import get_task_manager
         task_manager = get_task_manager()
