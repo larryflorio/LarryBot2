@@ -157,3 +157,62 @@ def schedule_daily_report(bot_handler, chat_id, hour=9, minute=0):
     except Exception as e:
         logger.error(f'❌ Failed to schedule daily report for chat_id {chat_id}: {e}')
         raise
+
+
+def schedule_end_of_day_reminder(bot_handler, chat_id, hour=17, minute=0):
+    """Schedule end-of-day reminder to be sent every day at the specified time (default 5pm)."""
+
+    def send_eod_reminder_job():
+        try:
+            logger.info(f'🔄 Executing scheduled end-of-day reminder for chat_id {chat_id}')
+            
+            # Use the stored main event loop instead of trying to get it from the scheduler thread
+            if _main_loop is None:
+                logger.error(f'❌ No main event loop available for end-of-day reminder job for chat_id {chat_id}')
+                return
+                
+            coro = bot_handler._send_end_of_day_reminder(chat_id=chat_id, context=None)
+            
+            if _main_loop.is_running():
+                # Submit to the main event loop if it's running
+                asyncio.run_coroutine_threadsafe(coro, _main_loop)
+                logger.info(f'✅ End-of-day reminder job submitted to event loop for chat_id {chat_id}')
+            else:
+                # This shouldn't happen in normal operation, but handle it gracefully
+                logger.warning(f'⚠️ Main event loop not running for end-of-day reminder job for chat_id {chat_id}')
+                
+        except Exception as e:
+            logger.error(f'❌ Error in end-of-day reminder job for chat_id {chat_id}: {e}')
+    
+    job_id = f'end_of_day_reminder_{chat_id}'
+    if scheduler.get_job(job_id):
+        scheduler.remove_job(job_id)
+        logger.info(f'🔄 Replaced existing end-of-day reminder job for chat_id {chat_id}')
+    
+    try:
+        scheduler.add_job(
+            send_eod_reminder_job,
+            'cron',
+            hour=hour,
+            minute=minute,
+            id=job_id,
+            replace_existing=True,
+            misfire_grace_time=300
+        )
+        logger.info(
+            f'✅ Scheduled end-of-day reminder for chat_id {chat_id} at {hour:02d}:{minute:02d}')
+        
+        # Log next run time for verification (only if scheduler is running)
+        if scheduler.running:
+            job = scheduler.get_job(job_id)
+            if job and hasattr(job, 'next_run_time') and job.next_run_time:
+                next_run = job.next_run_time
+                logger.info(f'📅 Next end-of-day reminder scheduled for: {next_run}')
+            else:
+                logger.info(f'📅 End-of-day reminder job created (next run time not available)')
+        else:
+            logger.info(f'📅 End-of-day reminder job created (scheduler not running)')
+            
+    except Exception as e:
+        logger.error(f'❌ Failed to schedule end-of-day reminder for chat_id {chat_id}: {e}')
+        raise

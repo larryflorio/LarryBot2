@@ -109,6 +109,12 @@ class TelegramBotHandler:
         self.command_registry.register('/daily', self.daily_command,
             daily_metadata)
         
+        eod_metadata = CommandMetadata(name='/eod', description=
+            'Send end-of-day reminder with urgent tasks only',
+            usage='/eod', category='system')
+        self.command_registry.register('/eod', self.eod_command,
+            eod_metadata)
+        
         scheduler_status_metadata = CommandMetadata(name='/scheduler_status', 
             description='Check scheduler and daily report status',
             usage='/scheduler_status', category='system')
@@ -3961,6 +3967,70 @@ Choose what you'd like to learn about:"""
             logger.error(f'Exception in _send_daily_report: {e}')
             raise
 
+    async def _send_end_of_day_reminder(self, update=None, context=None, chat_id=None):
+        """Send focused end-of-day reminder with only urgent tasks."""
+        logger.info('Generating end-of-day reminder')
+        try:
+            from larrybot.services.datetime_service import DateTimeService
+            start_of_today = DateTimeService.get_start_of_day()
+            end_of_today = DateTimeService.get_end_of_day()
+            
+            with get_optimized_session() as session:
+                task_repository = TaskRepository(session)
+                task_service = TaskService(task_repository)
+                
+                # Get overdue tasks
+                overdue_result = await task_service.get_tasks_with_filters(overdue_only=True)
+                overdue_tasks = overdue_result['data'] if overdue_result['success'] else []
+                
+                # Get tasks due today
+                due_today_result = await task_service.get_tasks_with_filters(
+                    due_after=start_of_today, due_before=end_of_today, done=False)
+                due_today_tasks = due_today_result['data'] if due_today_result['success'] else []
+            
+            # Build focused message
+            urgent_count = len(overdue_tasks) + len(due_today_tasks)
+            
+            if urgent_count == 0:
+                message = "🎉 **End of Day Check** — All caught up!\n\nNo urgent tasks remaining. Great work today! 👏"
+            else:
+                lines = [f"⏰ **End of Day Reminder** — {urgent_count} urgent task{'s' if urgent_count > 1 else ''}"]
+                
+                if overdue_tasks:
+                    lines.append(f"\n🚨 **Overdue ({len(overdue_tasks)}):**")
+                    for task in overdue_tasks[:3]:  # Limit to 3 for focus
+                        client = f" _(Client: {task.get('client_name')})_" if task.get('client_name') else ''
+                        lines.append(f"• ❗ {task['description']}{client}")
+                    if len(overdue_tasks) > 3:
+                        lines.append(f"• ...and {len(overdue_tasks) - 3} more overdue")
+                
+                if due_today_tasks:
+                    lines.append(f"\n📅 **Due Today ({len(due_today_tasks)}):**")
+                    for task in due_today_tasks[:3]:  # Limit to 3 for focus
+                        client = f" _(Client: {task.get('client_name')})_" if task.get('client_name') else ''
+                        lines.append(f"• {task['description']}{client}")
+                    if len(due_today_tasks) > 3:
+                        lines.append(f"• ...and {len(due_today_tasks) - 3} more due today")
+                
+                lines.append(f"\n💪 _Focus on completing these before end of day!_")
+                message = '\n'.join(lines)
+            
+            logger.info('End-of-day reminder generated successfully')
+            
+            # Send message
+            if update:
+                await update.message.reply_text(message, parse_mode='Markdown')
+            elif context and chat_id:
+                await context.bot.send_message(chat_id=chat_id, text=message, parse_mode='Markdown')
+            elif chat_id:  # Handle case where only chat_id is provided (scheduled jobs)
+                await self.application.bot.send_message(chat_id=chat_id, text=message, parse_mode='Markdown')
+            else:
+                logger.error('No valid message target provided for end-of-day reminder')
+                
+        except Exception as e:
+            logger.error(f'Exception in _send_end_of_day_reminder: {e}')
+            raise
+
     async def daily_command(self, update, context):
         """Handle /daily command to send daily report."""
         logger.info('Daily command invoked by user')
@@ -3973,6 +4043,20 @@ Choose what you'd like to learn about:"""
             logger.error(f'Error in daily command: {e}')
             await update.message.reply_text(MessageFormatter.
                 format_error_message('Failed to generate daily report',
+                'Please try again later.'), parse_mode='MarkdownV2')
+
+    async def eod_command(self, update, context):
+        """Handle /eod command to send end-of-day reminder."""
+        logger.info('End-of-day command invoked by user')
+        if not self._is_authorized(update):
+            await update.message.reply_text('🚫 Unauthorized access.')
+            return
+        try:
+            await self._send_end_of_day_reminder(update, context)
+        except Exception as e:
+            logger.error(f'Error in eod command: {e}')
+            await update.message.reply_text(MessageFormatter.
+                format_error_message('Failed to generate end-of-day reminder',
                 'Please try again later.'), parse_mode='MarkdownV2')
 
     async def scheduler_status_command(self, update, context):
