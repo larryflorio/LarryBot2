@@ -24,7 +24,10 @@ def ensure_timezone_aware(dt: datetime, assume_local: bool=True) ->datetime:
         return None
     if dt.tzinfo is None:
         if assume_local:
-            return dt.replace(tzinfo=timezone.utc)
+            # Get local timezone from timezone service
+            from larrybot.core.timezone import get_timezone_service
+            tz_service = get_timezone_service()
+            return dt.replace(tzinfo=tz_service._timezone)
         else:
             return dt.replace(tzinfo=timezone.utc)
     return dt
@@ -60,8 +63,14 @@ def ensure_local(dt: datetime) ->datetime:
     """
     if dt is None:
         return None
-    dt = ensure_timezone_aware(dt)
-    return dt
+    
+    # Ensure timezone-aware first
+    dt = ensure_timezone_aware(dt, assume_local=False)  # Assume UTC if naive
+    
+    # Convert to local timezone using timezone service
+    from larrybot.core.timezone import get_timezone_service
+    tz_service = get_timezone_service()
+    return tz_service.to_local(dt)
 
 
 def safe_datetime_arithmetic(dt1: datetime, dt2: datetime) ->timedelta:
@@ -443,7 +452,8 @@ def is_today(dt: datetime) ->bool:
     if dt is None:
         return False
     dt = ensure_local(dt)
-    return dt.date() == now().date()
+    from larrybot.utils.basic_datetime import get_current_datetime
+    return dt.date() == get_current_datetime().date()
 
 
 def is_this_week(dt: datetime) ->bool:
@@ -471,10 +481,12 @@ def get_timezone_info() ->dict:
     Returns:
         Dictionary with timezone information
     """
+    from larrybot.core.timezone import get_timezone_service
     tz_service = get_timezone_service()
+    current_time = tz_service.now()
     return {'timezone_name': tz_service.timezone_name, 'is_auto_detected': 
-        tz_service.detected_timezone is not None, 'current_offset': now().
-        strftime('%z'), 'current_time': format_datetime_for_display(now())}
+        tz_service._detected_timezone is not None, 'current_offset': current_time.
+        strftime('%z'), 'current_time': format_datetime_for_display(current_time)}
 
 
 def set_timezone(timezone_name: str) ->bool:
@@ -487,6 +499,7 @@ def set_timezone(timezone_name: str) ->bool:
     Returns:
         True if successful, False otherwise
     """
+    from larrybot.core.timezone import get_timezone_service
     tz_service = get_timezone_service()
     return tz_service.set_timezone(timezone_name)
 
@@ -498,5 +511,6 @@ def reset_timezone_to_auto() ->bool:
     Returns:
         True if successful, False otherwise
     """
+    from larrybot.core.timezone import get_timezone_service
     tz_service = get_timezone_service()
     return tz_service.reset_to_auto_detection()
